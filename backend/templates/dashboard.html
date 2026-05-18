@@ -277,6 +277,7 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
   <div class="dash-layout">
     <!-- Single merged panel for both people -->
     <div id="dashMain" style="display:flex;flex-direction:column;gap:8px;overflow:hidden;min-height:0">
+      <div id="unassignedStrip" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.45rem .7rem;box-shadow:var(--sh);flex-shrink:0"></div>
       <div class="person-panel" id="panel-Liam"></div>
       <div class="person-panel" id="panel-Rachel"></div>
     </div>
@@ -592,11 +593,21 @@ document.getElementById('addTodayForm').addEventListener('submit',async e=>{
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 async function loadDashboard(){
   const [plan,viols,daily,monthly]=await Promise.all([
-    fetch(`${API}/api/chores/daily-plan`).then(r=>r.json()).catch(()=>({plan:{}})),
+    fetch(`${API}/api/chores/daily-plan`).then(r=>r.json()).catch(()=>({plan:{},unassigned:[]})),
     fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({by_person:{},violations:[]})),
     fetch(`${API}/api/stats/daily`).then(r=>r.json()).catch(()=>({})),
     fetch(`${API}/api/stats/monthly`).then(r=>r.json()).catch(()=>({persons:{}})),
   ]);
+  // Render unassigned chores strip
+  const uArr=plan.unassigned||[];
+  const uEl=document.getElementById('unassignedStrip');
+  if(uEl&&uArr.length){
+    const uHtml=uArr.map(c=>`<span style="display:inline-flex;align-items:center;gap:.3rem;background:${c.done?'#dcfce7':'var(--bg)'};border:1px solid ${c.done?'#86efac':'var(--border)'};border-radius:20px;padding:.18rem .55rem;font-size:.68rem;cursor:pointer;white-space:nowrap" onclick="openAddToday()" title="${c.done?'Done by '+c.done_by:'Click to record'}">
+      ${c.done?'✅':'⏳'} ${esc(c.chore_name)}${c.done?' <span style="color:var(--green);font-weight:700">('+esc(c.done_by)+')</span>':''}
+    </span>`).join('');
+    uEl.innerHTML=`<div style="font-size:.62rem;font-weight:700;color:var(--sub);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.05em">🏠 Anyone's tasks today</div><div style="display:flex;flex-wrap:wrap;gap:.3rem">${uHtml}</div>`;
+    uEl.style.display='block';
+  }else if(uEl){uEl.style.display='none';}
   if(!_persons.length) _persons=await fetch(`${API}/api/persons`).then(r=>r.json()).catch(()=>[]);
   ['Liam','Rachel'].forEach(p=>renderPanel(p,plan.plan?.[p]||{chores:[],total_points:100,earned_points:0,pct:0},viols,daily[p]||{},(monthly.persons||{})[p]||{}));
   loadNotifications(viols);
@@ -739,21 +750,71 @@ function choreClick(el){
   }catch(e){console.error(e);}
 }
 
+function violationCardHtml(v){
+  const ts=new Date(v.timestamp+'Z').toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  return `<div id="vcard-${v.id}" style="margin-bottom:.7rem;padding:.6rem;background:var(--bg);border-radius:8px;border-left:3px solid var(--orange)">
+    ${v.thumbnail_url?`<img src="${esc(v.thumbnail_url)}" style="width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin-bottom:.4rem;cursor:pointer" onclick="openLB('${esc(v.thumbnail_url)}')">`:'' }
+    <div style="font-size:.68rem;font-weight:700;color:var(--orange)">${esc(v.violation_code)}</div>
+    <div style="font-size:.75rem;color:var(--text);margin:.18rem 0">${esc(v.description||'')}</div>
+    <div style="font-size:.7rem;color:var(--purple);font-style:italic">${esc(v.callout||'')}</div>
+    <div style="font-size:.6rem;color:var(--faint);margin-top:.2rem">${ts} · ${esc(v.location||'')}</div>
+    <div style="display:flex;gap:.35rem;margin-top:.45rem;flex-wrap:wrap">
+      <button class="btn-del" style="background:#fef3c7;color:#b45309;border-color:#fcd34d" onclick="disputeViol(${v.id},'peer','${esc(v.person_name)}')">👥 Ask other person</button>
+      <button class="btn-del" style="background:#ede9fe;color:#7c3aed;border-color:#c4b5fd" onclick="disputeViol(${v.id},'ai')">🤖 AI second opinion</button>
+      <button class="btn-del" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5" onclick="removeViol(${v.id})">🗑️ Remove</button>
+    </div>
+    <div class="viol-review-status" id="vrs-${v.id}" style="font-size:.68rem;color:var(--sub);margin-top:.3rem;display:none"></div>
+  </div>`;
+}
+
 async function reworkClick_p(person){
   const viols=await fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({violations:[]}));
   const mine=(viols.violations||[]).filter(v=>v.person_name===person);
   if(!mine.length){showDetail(`${person} — Rework`,'No violations today! 🎉');return;}
-  const html=`<p style="margin-bottom:.7rem;font-size:.75rem;color:var(--sub)">${mine.length} violation${mine.length!==1?'s':''} recorded today</p>`+
-    mine.map(v=>`
-    <div style="margin-bottom:.7rem;padding:.6rem;background:var(--bg);border-radius:8px;border-left:3px solid var(--orange)">
-      ${v.thumbnail_url?`<img src="${esc(v.thumbnail_url)}" style="width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin-bottom:.4rem;cursor:pointer" onclick="openLB('${esc(v.thumbnail_url)}')">`:'' }
-      <div style="font-size:.68rem;font-weight:700;color:var(--orange)">${esc(v.violation_code)}</div>
-      <div style="font-size:.75rem;color:var(--text);margin:.18rem 0">${esc(v.description||'')}</div>
-      <div style="font-size:.7rem;color:var(--purple);font-style:italic">${esc(v.callout||'')}</div>
-      <div style="font-size:.6rem;color:var(--faint);margin-top:.2rem">${new Date(v.timestamp+'Z').toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} · ${esc(v.location||'')}</div>
-    </div>`).join('');
+  const html=`<p style="margin-bottom:.7rem;font-size:.75rem;color:var(--sub)">${mine.length} violation${mine.length!==1?'s':''} recorded today. Use the buttons to dispute if unfair.</p>`+
+    mine.map(violationCardHtml).join('');
   const actBtn=`<button class="btn" style="margin-top:.5rem" onclick="closeDetail();goToActivity('','${person}')">→ View in Activity Stream</button>`;
   showDetail(`${person} — Rework Violations`,html+actBtn);
+}
+
+async function disputeViol(vid, method, personName){
+  const statusEl=document.getElementById(`vrs-${vid}`);
+  if(statusEl){statusEl.style.display='block';}
+  if(method==='peer'){
+    if(statusEl)statusEl.textContent='⏳ Requesting peer review…';
+    const fd=new FormData();fd.append('requested_by',personName||'User');
+    const r=await fetch(`${API}/api/violations/${vid}/review-request`,{method:'POST',body:fd}).catch(()=>null);
+    if(r?.ok){
+      const other=personName==='Liam'?'Rachel':'Liam';
+      if(statusEl)statusEl.textContent=`✓ Sent to ${other} for review. They'll see it in notifications.`;
+    }else{
+      if(statusEl)statusEl.textContent='✗ Could not send for review.';
+    }
+  } else {
+    if(statusEl)statusEl.textContent='🤖 Sending to AI for second opinion…';
+    const r=await fetch(`${API}/api/violations/${vid}/ai-recheck`,{method:'POST'}).catch(()=>null);
+    if(r?.ok){
+      const d=await r.json();
+      const msg=d.confirmed
+        ?`🤖 AI confirmed the violation: ${d.reason}`
+        :`✓ AI not certain — violation removed. ${d.reason}`;
+      if(statusEl)statusEl.textContent=msg;
+      if(!d.confirmed){
+        // Fade out the card
+        const card=document.getElementById(`vcard-${vid}`);
+        if(card){card.style.opacity='.4';card.style.pointerEvents='none';}
+      }
+    }else{
+      if(statusEl)statusEl.textContent='✗ AI recheck failed.';
+    }
+  }
+}
+
+async function removeViol(vid){
+  if(!confirm('Remove this violation?'))return;
+  await fetch(`${API}/api/violations/${vid}`,{method:'DELETE'}).catch(()=>{});
+  const card=document.getElementById(`vcard-${vid}`);
+  if(card){card.style.opacity='.3';card.style.pointerEvents='none';card.innerHTML+='<div style="text-align:center;font-weight:700;color:var(--green);margin-top:.3rem">✓ Removed</div>';}
 }
 
 function toggleDispute(){
@@ -786,6 +847,41 @@ async function loadNotifications(viols){
   const body=document.getElementById('notifBody');
   try{
     let html='';
+
+    // ── Pending violation peer reviews ──
+    const pendingReviews=await fetch(`${API}/api/violations/pending-reviews`).then(r=>r.json()).catch(()=>[]);
+    if(pendingReviews.length){
+      html+=`<div class="ns-title">👥 Awaiting Your Review (${pendingReviews.length})</div>`;
+      html+=pendingReviews.map(r=>`
+        <div class="ni ni-viol" style="padding:.45rem .5rem">
+          <div style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-bottom:.3rem">
+            <span class="ni-badge" style="background:var(--orange)">${esc(r.person_name)}</span>
+            <strong style="font-size:.72rem">${esc(r.violation_code)}</strong>
+          </div>
+          <div style="font-size:.68rem;color:var(--sub);margin-bottom:.3rem">${esc((r.description||'').slice(0,60))}</div>
+          ${r.thumbnail_url?`<img src="${esc(r.thumbnail_url)}" style="width:100%;max-height:80px;object-fit:cover;border-radius:5px;margin-bottom:.3rem;cursor:pointer" onclick="openLB('${esc(r.thumbnail_url)}')">` :''}
+          <div style="display:flex;gap:.3rem">
+            <button class="btn-del" style="background:#dcfce7;color:#15803d;border-color:#86efac;flex:1" onclick="peerVerdict(${r.violation_id},${r.review_id},'keep','${esc(r.requested_by)}')">✓ Keep it</button>
+            <button class="btn-del" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;flex:1" onclick="peerVerdict(${r.violation_id},${r.review_id},'remove','${esc(r.requested_by)}')">🗑️ Remove it</button>
+          </div>
+        </div>`).join('');
+    }
+
+    // ── Pending point proposals ──
+    const proposals=await fetch(`${API}/api/chores/proposals`).then(r=>r.json()).catch(()=>[]);
+    if(proposals.length){
+      html+=`<div class="ns-title">💰 Pending Point Changes (${proposals.length})</div>`;
+      html+=proposals.map(p=>`
+        <div class="ni" style="padding:.45rem .5rem">
+          <div style="font-size:.72rem;margin-bottom:.25rem"><strong>${esc(p.proposed_by)}</strong> proposes <strong>${esc(p.chore_name)}</strong>: ${p.current_points}pts → <strong>${p.proposed_points}pts</strong></div>
+          <div style="display:flex;gap:.3rem">
+            <button class="btn-del" style="background:#dcfce7;color:#15803d;border-color:#86efac;flex:1" onclick="proposalVerdict(${p.id},'approved')">✓ Approve</button>
+            <button class="btn-del" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;flex:1" onclick="proposalVerdict(${p.id},'denied')">✗ Deny</button>
+          </div>
+        </div>`).join('');
+    }
+
+    // ── Today's violations ──
     const vs=(viols.violations||[]);
     if(vs.length){
       html+=`<div class="ns-title">⚠️ Rework Violations Today (${vs.length})</div>`;
@@ -793,6 +889,8 @@ async function loadNotifications(viols){
         <span class="ni-badge">${esc(v.person_name)}</span><strong>${esc(v.violation_code)}</strong> — ${esc((v.description||'').slice(0,70))}
       </div>`).join('');
     }
+
+    // ── Recent observations ──
     const sightings=await fetch(`${API}/api/sightings?limit=8`).then(r=>r.json()).catch(()=>[]);
     const obs=sightings.filter(s=>s.person_name!=='Unknown');
     if(obs.length){
@@ -801,6 +899,8 @@ async function loadNotifications(viols){
         <span class="ni-badge">${esc(s.person_name)}</span>${ACT_ICONS[s.activity_type]||'💼'} ${esc((s.task||'').slice(0,65))}
       </div>`).join('');
     }
+
+    // ── Trend report ──
     const trend=await fetch(`${API}/api/trends/latest`).then(r=>r.json()).catch(()=>({report:null}));
     if(trend.report){
       html+=`<div class="ns-title">📈 Trend Observations</div>
@@ -809,6 +909,23 @@ async function loadNotifications(viols){
     if(!html)html='<div class="empty" style="padding:1rem">All clear — no notifications.</div>';
     body.innerHTML=html;
   }catch(e){body.innerHTML='<div class="empty" style="padding:1rem">Unable to load.</div>';}
+}
+
+async function peerVerdict(vid, reviewId, verdict, requestedBy){
+  const fd=new FormData();
+  const reviewer=requestedBy==='Liam'?'Rachel':'Liam';
+  fd.append('verdict', verdict==='keep'?'keep':'remove');
+  fd.append('reviewed_by', reviewer);
+  await fetch(`${API}/api/violations/${vid}/peer-verdict`,{method:'POST',body:fd}).catch(()=>{});
+  loadNotifications({violations:[]});
+  loadDashboard();
+}
+
+async function proposalVerdict(pid, verdict){
+  const fd=new FormData();fd.append('verdict',verdict);fd.append('approved_by','Other');
+  await fetch(`${API}/api/chores/proposals/${pid}/verdict`,{method:'POST',body:fd}).catch(()=>{});
+  loadNotifications({violations:[]});
+  if(document.getElementById('tab-chores').classList.contains('active'))loadChoreTable();
 }
 
 async function generateTrends(){
@@ -945,7 +1062,10 @@ async function loadChoreTable(){
           <option value="Rachel"${personCol==='Rachel'?' selected':''}>Rachel</option>
           <option value="both"${personCol==='both'?' selected':''}>both</option>
         </select></td>
-        <td style="text-align:center"><input class="pts-num" type="number" value="${c.points}" min="1" max="300" onblur="updChore(${c.id},'points',this.value)"></td>
+        <td style="text-align:center;white-space:nowrap">
+          <input class="pts-num" type="number" value="${c.points}" min="1" max="300" id="pts-${c.id}" style="width:52px">
+          <button class="btn-del" style="font-size:.55rem;padding:.1rem .3rem;margin-left:2px" title="Propose point change (requires other person's approval)" onclick="proposePoints(${c.id},'${esc(c.chore_name)}',${c.points})">💰</button>
+        </td>
         <td style="text-align:center"><input type="checkbox" ${c.show_on_dashboard!==false?'checked':''} onchange="updChore(${c.id},'show_on_dashboard',this.checked?'1':'0')" title="Show on dashboard"></td>
         <td><button class="btn-del" onclick="delChore(${c.id})">✕</button></td>
       </tr>`;
@@ -957,6 +1077,19 @@ async function loadChoreTable(){
 async function updChore(id,field,val){
   const fd=new FormData();fd.append(field,val);
   await fetch(`${API}/api/chores/list/${id}`,{method:'PUT',body:fd});
+}
+
+async function proposePoints(choreId, choreName, currentPts){
+  const newPts=parseInt(document.getElementById(`pts-${choreId}`)?.value||currentPts);
+  if(newPts===currentPts){alert('Change the points value first, then click 💰 to propose.');return;}
+  if(!confirm(`Propose changing "${choreName}" from ${currentPts}pts to ${newPts}pts?\nThe other person will need to approve this.`))return;
+  const who=prompt('Who is proposing this? (Liam or Rachel)','Liam');
+  if(!who)return;
+  const fd=new FormData();
+  fd.append('chore_id',choreId);fd.append('proposed_points',newPts);fd.append('proposed_by',who);
+  const r=await fetch(`${API}/api/chores/proposals`,{method:'POST',body:fd});
+  if(r.ok)alert('✓ Proposal sent! The other person will see it in notifications.');
+  else alert('✗ Could not create proposal.');
 }
 async function delChore(id){
   if(!confirm('Remove this chore?'))return;
@@ -1076,13 +1209,19 @@ async function loadFeed(){
       else{
         feed.innerHTML=vArr.map(v=>{
           const ts=new Date(v.timestamp+'Z').toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-          return `<div class="feed-item type-violation">
+          return `<div class="feed-item type-violation" id="vfeed-${v.id}">
             ${v.thumbnail_url?`<img src="${v.thumbnail_url}" onclick="openLB('${v.thumbnail_url}')" title="Click to enlarge">` :''}
-            <div>
+            <div style="flex:1;min-width:0">
               <div class="fi-who"><span class="ni-badge" style="background:var(--orange)">${esc(v.person_name)}</span> ⚠️ Violation</div>
               <div class="fi-task"><strong>${esc(v.violation_code)}</strong> — ${esc(v.description||'')}</div>
               <div style="font-size:.7rem;color:var(--purple);font-style:italic;margin-top:.1rem">${esc(v.callout||'')}</div>
               <div class="fi-meta">📍 ${esc(v.location||'')} · ${ts}</div>
+              <div style="display:flex;gap:.3rem;margin-top:.4rem;flex-wrap:wrap">
+                <button class="btn-del" style="background:#fef3c7;color:#b45309;border-color:#fcd34d;font-size:.6rem" onclick="disputeViol(${v.id},'peer','${esc(v.person_name)}')">👥 Ask other person</button>
+                <button class="btn-del" style="background:#ede9fe;color:#7c3aed;border-color:#c4b5fd;font-size:.6rem" onclick="disputeViol(${v.id},'ai')">🤖 AI opinion</button>
+                <button class="btn-del" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;font-size:.6rem" onclick="removeViol(${v.id})">🗑️ Remove</button>
+              </div>
+              <div id="vrs-${v.id}" style="font-size:.65rem;color:var(--sub);margin-top:.2rem;display:none"></div>
             </div>
           </div>`;
         }).join('');

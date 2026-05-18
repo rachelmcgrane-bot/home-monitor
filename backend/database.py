@@ -127,8 +127,37 @@ class TrendReport(Base):
     generated_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
+class ViolationReview(Base):
+    """Peer or AI second-opinion review of a chore violation."""
+    __tablename__ = "violation_reviews"
+    id = Column(Integer, primary_key=True, index=True)
+    violation_id = Column(Integer, ForeignKey("chore_violations.id"))
+    requested_by = Column(String(100))
+    reviewed_by = Column(String(100), nullable=True)
+    # peer_pending / peer_kept / peer_removed / ai_confirmed / ai_uncertain
+    status = Column(String(20), default="peer_pending")
+    ai_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class ChorePointProposal(Base):
+    """Point-value change proposed by one person, requiring the other's approval."""
+    __tablename__ = "chore_point_proposals"
+    id = Column(Integer, primary_key=True, index=True)
+    chore_id = Column(Integer, ForeignKey("chores.id"), nullable=True)
+    chore_name = Column(String(200))
+    person_name = Column(String(100))
+    current_points = Column(Integer, default=0)
+    proposed_points = Column(Integer)
+    proposed_by = Column(String(100))
+    status = Column(String(20), default="pending")   # pending / approved / denied
+    approved_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
 # Safe idempotent migrations
 _MIGRATIONS = [
+    "ALTER TABLE chore_violations ADD COLUMN IF NOT EXISTS confirmed BOOLEAN DEFAULT NULL",
     "ALTER TABLE sightings ADD COLUMN IF NOT EXISTS activity_type VARCHAR(50)",
     "ALTER TABLE chores ADD COLUMN IF NOT EXISTS estimated_time VARCHAR(50)",
     "ALTER TABLE chores ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 10",

@@ -33,6 +33,10 @@ remote controls, books, plants, small furnishings, toys in the toy box.
 Only flag if the space looks genuinely untidy — visible piles on windowsills,
 couches, TV stands, or floors that make the room look clearly disorganised.
 
+CONFIDENCE REQUIREMENT: You must be at least 90% certain before flagging any violation.
+If you have any doubt about whether something truly qualifies, do NOT flag it.
+It is far better to miss a genuine violation than to falsely accuse someone.
+
 For each violation: code, description (what you see), callout (fun 70s presenter message using person's name).
 Return empty list [] if no violations found.
 """
@@ -346,6 +350,34 @@ async def check_point_weights(chores_by_person: dict) -> list:
         return json.loads(raw)
     except Exception:
         return []
+
+
+async def recheck_violation(image_bytes: bytes, violation_code: str,
+                             original_description: str) -> dict:
+    """Re-examine image for a specific violation. Returns {confirmed, confidence, reason}."""
+    b64 = _to_jpeg_b64(image_bytes)
+    prompt = (
+        HOUSEHOLD_CONTEXT + "\n\n"
+        f"A violation was flagged: {violation_code}\n"
+        f"Original description: {original_description}\n\n"
+        "Please carefully re-examine this image with fresh eyes.\n"
+        "IMPORTANT: Only confirm if you are MORE THAN 90% certain this is a genuine violation.\n"
+        "If there is ANY reasonable doubt, return confirmed=false — the person gets the benefit of the doubt.\n\n"
+        'Return JSON: {"confirmed": bool, "confidence": float 0.0-1.0, "reason": "one concise sentence"}\n'
+        "Output only valid JSON."
+    )
+    msg = await client.messages.create(
+        model="claude-sonnet-4-6", max_tokens=150,
+        messages=[{"role": "user", "content": [
+            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
+            {"type": "text", "text": prompt},
+        ]}],
+    )
+    raw = _strip_fences(msg.content[0].text)
+    try:
+        return json.loads(raw)
+    except Exception:
+        return {"confirmed": False, "confidence": 0.0, "reason": "Unable to re-assess — benefit of the doubt applies"}
 
 
 async def generate_trend_report(fact_data: dict) -> str:

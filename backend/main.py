@@ -1,6 +1,7 @@
 import os
 import base64
 import io
+import hashlib
 from datetime import datetime, timedelta
 from typing import Optional
 from pathlib import Path
@@ -15,9 +16,10 @@ from PIL import Image
 
 from database import (init_db, get_db, SessionLocal,
                       Person, Sighting, Chore, ChoreAssessment, ChoreViolation,
-                      PersonDailyStat, ChoreDispute, TrendReport)
+                      PersonDailyStat, ChoreDispute, TrendReport,
+                      ViolationReview, ChorePointProposal)
 from ai import (describe_face, analyse_frame, assess_chore,
-                suggest_chore_points, check_point_weights,
+                suggest_chore_points, check_point_weights, recheck_violation,
                 announce_morning_chores, generate_summary,
                 generate_comparison_report, generate_trend_report)
 
@@ -43,6 +45,21 @@ _last_ai_result: dict = {}      # {location: dict}       cached last AI result
 MOTION_THRESHOLD = 12           # mean abs pixel diff (0–255) to count as motion
 MIN_AI_INTERVAL_SECS = 300      # min seconds between AI calls per camera (5 min)
 WAKING_HOURS = (6, 23)          # UTC hour range — 6:00–23:59 UTC ≈ 7am–midnight Irish
+
+# ── Frame deduplication ───────────────────────────────────────────────────────
+_processed_hashes: dict = {}    # {sha256_hex: datetime} — skip already-analysed frames
+
+def _is_duplicate_frame(data: bytes) -> bool:
+    """Return True if this exact frame was already analysed in the past 2 hours."""
+    h = hashlib.sha256(data).hexdigest()
+    now = datetime.utcnow()
+    expired = [k for k, v in _processed_hashes.items() if (now - v).total_seconds() > 7200]
+    for k in expired:
+        del _processed_hashes[k]
+    if h in _processed_hashes:
+        return True
+    _processed_hashes[h] = now
+    return False
 
 
 def _detect_motion(location: str, frame_bytes: bytes) -> bool:
@@ -98,6 +115,13 @@ DEFAULT_CHORES = [
     ("both", "Laundry – put on wash", "when-suits", 12, "standard", None),
     ("both", "Laundry – sort",        "when-suits", 20, "standard", None),
     ("both", "Laundry – bring up clothes", "when-suits", 15, "standard", None),
+    # ── Unassigned — whoever does it gets the credit ──
+    ("unassigned", "Bring in milk delivery",   "daily",  5, "standard", None),
+    ("unassigned", "Put milk in fridge",        "daily",  5, "standard", None),
+    ("unassigned", "Collect post / mail",       "daily",  3, "standard", None),
+    ("unassigned", "Lock front door at night",  "daily",  3, "standard", None),
+    ("unassigned", "Fill water filter jug",     "daily",  3, "standard", None),
+    ("unassigned", "Put out school bags",       "daily",  5, "standard", None),
     # ── Liam — Weekly ──
     ("Liam", "Main bathroom clean",           "weekly", 20, "standard", None),
     ("Liam", "Hoover downstairs high-traffic","weekly", 20, "standard", None),
@@ -444,7 +468,15 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
                        db: AsyncSession = Depends(get_db)):
     data = _read(frame)
 
-    # ── Cost gates: motion + waking hours + minimum interval ─────────────────
+    # ── Cost gates: dedup + motion + waking hours + minimum interval ─────────
+    if _is_duplicate_frame(data):
+        return {"id": None, "person_name": None, "task": "Duplicate frame",
+                "activity_type": "other", "confidence": 0.0,
+                "timestamp": datetime.utcnow().isoformat(),
+                "etiquette_violation": None, "etiquette_nudge": None,
+                "violations": [], "morning_announcement": None, "chore_assessment": None,
+                "skipped": "duplicate"}
+
     motion = _detect_motion(location, data)
     waking = _is_waking_hours()
     interval_ok = _should_call_ai(location)
@@ -594,8 +626,10 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
         # ── Chore assessment ──────────────────────────────────────────────────
         chores_res = await db.execute(
             select(Chore).where(Chore.active == True))
-        person_chores = [c for c in chores_res.scalars().all()
-                         if c.person_name in (person_name, "both")]
+        all_active = chores_res.scalars().all()
+        # Include chores for this person, both, and unassigned
+        person_chores = [c for c in all_active
+                         if c.person_name in (person_name, "both", "unassigned")]
         matched = next((c for c in person_chores
                         if _chore_matches(c.chore_name, task_text)), None)
         if matched:
@@ -689,6 +723,148 @@ async def get_violations_today(date: Optional[str] = None,
               "timestamp": v.timestamp.isoformat()} for v in violations]
 
     return {"date": target, "by_person": by_person, "violations": items}
+
+
+# ── Violation review workflow ─────────────────────────────────────────────────
+
+@app.post("/api/violations/{vid}/review-request")
+async def request_violation_review(vid: int, requested_by: str = Form(...),
+                                    db: AsyncSession = Depends(get_db)):
+    """Person disputes a violation — creates a peer-review request."""
+    v = await db.get(ChoreViolation, vid)
+    if not v: raise HTTPException(404, "Violation not found")
+    review = ViolationReview(violation_id=vid, requested_by=requested_by,
+                              status="peer_pending")
+    db.add(review); await db.commit(); await db.refresh(review)
+    return {"ok": True, "review_id": review.id}
+
+@app.get("/api/violations/pending-reviews")
+async def get_pending_reviews(db: AsyncSession = Depends(get_db)):
+    """Get violations with pending peer reviews (for the other person to act on)."""
+    result = await db.execute(
+        select(ViolationReview).where(ViolationReview.status == "peer_pending")
+        .order_by(desc(ViolationReview.created_at)))
+    reviews = result.scalars().all()
+    out = []
+    for r in reviews:
+        v = await db.get(ChoreViolation, r.violation_id)
+        if v:
+            out.append({
+                "review_id": r.id, "violation_id": v.id,
+                "requested_by": r.requested_by,
+                "person_name": v.person_name,
+                "violation_code": v.violation_code,
+                "description": v.description,
+                "callout": v.callout,
+                "location": v.location,
+                "thumbnail_url": _uri(v.thumbnail_data) if v.thumbnail_data else None,
+                "timestamp": v.timestamp.isoformat(),
+                "created_at": r.created_at.isoformat(),
+            })
+    return out
+
+@app.post("/api/violations/{vid}/peer-verdict")
+async def peer_verdict(vid: int, verdict: str = Form(...), reviewed_by: str = Form(...),
+                       db: AsyncSession = Depends(get_db)):
+    """Other person gives verdict: 'keep' or 'remove'."""
+    result = await db.execute(
+        select(ViolationReview).where(
+            ViolationReview.violation_id == vid,
+            ViolationReview.status == "peer_pending"))
+    review = result.scalar_one_or_none()
+    if not review: raise HTTPException(404, "No pending review for this violation")
+    review.reviewed_by = reviewed_by
+    if verdict == "remove":
+        review.status = "peer_removed"
+        v = await db.get(ChoreViolation, vid)
+        if v: await db.delete(v)
+    else:
+        review.status = "peer_kept"
+        v = await db.get(ChoreViolation, vid)
+        if v: v.confirmed = True
+    await db.commit()
+    return {"ok": True, "verdict": verdict}
+
+@app.post("/api/violations/{vid}/ai-recheck")
+async def ai_recheck(vid: int, db: AsyncSession = Depends(get_db)):
+    """Send violation image back to AI for a second opinion."""
+    v = await db.get(ChoreViolation, vid)
+    if not v: raise HTTPException(404, "Violation not found")
+    if not v.thumbnail_data:
+        raise HTTPException(400, "No image stored for this violation")
+    img_bytes = base64.standard_b64decode(v.thumbnail_data)
+    result = await recheck_violation(img_bytes, v.violation_code, v.description or "")
+    confirmed = result.get("confirmed", False)
+    reason = result.get("reason", "")
+    # Update or create review record
+    rev_res = await db.execute(
+        select(ViolationReview).where(ViolationReview.violation_id == vid))
+    review = rev_res.scalar_one_or_none()
+    if review:
+        review.status = "ai_confirmed" if confirmed else "ai_uncertain"
+        review.ai_reason = reason
+    else:
+        db.add(ViolationReview(violation_id=vid, requested_by="system",
+                                status="ai_confirmed" if confirmed else "ai_uncertain",
+                                ai_reason=reason))
+    if not confirmed:
+        v.confirmed = False
+        await db.delete(v)
+    else:
+        v.confirmed = True
+    await db.commit()
+    return {"ok": True, "confirmed": confirmed, "confidence": result.get("confidence", 0.0),
+            "reason": reason, "action": "kept" if confirmed else "removed"}
+
+@app.delete("/api/violations/{vid}")
+async def delete_violation(vid: int, db: AsyncSession = Depends(get_db)):
+    """Manually remove a violation."""
+    v = await db.get(ChoreViolation, vid)
+    if not v: raise HTTPException(404, "Violation not found")
+    await db.delete(v); await db.commit()
+    return {"ok": True}
+
+
+# ── Point proposals ───────────────────────────────────────────────────────────
+
+@app.post("/api/chores/proposals")
+async def create_proposal(chore_id: int = Form(...), proposed_points: int = Form(...),
+                           proposed_by: str = Form(...),
+                           db: AsyncSession = Depends(get_db)):
+    """Propose a point-value change — requires the other person to approve."""
+    chore = await db.get(Chore, chore_id)
+    if not chore: raise HTTPException(404, "Chore not found")
+    prop = ChorePointProposal(
+        chore_id=chore_id, chore_name=chore.chore_name,
+        person_name=chore.person_name,
+        current_points=chore.points, proposed_points=proposed_points,
+        proposed_by=proposed_by, status="pending")
+    db.add(prop); await db.commit(); await db.refresh(prop)
+    return {"ok": True, "proposal_id": prop.id}
+
+@app.get("/api/chores/proposals")
+async def list_proposals(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(ChorePointProposal)
+        .where(ChorePointProposal.status == "pending")
+        .order_by(desc(ChorePointProposal.created_at)))
+    return [{"id": p.id, "chore_id": p.chore_id, "chore_name": p.chore_name,
+             "person_name": p.person_name, "current_points": p.current_points,
+             "proposed_points": p.proposed_points, "proposed_by": p.proposed_by,
+             "created_at": p.created_at.isoformat()} for p in result.scalars().all()]
+
+@app.post("/api/chores/proposals/{pid}/verdict")
+async def verdict_proposal(pid: int, verdict: str = Form(...), approved_by: str = Form(...),
+                            db: AsyncSession = Depends(get_db)):
+    prop = await db.get(ChorePointProposal, pid)
+    if not prop: raise HTTPException(404, "Proposal not found")
+    prop.status = verdict   # "approved" or "denied"
+    prop.approved_by = approved_by
+    if verdict == "approved" and prop.chore_id:
+        chore = await db.get(Chore, prop.chore_id)
+        if chore: chore.points = prop.proposed_points
+    await db.commit()
+    return {"ok": True, "verdict": verdict}
 
 
 # ── Sightings ─────────────────────────────────────────────────────────────────
@@ -902,7 +1078,23 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
             "weekly_pct": int(weekly_earned / weekly_pts * 100) if weekly_pts else 0,
         }
 
-    return {"date": today, "plan": plan}
+    # ── Unassigned chores (anyone can pick these up today) ───────────────────
+    unassigned_chores = [c for c in all_chores if c.person_name == "unassigned"]
+    unassigned_list = []
+    for c in unassigned_chores:
+        # Who did this today (any person)?
+        done_by = [a for a in today_ass if a.chore_name == c.chore_name]
+        ta = max(done_by, key=lambda a: a.score, default=None)
+        unassigned_list.append({
+            "id": c.id, "chore_name": c.chore_name, "frequency": c.frequency,
+            "points": c.points, "done": ta is not None,
+            "done_by": ta.person_name if ta else None,
+            "score": ta.score if ta else 0,
+            "points_earned": ta.points_earned if ta else 0,
+            "assessment_id": ta.id if ta else None,
+        })
+
+    return {"date": today, "plan": plan, "unassigned": unassigned_list}
 
 
 @app.get("/api/chores/calendar")
