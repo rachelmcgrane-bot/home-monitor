@@ -217,7 +217,9 @@ def _read(upload: UploadFile) -> bytes:
     return upload.file.read()
 
 def _today() -> str:
-    return datetime.utcnow().strftime("%Y-%m-%d")
+    """Return current chore-day date. Day starts at 06:00 UTC (≈ 7am Irish time).
+    Anything between midnight and 06:00 UTC is still counted as the previous day."""
+    return (datetime.utcnow() - timedelta(hours=6)).strftime("%Y-%m-%d")
 
 def _date_minus(date_str: str, days: int) -> str:
     return (datetime.strptime(date_str, "%Y-%m-%d") - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -402,9 +404,11 @@ async def add_chore_to_day(
     chore_name: str = Form(...),
     score: int = Form(10),
     notes: str = Form(""),
+    meal_name: str = Form(""),
+    date: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
 ):
-    today = _today()
+    target_date = date or _today()
     # Look up the chore to get points value
     res = await db.execute(
         select(Chore).where(
@@ -417,21 +421,28 @@ async def add_chore_to_day(
     pts_earned = int(base_pts * score / 10)
     status = "done" if score >= 7 else "partial" if score >= 4 else "not_done"
 
+    # Build assessment text — prepend meal name for cooking chores
+    if meal_name.strip():
+        assessment_text = f"🍽️ {meal_name.strip()}" + (f" — {notes.strip()}" if notes.strip() else "")
+    else:
+        assessment_text = notes.strip() or "Manually recorded"
+
     ca = ChoreAssessment(
         person_name=person_name,
         chore_name=chore_name,
         status=status,
         score=score,
         points_earned=pts_earned,
-        assessment_text=notes or "Manually added to today",
+        assessment_text=assessment_text,
         commentary_text="",
-        assessed_date=today,
+        assessed_date=target_date,
         time_spent_mins=0,
     )
     db.add(ca)
     await db.commit()
     await db.refresh(ca)
-    return {"ok": True, "id": ca.id, "points_earned": pts_earned, "status": status}
+    return {"ok": True, "id": ca.id, "points_earned": pts_earned,
+            "status": status, "date": target_date}
 
 
 # ── Recalculate daily totals ───────────────────────────────────────────────────
@@ -1095,6 +1106,42 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
         })
 
     return {"date": today, "plan": plan, "unassigned": unassigned_list}
+
+
+@app.get("/api/chores/cooking-history")
+async def cooking_history(person_name: Optional[str] = None, limit: int = 60,
+                          db: AsyncSession = Depends(get_db)):
+    """Return all cooking/meal-related chore assessments, newest first."""
+    COOKING_KW = ("cook", "dinner", "meal", "lunch", "breakfast",
+                  "bake", "roast", "laundry")  # keep laundry out — literal cooking only
+    COOKING_KW = ("cook", "dinner", "meal", "lunch", "breakfast", "bake", "roast")
+    q = select(ChoreAssessment).order_by(
+        desc(ChoreAssessment.assessed_date), desc(ChoreAssessment.timestamp))
+    if person_name:
+        q = q.where(ChoreAssessment.person_name == person_name)
+    result = await db.execute(q)
+    all_ass = result.scalars().all()
+    out = []
+    for a in all_ass:
+        if any(kw in a.chore_name.lower() for kw in COOKING_KW):
+            # Extract meal name from assessment_text if present
+            meal = ""
+            if a.assessment_text and a.assessment_text.startswith("🍽️"):
+                meal = a.assessment_text[2:].split("—")[0].strip()
+            elif a.assessment_text and a.assessment_text != "Manually recorded":
+                meal = a.assessment_text.split("—")[0].strip()
+            out.append({
+                "id": a.id, "person_name": a.person_name,
+                "chore_name": a.chore_name, "meal_name": meal,
+                "assessment_text": a.assessment_text or "",
+                "score": a.score or 0, "points_earned": a.points_earned or 0,
+                "assessed_date": a.assessed_date,
+                "timestamp": a.timestamp.isoformat(),
+                "thumbnail_url": _uri(a.thumbnail_data) if a.thumbnail_data else None,
+            })
+            if len(out) >= limit:
+                break
+    return out
 
 
 @app.get("/api/chores/calendar")

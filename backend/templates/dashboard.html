@@ -351,7 +351,8 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
         <button class="btn-sm btn-blue" onclick="loadComparison()">📊 AI Compare</button>
         <button class="btn-sm btn-purple" onclick="suggestPoints()">✨ Suggest Points</button>
         <button class="btn-sm btn-green" onclick="loadSummary()">📋 Summary</button>
-        <button class="btn-sm btn-amber" onclick="openAddToday()">📅 Add to Today</button>
+        <button class="btn-sm btn-amber" onclick="openAddToday()">📅 Add Activity</button>
+        <button class="btn-sm" style="background:var(--cyan)" onclick="openCookingHistory()">🍳 Cooking Log</button>
       </div>
     </div>
     <div class="comparison-box" id="compBox"></div>
@@ -414,27 +415,48 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
   </div>
 </div>
 
-<!-- Add-to-Today Modal -->
+<!-- Add Activity Modal (works for today or any past date) -->
 <div id="addTodayModal">
   <div class="at-box">
     <button class="dm-close" onclick="closeAddToday()">✕</button>
-    <h3>📅 Add Chore to Today</h3>
+    <h3 id="atTitle">📅 Record Activity</h3>
     <form id="addTodayForm" class="at-grid">
+      <label>Date</label>
+      <input type="date" id="atDate" required>
       <label>Person</label>
       <select id="atPerson">
         <option value="Liam">Liam</option>
         <option value="Rachel">Rachel</option>
       </select>
-      <label>Chore</label>
-      <input type="text" id="atChore" list="choreDL" placeholder="Search or type chore name…" required>
+      <label>Chore / Activity</label>
+      <input type="text" id="atChore" list="choreDL" placeholder="Search or type…" required>
       <datalist id="choreDL"></datalist>
+      <label id="atMealLabel" style="display:none">Meal name (what was cooked?)</label>
+      <input type="text" id="atMeal" placeholder="e.g. Shepherd's Pie, Pasta Bake…" style="display:none">
       <label>Score (0–10)</label>
       <input type="number" id="atScore" min="0" max="10" value="10">
       <label>Notes (optional)</label>
       <input type="text" id="atNotes" placeholder="e.g. done before camera was running">
       <div class="msg" id="atMsg"></div>
-      <button type="submit" class="btn" style="margin-top:.2rem">✓ Add Assessment</button>
+      <button type="submit" class="btn" style="margin-top:.2rem">✓ Save</button>
     </form>
+  </div>
+</div>
+
+<!-- Cooking History Modal -->
+<div id="cookModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9975;align-items:center;justify-content:center">
+  <div style="background:var(--card);border-radius:14px;padding:1.2rem;max-width:620px;width:95vw;max-height:88vh;overflow-y:auto;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.15)">
+    <button style="position:absolute;top:.7rem;right:.7rem;background:var(--bg);border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:.85rem" onclick="closeCookingHistory()">✕</button>
+    <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.8rem;flex-wrap:wrap">
+      <h3 style="font-size:.95rem;font-weight:700">🍳 Cooking Log</h3>
+      <select id="cookPersonFilter" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.3rem .55rem;font-size:.75rem" onchange="loadCookingHistory()">
+        <option value="">All people</option>
+        <option value="Liam">Liam</option>
+        <option value="Rachel">Rachel</option>
+      </select>
+    </div>
+    <div id="cookStats" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem"></div>
+    <div id="cookBody"><div class="empty">Loading…</div></div>
   </div>
 </div>
 
@@ -565,28 +587,59 @@ function openCal(day){
 function closeCal(){document.getElementById('calModal').classList.remove('open')}
 document.getElementById('calModal').addEventListener('click',e=>{if(e.target.id==='calModal')closeCal()});
 
-// ── Add-to-Today modal ────────────────────────────────────────────────────────
-function openAddToday(){document.getElementById('addTodayModal').classList.add('open')}
+// ── Add Activity modal (any date) ─────────────────────────────────────────────
+const COOKING_KEYWORDS=['cook','dinner','meal','lunch','breakfast','bake','roast'];
+function isCookingChore(name){return COOKING_KEYWORDS.some(k=>name.toLowerCase().includes(k));}
+
+function openAddToday(date){
+  // Set date field — default to today (chore-day aware: if before 6am use yesterday)
+  const now=new Date();
+  const choreDay=now.getUTCHours()<6
+    ?new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()-1))
+    :new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()));
+  const defaultDate=date||choreDay.toISOString().slice(0,10);
+  document.getElementById('atDate').value=defaultDate;
+  const isToday=defaultDate===choreDay.toISOString().slice(0,10);
+  document.getElementById('atTitle').textContent=isToday?'📅 Record Activity':`📅 Record Activity — ${defaultDate}`;
+  document.getElementById('addTodayModal').classList.add('open');
+  // Reset meal field
+  document.getElementById('atMeal').style.display='none';
+  document.getElementById('atMealLabel').style.display='none';
+}
 function closeAddToday(){document.getElementById('addTodayModal').classList.remove('open')}
 document.getElementById('addTodayModal').addEventListener('click',e=>{if(e.target.id==='addTodayModal')closeAddToday()});
+
+// Show/hide meal field based on chore name
+document.getElementById('atChore').addEventListener('input',function(){
+  const show=isCookingChore(this.value);
+  document.getElementById('atMeal').style.display=show?'':'none';
+  document.getElementById('atMealLabel').style.display=show?'':'none';
+});
+
 document.getElementById('addTodayForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const msg=document.getElementById('atMsg');
-  msg.className='msg';msg.textContent='Submitting…';
+  msg.className='msg';msg.textContent='Saving…';
   const fd=new FormData();
   fd.append('person_name',document.getElementById('atPerson').value);
   fd.append('chore_name',document.getElementById('atChore').value.trim());
   fd.append('score',document.getElementById('atScore').value);
   fd.append('notes',document.getElementById('atNotes').value.trim());
+  fd.append('meal_name',document.getElementById('atMeal').value.trim());
+  fd.append('date',document.getElementById('atDate').value);
   try{
     const res=await fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd});
     const d=await res.json();
     if(!res.ok)throw new Error(JSON.stringify(d));
-    msg.className='msg';msg.textContent=`✓ Added! +${d.points_earned} pts (${d.status})`;
+    msg.className='msg';msg.textContent=`✓ Saved for ${d.date}! +${d.points_earned} pts (${d.status})`;
     document.getElementById('atChore').value='';
     document.getElementById('atNotes').value='';
+    document.getElementById('atMeal').value='';
     document.getElementById('atScore').value='10';
-    setTimeout(()=>closeAddToday(),1500);
+    document.getElementById('atMeal').style.display='none';
+    document.getElementById('atMealLabel').style.display='none';
+    setTimeout(()=>closeAddToday(),1800);
+    loadDashboard();
   }catch(err){msg.className='msg err';msg.textContent='✗ '+err.message;}
 });
 
@@ -992,27 +1045,41 @@ async function renderCal(){
 }
 async function selectDay(ds){
   selDay=ds;renderCal();
+  const today=todayStr();
   const ass=await fetch(`${API}/api/chores/assessments?date=${ds}`).then(r=>r.json()).catch(()=>[]);
   const el=document.getElementById('dayDetail');
-  if(!ass.length){el.innerHTML=`<div class="empty">No assessments on ${ds}</div>`;return;}
+  const addBtn=`<button class="btn-sm btn-blue" style="font-size:.72rem;padding:.28rem .7rem;margin-bottom:.55rem" onclick="closeCal();openAddToday('${ds}')">+ Add Activity for ${ds}</button>`;
+  if(!ass.length){
+    el.innerHTML=`${addBtn}<div class="empty">No activity recorded for ${ds}.</div>`;
+    return;
+  }
   const html=ass.map(a=>{
     const sc=a.score>=7?'sc-hi':a.score>=4?'sc-mi':'sc-lo';
     const ts=new Date(a.timestamp+'Z').toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    const isCook=isCookingChore(a.chore_name);
+    // Extract meal name if stored in assessment text
+    let mealTag='';
+    if(isCook&&a.assessment){
+      const mealText=a.assessment.startsWith('🍽️')?a.assessment:null;
+      if(mealText)mealTag=`<span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:.05rem .3rem;font-size:.62rem;font-weight:700">🍽️ ${esc(mealText.replace('🍽️','').split('—')[0].trim())}</span>`;
+    }
     return `<div style="background:var(--bg);border-radius:8px;padding:.6rem;margin-bottom:.4rem;display:flex;gap:.6rem">
       ${a.thumbnail_url?`<img src="${a.thumbnail_url}" style="width:52px;height:39px;object-fit:cover;border-radius:5px;cursor:pointer;flex-shrink:0" onclick="openLB('${a.thumbnail_url}')">`:'' }
-      <div><div style="display:flex;align-items:center;gap:.35rem;margin-bottom:.15rem;flex-wrap:wrap">
-        <strong style="font-size:.8rem">${esc(a.person_name)}</strong>
-        <span class="sc-badge ${sc}" style="font-size:.65rem">${a.score}/10</span>
-        <span style="font-size:.65rem;color:var(--sub)">+${a.points_earned}pts</span>
-        ${a.time_spent_mins>0?`<span style="font-size:.62rem;color:var(--faint)">⏱ ${a.time_spent_mins}m</span>`:''}
-        ${a.dispute_status?`<span style="font-size:.58rem;background:var(--amber);color:#fff;border-radius:4px;padding:.05rem .3rem">${a.dispute_status}</span>`:''}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:.35rem;margin-bottom:.15rem;flex-wrap:wrap">
+          <strong style="font-size:.8rem">${esc(a.person_name)}</strong>
+          <span class="sc-badge ${sc}" style="font-size:.65rem">${a.score}/10</span>
+          <span style="font-size:.65rem;color:var(--sub)">+${a.points_earned}pts</span>
+          ${mealTag}
+          ${a.dispute_status?`<span style="font-size:.58rem;background:var(--amber);color:#fff;border-radius:4px;padding:.05rem .3rem">${a.dispute_status}</span>`:''}
+        </div>
+        <div style="font-size:.76rem;font-weight:600">${esc(a.chore_name)}</div>
+        <div style="font-size:.7rem;color:var(--sub);margin-top:.1rem">${esc((a.assessment||'').replace('🍽️',''))} <span style="color:var(--faint)">(${ts})</span></div>
+        ${a.commentary?`<div style="font-size:.68rem;color:var(--purple);font-style:italic;margin-top:.1rem">💬 ${esc(a.commentary)}</div>`:''}
       </div>
-      <div style="font-size:.76rem;font-weight:600">${esc(a.chore_name)}</div>
-      <div style="font-size:.7rem;color:var(--sub);margin-top:.15rem">${esc(a.assessment||'')} <span style="color:var(--faint)">(${ts})</span></div>
-      ${a.commentary?`<div style="font-size:.68rem;color:var(--purple);font-style:italic;margin-top:.15rem">💬 ${esc(a.commentary)}</div>`:''}
-      </div></div>`;
+    </div>`;
   }).join('');
-  el.innerHTML=`<h4 style="font-size:.82rem;margin-bottom:.5rem;color:var(--text)">📋 ${ds}</h4>${html}`;
+  el.innerHTML=`${addBtn}<h4 style="font-size:.82rem;margin-bottom:.5rem;color:var(--text)">📋 ${ds} — ${ass.length} activit${ass.length===1?'y':'ies'}</h4>${html}`;
 }
 
 // ── Push notifications ────────────────────────────────────────────────────────
@@ -1329,6 +1396,57 @@ document.getElementById('enrolForm').addEventListener('submit',async e=>{
   }catch(err){msg.className='msg err';msg.textContent='✗ '+err.message;}
   finally{btn.disabled=false;}
 });
+
+// ── Cooking history ───────────────────────────────────────────────────────────
+function openCookingHistory(){
+  document.getElementById('cookModal').style.display='flex';
+  loadCookingHistory();
+}
+function closeCookingHistory(){document.getElementById('cookModal').style.display='none';}
+document.getElementById('cookModal').addEventListener('click',e=>{if(e.target.id==='cookModal')closeCookingHistory()});
+
+async function loadCookingHistory(){
+  const person=document.getElementById('cookPersonFilter').value;
+  const url=`${API}/api/chores/cooking-history?limit=60`+(person?`&person_name=${encodeURIComponent(person)}`:'');
+  const items=await fetch(url).then(r=>r.json()).catch(()=>[]);
+  const body=document.getElementById('cookBody');
+  const statsEl=document.getElementById('cookStats');
+
+  if(!items.length){body.innerHTML='<div class="empty">No cooking sessions recorded yet.</div>';statsEl.innerHTML='';return;}
+
+  // Stats: count per person, last cooked
+  const byPerson={};
+  items.forEach(i=>{
+    if(!byPerson[i.person_name])byPerson[i.person_name]={count:0,last:'',meals:[]};
+    byPerson[i.person_name].count++;
+    if(!byPerson[i.person_name].last)byPerson[i.person_name].last=i.assessed_date;
+    if(i.meal_name)byPerson[i.person_name].meals.push(i.meal_name);
+  });
+  statsEl.innerHTML=Object.entries(byPerson).map(([p,d])=>`
+    <div style="background:var(--bg);border-radius:8px;padding:.45rem .7rem;border:1px solid var(--border);font-size:.72rem">
+      <strong>${esc(p)}</strong> — ${d.count} session${d.count!==1?'s':''}
+      ${d.last?`<span style="color:var(--sub)"> · last: ${d.last}</span>`:''}
+    </div>`).join('');
+
+  body.innerHTML=items.map(i=>{
+    const sc=i.score>=7?'sc-hi':i.score>=4?'sc-mi':'sc-lo';
+    const col=i.person_name==='Liam'?'var(--blue)':'var(--purple)';
+    return `<div style="display:flex;gap:.55rem;background:var(--bg);border-radius:8px;padding:.5rem;margin-bottom:.35rem;border-left:3px solid ${col}">
+      ${i.thumbnail_url?`<img src="${esc(i.thumbnail_url)}" style="width:52px;height:39px;object-fit:cover;border-radius:5px;cursor:pointer;flex-shrink:0" onclick="openLB('${esc(i.thumbnail_url)}')">` :'<div style="width:52px;height:39px;background:var(--border);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.2rem">🍳</div>'}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-bottom:.1rem">
+          <strong style="font-size:.78rem;color:${col}">${esc(i.person_name)}</strong>
+          <span class="sc-badge ${sc}" style="font-size:.6rem">${i.score}/10</span>
+          <span style="font-size:.62rem;color:var(--green)">+${i.points_earned}pts</span>
+          <span style="font-size:.6rem;color:var(--faint)">${i.assessed_date}</span>
+        </div>
+        <div style="font-size:.72rem;font-weight:600;color:var(--text)">${esc(i.chore_name)}</div>
+        ${i.meal_name?`<div style="font-size:.7rem;color:var(--orange);font-weight:600;margin-top:.1rem">🍽️ ${esc(i.meal_name)}</div>`:''}
+        ${i.assessment_text&&!i.assessment_text.startsWith('🍽️')?`<div style="font-size:.67rem;color:var(--sub);margin-top:.05rem">${esc(i.assessment_text)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 loadDashboard();
