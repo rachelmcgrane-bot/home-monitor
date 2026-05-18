@@ -558,20 +558,31 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
     today_day = int(today.split("-")[2])
 
     # ── Save frame-level violations ───────────────────────────────────────────
-    for v in frame_violations:
-        code = v.get("code", "UNKNOWN")
-        cv = ChoreViolation(
-            person_name=person_name,
-            violation_code=code,
-            description=v.get("description", ""),
-            callout=v.get("callout", ""),
-            location=location,
-            thumbnail_data=thumb,
-            violation_date=today,
-        )
-        db.add(cv)
-    if frame_violations:
-        await db.commit()
+    # Never flag violations for Unknown persons; cap at 3 per identified person per day
+    if frame_violations and person_name and person_name != "Unknown":
+        viol_count_res = await db.execute(
+            select(func.count(ChoreViolation.id)).where(
+                ChoreViolation.person_name == person_name,
+                ChoreViolation.violation_date == today))
+        today_viol_count = int(viol_count_res.scalar() or 0)
+        slots = max(0, 3 - today_viol_count)
+        saved = 0
+        for v in frame_violations:
+            if saved >= slots:
+                break
+            cv = ChoreViolation(
+                person_name=person_name,
+                violation_code=v.get("code", "UNKNOWN"),
+                description=v.get("description", ""),
+                callout=v.get("callout", ""),
+                location=location,
+                thumbnail_data=thumb,
+                violation_date=today,
+            )
+            db.add(cv)
+            saved += 1
+        if saved:
+            await db.commit()
 
     # ── Person daily time-tracking ────────────────────────────────────────────
     if person_name not in ("Unknown", None):
@@ -668,19 +679,31 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
             )
             db.add(ca); await db.commit(); await db.refresh(ca)
 
-            for v in assessment.get("violations", []):
-                cv = ChoreViolation(
-                    person_name=person_name,
-                    violation_code=v.get("code", "UNKNOWN"),
-                    description=v.get("description", ""),
-                    callout=v.get("callout", ""),
-                    location=location,
-                    thumbnail_data=thumb,
-                    violation_date=today,
-                )
-                db.add(cv)
-            if assessment.get("violations"):
-                await db.commit()
+            # Cap assessment violations too — never exceed 3/person/day total
+            if assessment.get("violations") and person_name != "Unknown":
+                viol_count_res2 = await db.execute(
+                    select(func.count(ChoreViolation.id)).where(
+                        ChoreViolation.person_name == person_name,
+                        ChoreViolation.violation_date == today))
+                today_viol_count2 = int(viol_count_res2.scalar() or 0)
+                slots2 = max(0, 3 - today_viol_count2)
+                saved2 = 0
+                for v in assessment.get("violations", []):
+                    if saved2 >= slots2:
+                        break
+                    cv = ChoreViolation(
+                        person_name=person_name,
+                        violation_code=v.get("code", "UNKNOWN"),
+                        description=v.get("description", ""),
+                        callout=v.get("callout", ""),
+                        location=location,
+                        thumbnail_data=thumb,
+                        violation_date=today,
+                    )
+                    db.add(cv)
+                    saved2 += 1
+                if saved2:
+                    await db.commit()
 
             chore_result = {
                 "chore": ca.chore_name, "status": ca.status,

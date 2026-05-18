@@ -496,13 +496,20 @@ function gaugeColor(pct){
   if(pct>=20)return '#f97316';   // orange
   return '#f59e0b';               // yellow
 }
+// ── Inverted gauge colour for Rework: 0%=green (clean), 100%=red (bad) ───────
+function gaugeColorInv(pct){
+  if(pct<=0)return '#22c55e';    // green  — no violations
+  if(pct<=33)return '#f59e0b';   // amber  — 1 violation
+  if(pct<=66)return '#f97316';   // orange — 2 violations
+  return '#ef4444';               // red    — 3+ violations
+}
 
 // ── Improved half-donut gauge ─────────────────────────────────────────────────
-function halfDonut(pct,label,sublabel,onclickFn){
+function halfDonut(pct,label,sublabel,onclickFn,colorOverride){
   const R=40,W=100,CX=50,CY=50,circ=Math.PI*R;
   const p=Math.min(Math.max(pct||0,0),100);
   const offset=circ*(1-p/100);
-  const color=gaugeColor(p);
+  const color=colorOverride||gaugeColor(p);
   const bgCol=color+'28';
   const oc=onclickFn?`onclick="${onclickFn}"` :'';
   return `<div class="hd-wrap" ${oc} title="${p}%">
@@ -677,8 +684,8 @@ function renderPanel(person,data,viols,ds,ms){
 
   const pct=data.pct||0;
   const violCount=(viols.by_person||{})[person]||0;
-  const reworkPts=(data.chores||[]).reduce((s,c)=>(!c.done&&c.points>c.points_earned?s+(c.points-c.points_earned):s),0);
-  const reworkPct=Math.min(reworkPts/Math.max(data.total_points||100,1)*100,100);
+  // Rework % = how many of the 3-violation cap has been hit today (0 = clean, 100 = 3+ violations)
+  const reworkPct=Math.min(Math.round(violCount/3*100),100);
   const dayFamPct=Math.min(Math.round((ds.family_mins||0)/120*100),100);
   const dayPersonPct=Math.min(Math.round((ds.personal_mins||0)/120*100),100);
   const mthFamPct=Math.min(Math.round((ms.family_mins||0)/3600*100),100);
@@ -742,15 +749,15 @@ function renderPanel(person,data,viols,ds,ms){
     <div class="hd-row">
       ${halfDonut(pct,'Chores',choreSublabel,choreOnclick)}
       ${halfDonut(dayFamPct,'Family',famSublabel,famOnclick)}
-      ${halfDonut(Math.round(reworkPct),'Rework',rewSublabel,`reworkClick_p('${person}')`)}
+      ${halfDonut(reworkPct,'Rework',rewSublabel,`reworkClick_p('${person}')`,gaugeColorInv(reworkPct))}
       ${halfDonut(dayPersonPct,'Personal',persSublabel,persOnclick)}
     </div>
 
     <div class="month-row">
-      ${[['Chores',mthChoresPct],['Family',mthFamPct],['Rework',Math.min(Math.round(reworkPct),100)],['Personal',mthPersonPct]].map(([l,p])=>`
+      ${[['Chores',mthChoresPct],['Family',mthFamPct],['Rework',reworkPct],['Personal',mthPersonPct]].map(([l,p])=>`
         <div class="mb">
-          <div class="mb-track" onclick="goToActivity('${l==='Chores'?'cleaning':l==='Family'?'family':l==='Personal'?'personal':''}','${person}')">
-            <div class="mb-fill" style="width:${p}%;background:${gaugeColor(p)}"></div>
+          <div class="mb-track" onclick="${l==='Rework'?`reworkClick_p('${person}')`:` goToActivity('${l==='Chores'?'cleaning':l==='Family'?'family':l==='Personal'?'personal':''}','${person}')`}">
+            <div class="mb-fill" style="width:${p}%;background:${l==='Rework'?gaugeColorInv(p):gaugeColor(p)}"></div>
           </div>
           <div class="mb-lbl">↑ month</div>
         </div>`).join('')}
@@ -823,11 +830,44 @@ function violationCardHtml(v){
 async function reworkClick_p(person){
   const viols=await fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({violations:[]}));
   const mine=(viols.violations||[]).filter(v=>v.person_name===person);
-  if(!mine.length){showDetail(`${person} — Rework`,'No violations today! 🎉');return;}
-  const html=`<p style="margin-bottom:.7rem;font-size:.75rem;color:var(--sub)">${mine.length} violation${mine.length!==1?'s':''} recorded today. Use the buttons to dispute if unfair.</p>`+
-    mine.map(violationCardHtml).join('');
-  const actBtn=`<button class="btn" style="margin-top:.5rem" onclick="closeDetail();goToActivity('','${person}')">→ View in Activity Stream</button>`;
-  showDetail(`${person} — Rework Violations`,html+actBtn);
+
+  if(!mine.length){
+    showDetail(`${person} — Rework`,`
+      <div style="text-align:center;padding:2rem 1rem">
+        <div style="font-size:2.5rem;margin-bottom:.6rem">✅</div>
+        <div style="font-weight:700;font-size:1rem;color:var(--green);margin-bottom:.3rem">All clean today!</div>
+        <div style="font-size:.78rem;color:var(--sub)">No rework violations recorded for ${esc(person)}.</div>
+      </div>`);
+    return;
+  }
+
+  // Group violations by code to summarise impact
+  const byCode={};
+  mine.forEach(v=>{byCode[v.violation_code]=(byCode[v.violation_code]||0)+1;});
+  const fmtCode=s=>s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+
+  const summaryRows=Object.entries(byCode).map(([code,n])=>`
+    <div style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;border-bottom:1px solid var(--border);font-size:.75rem">
+      <span style="font-size:.9rem">⚠️</span>
+      <span style="flex:1;font-weight:600">${esc(fmtCode(code))}</span>
+      <span style="color:var(--orange);font-weight:700">${n}×</span>
+    </div>`).join('');
+
+  let html=`
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:.8rem 1rem;margin-bottom:1rem">
+      <div style="font-size:.88rem;font-weight:700;color:var(--orange);margin-bottom:.4rem">
+        ⚠️ ${mine.length} Rework Violation${mine.length!==1?'s':''} Today
+      </div>
+      <div style="font-size:.73rem;color:var(--sub);margin-bottom:.6rem">
+        Each violation means something was spotted by the camera that needs attention or correction. Tap <strong>AI second opinion</strong> or <strong>Remove</strong> if any seem unfair.
+      </div>
+      <div style="background:#fff;border-radius:7px;padding:.4rem .6rem">${summaryRows}</div>
+    </div>
+    <div style="font-size:.67rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem">Full Details</div>
+    ${mine.map(violationCardHtml).join('')}
+    <button class="btn" style="margin-top:.6rem;background:var(--sub);font-size:.78rem" onclick="closeDetail();goToActivity('','${person}')">→ View in Activity Stream</button>`;
+
+  showDetail(`${person} — Rework Breakdown`,html);
 }
 
 async function disputeViol(vid, method, personName){
