@@ -35,6 +35,44 @@ _morning_announced: dict = {}    # {person_name: {"date": str, "text": str}}
 _chore_sessions: dict = {}       # {person_name: {"chore_name": str, "start": datetime}}
 _person_day_tracking: dict = {}  # {person_name: {date, morning_arrival, ...}}
 
+# ── Motion detection state ────────────────────────────────────────────────────
+_last_frame_pixels: dict = {}   # {location: list[int]}  grayscale 80×60 pixels
+_last_ai_call: dict = {}        # {location: datetime}   time of last AI analysis
+_last_ai_result: dict = {}      # {location: dict}       cached last AI result
+
+MOTION_THRESHOLD = 12           # mean abs pixel diff (0–255) to count as motion
+MIN_AI_INTERVAL_SECS = 300      # min seconds between AI calls per camera (5 min)
+WAKING_HOURS = (6, 23)          # UTC hour range — 6:00–23:59 UTC ≈ 7am–midnight Irish
+
+
+def _detect_motion(location: str, frame_bytes: bytes) -> bool:
+    """Compare incoming frame against last stored frame. Returns True if motion detected."""
+    try:
+        img = Image.open(io.BytesIO(frame_bytes)).convert("L").resize((80, 60))
+        pixels = list(img.getdata())
+        prev = _last_frame_pixels.get(location)
+        _last_frame_pixels[location] = pixels
+        if prev is None:
+            return True  # first frame always processes
+        diff = sum(abs(a - b) for a, b in zip(pixels, prev)) / len(pixels)
+        return diff > MOTION_THRESHOLD
+    except Exception:
+        return True  # on error, process anyway
+
+
+def _should_call_ai(location: str) -> bool:
+    """Returns True if enough time has passed since last AI call for this camera."""
+    last = _last_ai_call.get(location)
+    if last is None:
+        return True
+    return (datetime.utcnow() - last).total_seconds() >= MIN_AI_INTERVAL_SECS
+
+
+def _is_waking_hours() -> bool:
+    """Returns True if current UTC hour is within waking hours window."""
+    hour = datetime.utcnow().hour
+    return WAKING_HOURS[0] <= hour <= WAKING_HOURS[1]
+
 # ── Default chore seed ────────────────────────────────────────────────────────
 # Format: (person, name, frequency, points, chore_type, rotating_with)
 DEFAULT_CHORES = [
@@ -405,11 +443,42 @@ async def recalculate_stats(db: AsyncSession = Depends(get_db)):
 async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
                        db: AsyncSession = Depends(get_db)):
     data = _read(frame)
+
+    # ── Cost gates: motion + waking hours + minimum interval ─────────────────
+    motion = _detect_motion(location, data)
+    waking = _is_waking_hours()
+    interval_ok = _should_call_ai(location)
+
+    if not waking:
+        # Outside waking hours — skip AI entirely, return empty
+        return {"id": None, "person_name": None, "task": "Outside active hours",
+                "activity_type": "other", "confidence": 0.0,
+                "timestamp": datetime.utcnow().isoformat(),
+                "etiquette_violation": None, "etiquette_nudge": None,
+                "violations": [], "morning_announcement": None, "chore_assessment": None,
+                "skipped": "outside_hours"}
+
+    if not motion and not interval_ok:
+        # No motion and too soon to re-call — return cached result
+        cached = _last_ai_result.get(location, {})
+        return {**cached, "skipped": "no_motion",
+                "timestamp": datetime.utcnow().isoformat()}
+
     result = await db.execute(select(Person))
     enrolled = [{"id": p.id, "name": p.name, "face_description": p.face_description or ""}
                 for p in result.scalars().all()]
 
     analysis = await analyse_frame(data, enrolled)
+    _last_ai_call[location] = datetime.utcnow()
+    _last_ai_result[location] = {
+        "id": None, "person_name": analysis.get("person_name", "Unknown"),
+        "task": analysis.get("task", ""), "activity_type": analysis.get("activity_type", "other"),
+        "confidence": float(analysis.get("confidence", 0.0)),
+        "etiquette_violation": analysis.get("etiquette_violation"),
+        "etiquette_nudge": analysis.get("etiquette_nudge"),
+        "violations": analysis.get("violations", []),
+        "morning_announcement": None, "chore_assessment": None,
+    }
 
     # Storage optimisation: skip saving if no known person detected
     if analysis.get("person_name", "Unknown") == "Unknown" and not analysis.get("violations"):
