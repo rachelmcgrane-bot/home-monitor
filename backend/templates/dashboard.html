@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<title>Home Monitor</title>
+<style>
+:root{
+  --bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#1e293b;--sub:#64748b;--faint:#94a3b8;
+  --blue:#3b82f6;--green:#22c55e;--orange:#f97316;--purple:#a855f7;--amber:#f59e0b;--cyan:#06b6d4;
+  --hdr:50px;--sh:0 1px 4px rgba(0,0,0,.07);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1rem;gap:0;box-shadow:var(--sh);position:fixed;top:0;left:0;right:0;z-index:100}
+.h-brand{font-size:.9rem;font-weight:800;color:var(--blue);white-space:nowrap;margin-right:1rem;padding-right:1rem;border-right:1px solid var(--border)}
+.tab-nav{display:flex;gap:0;flex:1}
+.tab-btn{background:none;border:none;color:var(--sub);padding:.75rem 1.1rem;cursor:pointer;font-size:.83rem;font-weight:500;border-bottom:3px solid transparent;transition:all .15s}
+.tab-btn:hover{color:var(--blue);background:#3b82f608}
+.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
+.cam-link{margin-left:auto;background:var(--border);color:var(--sub);padding:.3rem .8rem;border-radius:6px;text-decoration:none;font-size:.75rem}
+.cam-link:hover{background:#cbd5e1}
+/* Layout */
+.tab-pane{display:none;height:calc(100vh - var(--hdr));margin-top:var(--hdr);overflow:hidden}
+.tab-pane.active{display:flex;flex-direction:column}
+/* Dashboard grid — single wide column (no 2-person split; user removed one) */
+.dash-layout{display:grid;grid-template-columns:1fr 300px;gap:8px;padding:8px;height:100%;overflow:hidden}
+/* Person panel */
+.person-panel{background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.pp-head{padding:.55rem .8rem .3rem;border-bottom:1px solid var(--border);flex-shrink:0}
+.pp-name-row{display:flex;align-items:center;gap:.55rem;margin-bottom:.2rem}
+.pp-photo{width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid var(--border);cursor:pointer}
+.pp-photo-ph{width:38px;height:38px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.pp-name{font-size:.95rem;font-weight:800;color:var(--text)}
+.pp-arrival{font-size:.68rem;color:var(--sub)}
+.pp-arrival strong{color:var(--blue)}
+.pp-first{font-size:.65rem;color:var(--faint);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ── Gauge row ── */
+.hd-row{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:.3rem .4rem .1rem;flex-shrink:0}
+.hd-wrap{display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:8px;padding:3px 2px 1px;transition:background .15s;position:relative}
+.hd-wrap:hover{background:var(--bg)}
+.hd-svg{width:100%}
+.hd-label{font-size:.58rem;color:var(--sub);text-align:center;margin-top:-2px;line-height:1.2}
+/* ── Monthly mini bars ── */
+.month-row{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;padding:0 .6rem .3rem;flex-shrink:0}
+.mb{display:flex;flex-direction:column;align-items:center;gap:2px}
+.mb-track{width:100%;background:var(--border);border-radius:3px;height:5px;overflow:hidden;cursor:pointer}
+.mb-fill{height:100%;border-radius:3px;transition:width .4s}
+.mb-lbl{font-size:.52rem;color:var(--faint)}
+/* ── Pie + kitchen ── */
+.pp-mid{display:flex;align-items:center;gap:.5rem;padding:.25rem .7rem .3rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border);flex-shrink:0}
+.pie-wrap{flex-shrink:0;cursor:pointer}
+.pie-legend{flex:1;display:flex;flex-direction:column;gap:2px}
+.pl-item{display:flex;align-items:center;gap:.3rem;font-size:.62rem;color:var(--sub)}
+.pl-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.kitchen-stat{font-size:.65rem;color:var(--sub);text-align:right;margin-left:auto}
+.kitchen-stat strong{color:var(--cyan);display:block;font-size:.8rem}
+/* ── Chore list ── */
+.chore-list-hdr{padding:.3rem .7rem .15rem;font-size:.62rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.chore-list{flex:1;overflow-y:auto;padding:0 .45rem .25rem;min-height:0}
+.chore-list::-webkit-scrollbar{width:3px}
+.chore-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.cl-item{display:flex;align-items:center;gap:.35rem;padding:.28rem .35rem;border-radius:6px;margin-bottom:2px;cursor:pointer;transition:background .1s;border-left:3px solid transparent}
+.cl-item:hover{background:var(--bg)}
+.cl-item.type-core{border-left-color:var(--blue)}
+.cl-item.type-rotating{border-left-color:var(--purple)}
+.cl-item.type-standard{border-left-color:var(--border)}
+.cl-item.type-when-suits{border-left-color:var(--amber);opacity:.8}
+.cl-icon{font-size:.8rem;flex-shrink:0;width:16px;text-align:center}
+.cl-name{flex:1;font-size:.72rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cl-name.carried{color:var(--amber)}
+.cl-pts{font-size:.62rem;font-weight:700;color:var(--blue);white-space:nowrap;flex-shrink:0}
+.cl-badge{font-size:.5rem;padding:.06rem .22rem;border-radius:4px;font-weight:700;flex-shrink:0;text-transform:uppercase}
+.cb-core{background:#dbeafe;color:var(--blue)}
+.cb-rot{background:#f3e8ff;color:var(--purple)}
+.cb-ws{background:#fef9c3;color:#a16207}
+/* ── Rework bar ── */
+.rework-wrap{padding:.25rem .7rem .4rem;flex-shrink:0;border-top:1px solid var(--border)}
+.rework-lbl{display:flex;justify-content:space-between;font-size:.62rem;color:var(--sub);margin-bottom:.2rem}
+.rework-count{font-weight:700;color:var(--orange)}
+.pb-track{background:var(--border);border-radius:4px;height:7px;overflow:hidden;cursor:pointer;position:relative}
+.pb-rework{height:100%;background:var(--orange);border-radius:4px;transition:width .4s}
+/* ── Right info panel ── */
+.info-panel{display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden}
+.notif-box{background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.notif-hdr{padding:.5rem .7rem;border-bottom:1px solid var(--border);font-size:.7rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:.4rem;flex-shrink:0;justify-content:space-between}
+.notif-body{flex:1;overflow-y:auto;padding:.4rem .6rem}
+.notif-body::-webkit-scrollbar{width:3px}
+.notif-body::-webkit-scrollbar-thumb{background:var(--border)}
+.ns-title{font-size:.6rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin:.4rem 0 .2rem}
+.ni{font-size:.7rem;color:var(--text);padding:.28rem .45rem;background:var(--bg);border-radius:6px;margin-bottom:.2rem;line-height:1.4;cursor:pointer;border-left:3px solid transparent}
+.ni:hover{background:var(--border)}
+.ni-viol{border-left-color:var(--orange)}
+.ni-trend{border-left-color:var(--purple)}
+.ni-obs{border-left-color:var(--blue)}
+.ni-badge{display:inline-block;background:var(--blue);color:#fff;border-radius:4px;padding:.03rem .28rem;font-size:.58rem;font-weight:700;margin-right:.2rem}
+.notif-gen-btn{background:none;border:1px solid var(--border);color:var(--sub);border-radius:5px;padding:.2rem .5rem;font-size:.62rem;cursor:pointer}
+.notif-gen-btn:hover{background:var(--purple);color:#fff;border-color:var(--purple)}
+/* ── Mini calendar ── */
+.mini-cal{background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);padding:.5rem .6rem;flex-shrink:0}
+.mc-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem}
+.mc-title{font-size:.72rem;font-weight:700;color:var(--text)}
+.mc-btn{background:none;border:none;color:var(--sub);cursor:pointer;font-size:.85rem;padding:.1rem .25rem;border-radius:4px}
+.mc-btn:hover{background:var(--bg)}
+.mc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px}
+.mc-dow{font-size:.5rem;color:var(--faint);text-align:center;padding-bottom:2px;font-weight:600}
+.mc-day{border-radius:4px;cursor:pointer;padding:2px 1px;text-align:center}
+.mc-day:hover{background:var(--bg)}
+.mc-day-n{font-size:.58rem;color:var(--sub);display:block}
+.mc-day.is-today .mc-day-n{color:var(--blue);font-weight:800}
+.mc-day.is-future{opacity:.35;pointer-events:none}
+.mc-bars{display:flex;gap:1px;justify-content:center;margin-top:1px}
+.mc-bar{height:4px;width:7px;border-radius:2px}
+.cal-link{display:block;text-align:center;font-size:.62rem;color:var(--blue);margin-top:.35rem;cursor:pointer}
+.cal-link:hover{text-decoration:underline}
+/* ── Shared card styles ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem;box-shadow:var(--sh)}
+.card-title{font-size:.7rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.7rem}
+.btn{background:var(--blue);color:#fff;border:none;padding:.45rem 1rem;border-radius:7px;cursor:pointer;font-size:.8rem;width:100%;font-weight:600;transition:background .15s}
+.btn:hover{background:#2563eb}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.msg{font-size:.75rem;min-height:1.1em;color:var(--sub)}
+.msg.err{color:var(--orange)}
+.empty{color:var(--faint);text-align:center;padding:1.5rem;font-size:.8rem}
+/* ── Activity tab ── */
+.act-scroll{flex:1;overflow-y:auto;padding:.8rem}
+.act-cols{display:grid;grid-template-columns:280px 1fr;gap:.8rem}
+.enrol-form{display:flex;flex-direction:column;gap:.45rem}
+.enrol-form input{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.4rem .65rem;font-size:.8rem}
+.enrol-form input:focus{outline:none;border-color:var(--blue)}
+.person-list{margin-top:.6rem;display:flex;flex-direction:column;gap:.35rem}
+.person-item{display:flex;align-items:center;gap:.45rem;padding:.3rem .45rem;background:var(--bg);border-radius:8px}
+.person-item img{width:32px;height:32px;border-radius:50%;object-fit:cover;cursor:pointer}
+.pname{flex:1;font-size:.8rem;color:var(--text);font-weight:500}
+.btn-del{background:none;border:1px solid var(--border);color:var(--sub);border-radius:5px;cursor:pointer;padding:.12rem .35rem;font-size:.65rem}
+.btn-del:hover{background:var(--orange);color:#fff;border-color:var(--orange)}
+.type-pills{display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.5rem}
+.pill{background:var(--bg);border:1px solid var(--border);color:var(--sub);border-radius:20px;padding:.2rem .6rem;font-size:.7rem;cursor:pointer;transition:all .15s}
+.pill.active,.pill:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+.pill.p-viol.active,.pill.p-viol:hover{background:var(--orange);border-color:var(--orange)}
+.filter-row{display:flex;gap:.4rem;margin-bottom:.55rem;align-items:center;flex-wrap:wrap}
+.filter-row select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.32rem .55rem;font-size:.75rem;flex:1}
+.btn-sm-act{background:var(--bg);border:1px solid var(--border);color:var(--sub);border-radius:7px;padding:.32rem .65rem;cursor:pointer;font-size:.78rem;white-space:nowrap}
+.btn-sm-act:hover{background:var(--border)}
+.btn-sm-act.recalc:hover{background:var(--green);color:#fff;border-color:var(--green)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinning{animation:spin .6s linear infinite;display:inline-block}
+.feed-status{font-size:.75rem;color:var(--sub);text-align:center;padding:.6rem}
+.feed{display:flex;flex-direction:column;gap:.4rem;max-height:calc(100vh - 220px);overflow-y:auto}
+.feed::-webkit-scrollbar{width:3px}
+.feed::-webkit-scrollbar-thumb{background:var(--border)}
+.feed-item{display:flex;gap:.55rem;background:var(--bg);border-radius:8px;padding:.5rem;border-left:3px solid var(--border)}
+.feed-item.type-cleaning{border-left-color:var(--green)}
+.feed-item.type-cooking{border-left-color:var(--orange)}
+.feed-item.type-eating{border-left-color:var(--amber)}
+.feed-item.type-tv{border-left-color:var(--purple)}
+.feed-item.type-resting{border-left-color:var(--cyan)}
+.feed-item.type-personal{border-left-color:var(--orange)}
+.feed-item.type-family{border-left-color:var(--green)}
+.feed-item.type-violation{border-left-color:var(--orange);background:#fff7ed}
+.feed-item img{width:54px;height:40px;object-fit:cover;border-radius:5px;flex-shrink:0;cursor:pointer}
+.feed-item img:hover{opacity:.8}
+.fi-who{font-weight:700;color:var(--blue);font-size:.8rem;display:flex;align-items:center;gap:.3rem;flex-wrap:wrap}
+.fi-task{color:var(--text);font-size:.75rem;margin:.08rem 0}
+.fi-meta{font-size:.62rem;color:var(--faint);display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
+.conf-dot{display:inline-block;font-size:.58rem;padding:.04rem .28rem;border-radius:999px;margin-left:.25rem}
+.cd-hi{background:#dcfce7;color:#15803d}
+.cd-mi{background:#fef3c7;color:#b45309}
+.cd-lo{background:#ffedd5;color:#c2410c}
+.trace-badge{display:inline-block;font-size:.58rem;padding:.04rem .25rem;border-radius:4px;font-weight:600;cursor:pointer}
+.tb-chores{background:#dbeafe;color:#1d4ed8}
+.tb-family{background:#dcfce7;color:#15803d}
+.tb-personal{background:#f3e8ff;color:#7e22ce}
+.tb-kitchen{background:#cffafe;color:#0e7490}
+.tb-viol{background:#ffedd5;color:#c2410c}
+.chore-type-tag{display:inline-block;font-size:.55rem;padding:.03rem .22rem;border-radius:3px;font-weight:700;margin-left:.15rem;text-transform:uppercase}
+.ctt-core{background:#dbeafe;color:#1d4ed8}
+.ctt-rotating{background:#f3e8ff;color:#7e22ce}
+.ctt-standard{background:#f1f5f9;color:#64748b}
+.pts-tag{display:inline-block;font-size:.6rem;color:var(--green);font-weight:700}
+/* ── Chores tab ── */
+.chores-scroll{flex:1;overflow-y:auto;padding:.8rem}
+.chore-mgmt-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem;flex-wrap:wrap;gap:.4rem}
+.chore-mgmt-hdr h2{font-size:.95rem;font-weight:700;color:var(--text)}
+.hdr-btns{display:flex;gap:.4rem;flex-wrap:wrap}
+.btn-sm{border:none;border-radius:7px;color:#fff;padding:.35rem .8rem;font-size:.75rem;cursor:pointer;font-weight:600}
+.btn-green{background:var(--green)}.btn-green:hover{background:#16a34a}
+.btn-purple{background:var(--purple)}.btn-purple:hover{background:#9333ea}
+.btn-blue{background:var(--blue)}.btn-blue:hover{background:#2563eb}
+.btn-amber{background:var(--amber);color:#fff}.btn-amber:hover{background:#d97706}
+.chore-table{width:100%;border-collapse:collapse;font-size:.78rem}
+.chore-table th{text-align:left;padding:.45rem .55rem;color:var(--sub);font-weight:600;border-bottom:2px solid var(--border);font-size:.67rem;text-transform:uppercase;letter-spacing:.04em}
+.chore-table td{padding:.4rem .55rem;border-bottom:1px solid var(--border);vertical-align:middle}
+.chore-table tr:hover td{background:var(--bg)}
+.person-section td{background:#f8fafc;font-size:.72rem;font-weight:800;color:var(--blue);padding:.3rem .55rem;border-bottom:1px solid var(--border)}
+.editable{background:transparent;border:1px solid transparent;color:var(--text);border-radius:5px;padding:.18rem .35rem;font-size:.78rem;width:100%}
+.editable:focus{outline:none;border-color:var(--blue);background:var(--bg)}
+.freq-sel,.type-sel{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:.18rem .35rem;font-size:.73rem}
+.pts-num{background:var(--bg);border:1px solid var(--border);color:var(--amber);border-radius:5px;padding:.18rem .35rem;font-size:.78rem;width:58px;text-align:center}
+.pts-num:focus{outline:none;border-color:var(--amber)}
+.person-sel{background:var(--bg);border:1px solid var(--border);color:var(--purple);border-radius:5px;padding:.18rem .35rem;font-size:.73rem}
+.add-section{background:var(--bg);border-radius:10px;padding:.9rem;margin-top:.8rem;border:1px solid var(--border)}
+.add-section h3{font-size:.78rem;font-weight:700;color:var(--sub);margin-bottom:.7rem;text-transform:uppercase;letter-spacing:.05em}
+.add-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:.45rem;align-items:end}
+.add-grid input,.add-grid select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:.4rem .55rem;border-radius:7px;font-size:.78rem}
+.note{font-size:.67rem;color:var(--sub);margin-top:.35rem}
+.comparison-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:.9rem;margin-top:.7rem;font-size:.78rem;color:var(--text);line-height:1.6;white-space:pre-wrap;display:none}
+.weight-box{margin-top:.5rem;display:none}
+.weight-item{display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:#fffbeb;border:1px solid var(--amber);border-radius:7px;margin-bottom:.3rem;font-size:.75rem}
+.weight-item .wi-name{flex:1;font-weight:600}
+.weight-item .wi-reason{color:var(--sub);font-size:.7rem}
+/* ── Lightbox ── */
+#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out}
+#lightbox.open{display:flex}
+#lightbox img{max-width:92vw;max-height:92vh;border-radius:10px;object-fit:contain;box-shadow:0 0 60px rgba(0,0,0,.5)}
+/* ── Detail modal ── */
+#detailModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9990;align-items:center;justify-content:center}
+#detailModal.open{display:flex}
+.dm-box{background:var(--card);border-radius:14px;padding:1.3rem;max-width:560px;width:92vw;max-height:84vh;overflow-y:auto;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.dm-close{position:absolute;top:.7rem;right:.7rem;background:var(--bg);border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:.85rem;color:var(--sub)}
+.dm-close:hover{background:var(--border)}
+.dm-title{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:.9rem;padding-right:2rem}
+.dm-content{font-size:.8rem;color:var(--sub);line-height:1.6}
+.dm-photo{width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:.7rem;cursor:pointer}
+.dm-score{display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem;flex-wrap:wrap}
+.sc-badge{font-size:.82rem;font-weight:700;padding:.18rem .55rem;border-radius:6px}
+.sc-hi{background:#dcfce7;color:#15803d}
+.sc-mi{background:#fef3c7;color:#b45309}
+.sc-lo{background:#ffedd5;color:#c2410c}
+.dispute-btn{background:var(--amber);color:#fff;border:none;border-radius:6px;padding:.3rem .7rem;font-size:.72rem;cursor:pointer;font-weight:600;margin-top:.6rem}
+.dispute-btn:hover{background:#d97706}
+.dispute-form{margin-top:.5rem;display:none}
+.dispute-form textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.45rem;font-size:.78rem;min-height:70px;resize:vertical}
+.dispute-submit{background:var(--blue);color:#fff;border:none;border-radius:6px;padding:.3rem .7rem;font-size:.72rem;cursor:pointer;margin-top:.35rem;font-weight:600}
+/* ── Add-to-today modal ── */
+#addTodayModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9970;align-items:center;justify-content:center}
+#addTodayModal.open{display:flex}
+.at-box{background:var(--card);border-radius:14px;padding:1.3rem;max-width:440px;width:92vw;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.at-box h3{font-size:.88rem;font-weight:700;margin-bottom:.9rem;padding-right:2rem}
+.at-grid{display:grid;gap:.55rem}
+.at-grid input,.at-grid select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.42rem .65rem;font-size:.8rem}
+.at-grid label{font-size:.7rem;color:var(--sub);font-weight:600;margin-bottom:-.3rem}
+/* ── Calendar modal ── */
+#calModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9980;align-items:center;justify-content:center}
+#calModal.open{display:flex}
+.cal-box{background:var(--card);border-radius:14px;padding:1.3rem;max-width:680px;width:95vw;max-height:88vh;overflow-y:auto;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.cal-nav{display:flex;align-items:center;gap:.7rem;margin-bottom:.9rem}
+.cal-nav h3{flex:1;text-align:center;font-size:.95rem;font-weight:700}
+.cal-nav-btn{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:.3rem .7rem;cursor:pointer;font-size:.9rem;color:var(--sub)}
+.cal-nav-btn:hover{background:var(--border)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-dow{font-size:.65rem;color:var(--faint);text-align:center;padding-bottom:3px;font-weight:600}
+.cal-day{text-align:center;border-radius:7px;padding:4px 2px;cursor:pointer;transition:background .1s}
+.cal-day:hover{background:var(--bg)}
+.cal-day.is-today{background:#dbeafe}
+.cal-day.is-sel{background:var(--blue);color:#fff}
+.cal-day.is-future{opacity:.35;pointer-events:none}
+.cal-day-n{font-size:.72rem;font-weight:400;display:block}
+.cal-badge{font-size:.6rem;font-weight:700;display:block}
+@media(max-width:900px){.dash-layout{grid-template-columns:1fr};.tab-pane{overflow-y:auto}.person-panel{min-height:500px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-brand">🏠 Home Monitor</div>
+  <nav class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+    <button class="tab-btn" onclick="switchTab('activity')">📡 Activity</button>
+    <button class="tab-btn" onclick="switchTab('chores')">🧹 Chores</button>
+  </nav>
+  <a class="cam-link" href="/camera" target="_blank">📷 Camera</a>
+</header>
+
+<!-- ══ DASHBOARD ══ -->
+<div id="tab-dashboard" class="tab-pane active">
+  <div class="dash-layout">
+    <!-- Single merged panel for both people -->
+    <div id="dashMain" style="display:flex;flex-direction:column;gap:8px;overflow:hidden;min-height:0">
+      <div class="person-panel" id="panel-Liam"></div>
+      <div class="person-panel" id="panel-Rachel"></div>
+    </div>
+    <div class="info-panel">
+      <div class="notif-box">
+        <div class="notif-hdr">
+          <span>🔔 Notifications</span>
+          <button class="notif-gen-btn" onclick="generateTrends()" title="Generate bi-weekly trend report">📈 Trends</button>
+        </div>
+        <div class="notif-body" id="notifBody"><div class="empty">Loading…</div></div>
+      </div>
+      <div class="mini-cal">
+        <div class="mc-nav">
+          <button class="mc-btn" onclick="mcNav(-1)">‹</button>
+          <span class="mc-title" id="mcTitle"></span>
+          <button class="mc-btn" onclick="mcNav(1)">›</button>
+        </div>
+        <div class="mc-grid" id="mcGrid"></div>
+        <span class="cal-link" onclick="openCal()">📅 Full calendar →</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ACTIVITY ══ -->
+<div id="tab-activity" class="tab-pane">
+  <div class="act-scroll">
+    <div class="act-cols">
+      <div class="card">
+        <div class="card-title">Enrol a Person</div>
+        <form class="enrol-form" id="enrolForm">
+          <input type="text" id="enrolName" placeholder="Full name" required>
+          <input type="file" id="enrolPhoto" accept="image/*" required>
+          <div class="msg" id="enrolMsg"></div>
+          <button type="submit" class="btn" id="enrolBtn">Add Person</button>
+        </form>
+        <div class="person-list" id="personList"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Activity Stream</div>
+        <div class="type-pills" id="typePills">
+          <span class="pill active" onclick="setFilter(this,'')">All</span>
+          <span class="pill" onclick="setFilter(this,'cleaning')">🧹 Cleaning</span>
+          <span class="pill" onclick="setFilter(this,'cooking')">🍳 Cooking</span>
+          <span class="pill" onclick="setFilter(this,'eating')">🍽️ Eating</span>
+          <span class="pill" onclick="setFilter(this,'tv')">📺 TV</span>
+          <span class="pill" onclick="setFilter(this,'resting')">🛋️ Resting</span>
+          <span class="pill" onclick="setFilter(this,'personal')">📱 Personal</span>
+          <span class="pill" onclick="setFilter(this,'family')">👨‍👩‍👧‍👦 Family</span>
+          <span class="pill p-viol" onclick="setViolFilter(this)">⚠️ Violations</span>
+        </div>
+        <div class="filter-row">
+          <select id="filterLoc"><option value="">All locations</option></select>
+          <select id="filterPerson"><option value="">All people</option></select>
+          <button class="btn-sm-act recalc" onclick="recalculate()" title="Recalculate all totals">🔄 Recalc</button>
+          <button class="btn-sm-act" id="refreshBtn" onclick="manualRefresh()">↻ Refresh</button>
+        </div>
+        <div id="feedStatus" class="feed-status" style="display:none"></div>
+        <div class="feed" id="feed"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CHORES ══ -->
+<div id="tab-chores" class="tab-pane">
+  <div class="chores-scroll">
+    <div class="chore-mgmt-hdr">
+      <h2>Chore Management</h2>
+      <div class="hdr-btns">
+        <button class="btn-sm btn-blue" onclick="loadComparison()">📊 AI Compare</button>
+        <button class="btn-sm btn-purple" onclick="suggestPoints()">✨ Suggest Points</button>
+        <button class="btn-sm btn-green" onclick="loadSummary()">📋 Summary</button>
+        <button class="btn-sm btn-amber" onclick="openAddToday()">📅 Add to Today</button>
+      </div>
+    </div>
+    <div class="comparison-box" id="compBox"></div>
+    <div class="weight-box" id="weightBox"></div>
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:.8rem">
+      <table class="chore-table" id="choreTable">
+        <thead><tr>
+          <th>Chore</th><th>Freq</th><th>Type</th>
+          <th>Person</th><th style="text-align:center">Pts</th>
+          <th style="text-align:center">📋</th><th></th>
+        </tr></thead>
+        <tbody id="choreBody"></tbody>
+      </table>
+    </div>
+    <div class="add-section">
+      <h3>+ Add Chore</h3>
+      <form id="addChoreForm">
+        <div class="add-grid">
+          <input type="text" id="newName" placeholder="Chore description…" required>
+          <select id="newPerson">
+            <option value="Liam">Liam</option>
+            <option value="Rachel">Rachel</option>
+            <option value="both">Both</option>
+          </select>
+          <select id="newFreq">
+            <option value="daily">Daily</option>
+            <option value="every-2-days">Every 2 days</option>
+            <option value="weekly">Weekly</option>
+            <option value="when-suits">When suits</option>
+            <option value="monthly">Monthly</option>
+          </select>
+          <select id="newType" onchange="toggleRot()">
+            <option value="standard">Standard</option>
+            <option value="core">Core</option>
+            <option value="rotating">Rotating</option>
+          </select>
+          <input type="number" id="newPts" placeholder="Pts" min="1" max="200" value="10" style="width:65px">
+          <button type="submit" class="btn-sm btn-green" style="white-space:nowrap">+ Add</button>
+        </div>
+      </form>
+      <div class="note">💡 <strong>Core</strong> = always this person · <strong>Rotating</strong> = alternates daily · <strong>Both</strong> = shared weekly task · <strong>When suits</strong> = anytime this week</div>
+      <div class="msg" id="choreMsg" style="margin-top:.4rem"></div>
+    </div>
+    <div style="margin-top:.8rem;background:var(--bg);border-radius:10px;padding:.7rem;border:1px solid var(--border)">
+      <div class="card-title">Carry-Forward Today</div>
+      <div id="carryList"><div class="empty">No carry-forward today.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" onclick="closeLightbox()"><img id="lbImg" src="" alt=""></div>
+
+<!-- Detail Modal -->
+<div id="detailModal">
+  <div class="dm-box">
+    <button class="dm-close" onclick="closeDetail()">✕</button>
+    <div class="dm-title" id="dmTitle"></div>
+    <div class="dm-content" id="dmContent"></div>
+  </div>
+</div>
+
+<!-- Add-to-Today Modal -->
+<div id="addTodayModal">
+  <div class="at-box">
+    <button class="dm-close" onclick="closeAddToday()">✕</button>
+    <h3>📅 Add Chore to Today</h3>
+    <form id="addTodayForm" class="at-grid">
+      <label>Person</label>
+      <select id="atPerson">
+        <option value="Liam">Liam</option>
+        <option value="Rachel">Rachel</option>
+      </select>
+      <label>Chore</label>
+      <input type="text" id="atChore" list="choreDL" placeholder="Search or type chore name…" required>
+      <datalist id="choreDL"></datalist>
+      <label>Score (0–10)</label>
+      <input type="number" id="atScore" min="0" max="10" value="10">
+      <label>Notes (optional)</label>
+      <input type="text" id="atNotes" placeholder="e.g. done before camera was running">
+      <div class="msg" id="atMsg"></div>
+      <button type="submit" class="btn" style="margin-top:.2rem">✓ Add Assessment</button>
+    </form>
+  </div>
+</div>
+
+<!-- Calendar Modal -->
+<div id="calModal">
+  <div class="cal-box">
+    <button style="position:absolute;top:.7rem;right:.7rem;background:var(--bg);border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:.85rem" onclick="closeCal()">✕</button>
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
+      <h3 id="calTitle"></h3>
+      <button class="cal-nav-btn" onclick="calNav(1)">›</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div id="dayDetail" style="margin-top:.9rem"></div>
+  </div>
+</div>
+
+<script>
+const API='';
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const ACT_ICONS={cleaning:'🧹',cooking:'🍳',eating:'🍽️',tv:'📺',resting:'🛋️',personal:'📱',family:'👨‍👩‍👧‍👦',other:'💼'};
+const C={chores:'#3b82f6',family:'#22c55e',personal:'#a855f7',kitchen:'#06b6d4',amber:'#f59e0b'};
+let calY=new Date().getUTCFullYear(),calM=new Date().getUTCMonth()+1;
+let mcY=new Date().getUTCFullYear(),mcM=new Date().getUTCMonth()+1;
+let calData={days:{}},selDay=null,_persons=[],activeType='',_showViolations=false,_feedLoading=false,feedTimer=null;
+
+function p2(n){return String(n).padStart(2,'0')}
+function todayStr(){return new Date().toISOString().slice(0,10)}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function fmtM(m){m=Math.round(m||0);if(m<60)return m+'m';return Math.floor(m/60)+'h'+(m%60?' '+m%60+'m':'')}
+
+// ── Gauge colour: yellow → orange → blue → purple → green ────────────────────
+function gaugeColor(pct){
+  if(pct>=80)return '#22c55e';   // green
+  if(pct>=60)return '#a855f7';   // purple
+  if(pct>=40)return '#3b82f6';   // blue
+  if(pct>=20)return '#f97316';   // orange
+  return '#f59e0b';               // yellow
+}
+
+// ── Improved half-donut gauge ─────────────────────────────────────────────────
+function halfDonut(pct,label,sublabel,onclickFn){
+  const R=40,W=100,CX=50,CY=50,circ=Math.PI*R;
+  const p=Math.min(Math.max(pct||0,0),100);
+  const offset=circ*(1-p/100);
+  const color=gaugeColor(p);
+  const bgCol=color+'28';
+  const oc=onclickFn?`onclick="${onclickFn}"` :'';
+  return `<div class="hd-wrap" ${oc} title="${p}%">
+    <svg viewBox="0 0 ${W} 56" class="hd-svg">
+      <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="${bgCol}" stroke-width="12" fill="none" stroke-linecap="round"/>
+      <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="${color}" stroke-width="12" fill="none" stroke-linecap="round"
+        stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" style="transition:stroke-dashoffset .5s,stroke .4s"/>
+      <text x="${CX}" y="${CY-16}" text-anchor="middle" font-size="14" font-weight="900" fill="#1e293b">${p}%</text>
+      ${sublabel?`<text x="${CX}" y="${CY-5}" text-anchor="middle" font-size="6.5" fill="#64748b">${esc(String(sublabel))}</text>`:''}
+    </svg>
+    <div class="hd-label" style="color:${color};font-weight:700">${esc(label)}</div>
+  </div>`;
+}
+
+function pie(segs,size=66){
+  const tot=segs.reduce((s,g)=>s+g.v,0);
+  if(!tot)return `<svg viewBox="0 0 100 100" width="${size}" height="${size}"><circle cx="50" cy="50" r="40" fill="#e2e8f0"/></svg>`;
+  let a=-Math.PI/2;
+  const paths=segs.filter(s=>s.v>0).map(s=>{
+    const f=s.v/tot,e=a+f*2*Math.PI;
+    const x1=50+40*Math.cos(a),y1=50+40*Math.sin(a);
+    const x2=50+40*Math.cos(e),y2=50+40*Math.sin(e);
+    const d=`M50 50 L${x1.toFixed(1)} ${y1.toFixed(1)} A40 40 0 ${f>.5?1:0} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`;
+    a=e;return `<path d="${d}" fill="${s.c}"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}">${paths}<circle cx="50" cy="50" r="18" fill="white"/></svg>`;
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function goToActivity(type,person){
+  // Set activity filter and navigate to activity tab
+  activeType=type||'';
+  _showViolations=false;
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  if(type){
+    const match=document.querySelector(`.pill[onclick*="'${type}'"]`);
+    if(match)match.classList.add('active');
+  }else{
+    const allPill=document.querySelector('.pill[onclick*="setFilter(this,\\'\\')"]');
+    if(allPill)allPill.classList.add('active');
+    else document.querySelector('.pill')?.classList.add('active');
+  }
+  if(person){
+    const po=_persons.find(p=>p.name===person);
+    if(po) document.getElementById('filterPerson').value=po.id;
+  }
+  switchTab('activity');
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['dashboard','activity','chores'][i]===name));
+  document.querySelectorAll('.tab-pane').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(feedTimer){clearInterval(feedTimer);feedTimer=null;}
+  if(name==='dashboard') loadDashboard();
+  if(name==='activity'){loadPersons();loadFeed();feedTimer=setInterval(loadFeed,15000);}
+  if(name==='chores'){loadChoreTable();loadCarry();loadChoreDL();}
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+function openLB(url){document.getElementById('lbImg').src=url;document.getElementById('lightbox').classList.add('open')}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('open')}
+document.getElementById('lightbox').addEventListener('click',closeLightbox);
+
+// ── Detail modal ──────────────────────────────────────────────────────────────
+function showDetail(title,html){
+  document.getElementById('dmTitle').textContent=title;
+  document.getElementById('dmContent').innerHTML=html;
+  document.getElementById('detailModal').classList.add('open');
+}
+function closeDetail(){document.getElementById('detailModal').classList.remove('open')}
+document.getElementById('detailModal').addEventListener('click',e=>{if(e.target.id==='detailModal')closeDetail()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLightbox();closeDetail();closeCal();closeAddToday();}});
+
+// ── Calendar modal ────────────────────────────────────────────────────────────
+function openCal(day){
+  document.getElementById('calModal').classList.add('open');
+  if(day){selDay=day;calY=+day.slice(0,4);calM=+day.slice(5,7);}
+  renderCal();if(day)selectDay(day);
+}
+function closeCal(){document.getElementById('calModal').classList.remove('open')}
+document.getElementById('calModal').addEventListener('click',e=>{if(e.target.id==='calModal')closeCal()});
+
+// ── Add-to-Today modal ────────────────────────────────────────────────────────
+function openAddToday(){document.getElementById('addTodayModal').classList.add('open')}
+function closeAddToday(){document.getElementById('addTodayModal').classList.remove('open')}
+document.getElementById('addTodayModal').addEventListener('click',e=>{if(e.target.id==='addTodayModal')closeAddToday()});
+document.getElementById('addTodayForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const msg=document.getElementById('atMsg');
+  msg.className='msg';msg.textContent='Submitting…';
+  const fd=new FormData();
+  fd.append('person_name',document.getElementById('atPerson').value);
+  fd.append('chore_name',document.getElementById('atChore').value.trim());
+  fd.append('score',document.getElementById('atScore').value);
+  fd.append('notes',document.getElementById('atNotes').value.trim());
+  try{
+    const res=await fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd});
+    const d=await res.json();
+    if(!res.ok)throw new Error(JSON.stringify(d));
+    msg.className='msg';msg.textContent=`✓ Added! +${d.points_earned} pts (${d.status})`;
+    document.getElementById('atChore').value='';
+    document.getElementById('atNotes').value='';
+    document.getElementById('atScore').value='10';
+    setTimeout(()=>closeAddToday(),1500);
+  }catch(err){msg.className='msg err';msg.textContent='✗ '+err.message;}
+});
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+async function loadDashboard(){
+  const [plan,viols,daily,monthly]=await Promise.all([
+    fetch(`${API}/api/chores/daily-plan`).then(r=>r.json()).catch(()=>({plan:{}})),
+    fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({by_person:{},violations:[]})),
+    fetch(`${API}/api/stats/daily`).then(r=>r.json()).catch(()=>({})),
+    fetch(`${API}/api/stats/monthly`).then(r=>r.json()).catch(()=>({persons:{}})),
+  ]);
+  if(!_persons.length) _persons=await fetch(`${API}/api/persons`).then(r=>r.json()).catch(()=>[]);
+  ['Liam','Rachel'].forEach(p=>renderPanel(p,plan.plan?.[p]||{chores:[],total_points:100,earned_points:0,pct:0},viols,daily[p]||{},(monthly.persons||{})[p]||{}));
+  loadNotifications(viols);
+  renderMiniCal();
+  checkPushNotif();
+}
+
+function renderPanel(person,data,viols,ds,ms){
+  const el=document.getElementById(`panel-${person}`);if(!el)return;
+  const po=_persons.find(p=>p.name===person);
+  const photoHtml=po?.photo_url
+    ?`<img src="${po.photo_url}" class="pp-photo" onclick="openLB('${po.photo_url}')">`
+    :`<div class="pp-photo-ph">👤</div>`;
+
+  const pct=data.pct||0;
+  const violCount=(viols.by_person||{})[person]||0;
+  const reworkPts=(data.chores||[]).reduce((s,c)=>(!c.done&&c.points>c.points_earned?s+(c.points-c.points_earned):s),0);
+  const reworkPct=Math.min(reworkPts/Math.max(data.total_points||100,1)*100,100);
+  const dayFamPct=Math.min(Math.round((ds.family_mins||0)/120*100),100);
+  const dayPersonPct=Math.min(Math.round((ds.personal_mins||0)/120*100),100);
+  const mthFamPct=Math.min(Math.round((ms.family_mins||0)/3600*100),100);
+  const mthPersonPct=Math.min(Math.round((ms.personal_mins||0)/3600*100),100);
+  const mthChoresPct=Math.min(Math.round((data.pct||0)),100);
+  const arrTxt=ds.morning_arrival?`<strong>${esc(ds.morning_arrival)} UTC</strong>`:'<span style="color:var(--faint)">not yet seen</span>';
+
+  const choreSublabel=`${data.earned_points||0}/${data.total_points||0}`;
+  const famSublabel=fmtM(ds.family_mins||0);
+  const persSublabel=fmtM(ds.personal_mins||0);
+  const rewSublabel=violCount?`${violCount} ⚠️`:'clean ✓';
+
+  // Gauge onclick: go to activity tab with appropriate filter
+  const pEnc=encodeURIComponent(person);
+  const choreOnclick=`goToActivity('cleaning','${person}')`;
+  const famOnclick=`goToActivity('family','${person}')`;
+  const persOnclick=`goToActivity('personal','${person}')`;
+  const rewOnclick=`reworkClick(this,event)`;
+
+  // Pie segments
+  const choreMins=(data.chores||[]).reduce((s,c)=>s+(c.time_spent_mins||0),0);
+  const pieSegs=[
+    {v:choreMins,c:C.chores,label:'Chores'},
+    {v:ds.family_mins||0,c:C.family,label:'Family'},
+    {v:ds.personal_mins||0,c:C.personal,label:'Personal'},
+    {v:Math.max((ds.kitchen_mins||0)-choreMins,0),c:C.kitchen,label:'Kitchen'},
+  ];
+  const pieDetailHtml=pieSegs.filter(s=>s.v>0).map(s=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><div style="width:12px;height:12px;border-radius:50%;background:${s.c}"></div><span style="flex:1">${esc(s.label)}</span><strong>${fmtM(s.v)}</strong></div>`).join('');
+
+  const shown=(data.chores||[]).filter(c=>c.chore_type==='core'||c.chore_type==='rotating'||(c.when_suits));
+
+  function choreRow(c){
+    let icon='⏳';
+    if(c.done)icon='✅';
+    else if(c.status==='partial')icon='⚠️';
+    else if(c.carried_forward)icon='🔄';
+    else if(c.when_suits)icon='🕐';
+    const typeClass=c.when_suits?'type-when-suits':`type-${c.chore_type}`;
+    const badge=c.chore_type==='core'?`<span class="cl-badge cb-core">core</span>`:
+                c.chore_type==='rotating'?`<span class="cl-badge cb-rot">↻</span>`:
+                c.when_suits?`<span class="cl-badge cb-ws">flex</span>`:'';
+    const carryNote=c.carried_forward?` <span style="font-size:.56rem;color:var(--amber)">(50%)</span>`:'';
+    const hasDetail=!!(c.assessment||c.thumbnail_url);
+    const ocAttr=hasDetail?` data-chore='${JSON.stringify(c).replace(/'/g,"&#39;")}'`:'';
+    return `<div class="cl-item ${typeClass}"${ocAttr} ${hasDetail?'onclick="choreClick(this)"':''}>
+      <span class="cl-icon">${icon}</span>
+      <span class="cl-name${c.carried_forward?' carried':''}">${esc(c.chore_name)}${carryNote}</span>
+      ${badge}<span class="cl-pts">${c.points_earned>0?'+'+c.points_earned:'0'}/${c.points}</span>
+    </div>`;
+  }
+
+  el.innerHTML=`
+    <div class="pp-head">
+      <div class="pp-name-row">${photoHtml}<div>
+        <div class="pp-name">${esc(person)}</div>
+        <div class="pp-arrival">🕐 ${arrTxt}</div>
+      </div></div>
+      <div class="pp-first">"${esc((ds.first_activity||'—').slice(0,65))}"</div>
+    </div>
+
+    <div class="hd-row">
+      ${halfDonut(pct,'Chores',choreSublabel,choreOnclick)}
+      ${halfDonut(dayFamPct,'Family',famSublabel,famOnclick)}
+      ${halfDonut(Math.round(reworkPct),'Rework',rewSublabel,`reworkClick_p('${person}')`)}
+      ${halfDonut(dayPersonPct,'Personal',persSublabel,persOnclick)}
+    </div>
+
+    <div class="month-row">
+      ${[['Chores',mthChoresPct],['Family',mthFamPct],['Rework',Math.min(Math.round(reworkPct),100)],['Personal',mthPersonPct]].map(([l,p])=>`
+        <div class="mb">
+          <div class="mb-track" onclick="goToActivity('${l==='Chores'?'cleaning':l==='Family'?'family':l==='Personal'?'personal':''}','${person}')">
+            <div class="mb-fill" style="width:${p}%;background:${gaugeColor(p)}"></div>
+          </div>
+          <div class="mb-lbl">↑ month</div>
+        </div>`).join('')}
+    </div>
+
+    <div class="pp-mid">
+      <div class="pie-wrap" onclick="showDetail('${esc(person)} — Time Today','${esc(pieDetailHtml)}')">${pie(pieSegs)}</div>
+      <div class="pie-legend">${pieSegs.filter(s=>s.v>0).map(s=>`<div class="pl-item"><div class="pl-dot" style="background:${s.c}"></div>${esc(s.label)}: ${fmtM(s.v)}</div>`).join('')}</div>
+      <div class="kitchen-stat">🍳 Kitchen<strong>${fmtM(ds.kitchen_mins||0)}</strong>today</div>
+    </div>
+
+    <div class="chore-list-hdr"><span>Today's Chores</span><span style="color:var(--blue)">${data.earned_points||0}/${data.total_points||0} pts</span></div>
+    <div class="chore-list">${shown.length?shown.map(choreRow).join(''):'<div class="empty" style="padding:.6rem">No chores assigned</div>'}</div>
+
+    <div class="rework-wrap">
+      <div class="rework-lbl">
+        <span>Rework <span class="rework-count">${violCount?`${violCount} violation${violCount!==1?'s':''}`:''}</span> ${!violCount?'(clean ✓)':''}</span>
+        <span style="font-size:.62rem;color:var(--sub);cursor:pointer" onclick="reworkClick_p('${person}')">→ view</span>
+      </div>
+      <div class="pb-track" data-person="${esc(person)}" onclick="reworkClick_p('${person}')">
+        <div class="pb-rework" style="width:${Math.min(reworkPct,100)}%"></div>
+      </div>
+    </div>`;
+}
+
+function choreClick(el){
+  try{
+    const c=JSON.parse(el.dataset.chore.replace(/&#39;/g,"'"));
+    let html='';
+    if(c.thumbnail_url)html+=`<img src="${esc(c.thumbnail_url)}" class="dm-photo" onclick="openLB('${esc(c.thumbnail_url)}')">`;
+    const sc=c.score>=7?'sc-hi':c.score>=4?'sc-mi':'sc-lo';
+    const typeLabel=c.chore_type==='core'?'Core':c.chore_type==='rotating'?'Rotating':'Standard';
+    html+=`<div class="dm-score">
+      <span class="sc-badge ${sc}">${c.score||0}/10</span>
+      <strong>+${c.points_earned||0}/${c.points} pts</strong>
+      <span class="chore-type-tag ctt-${c.chore_type}">${typeLabel}</span>
+      ${c.time_spent_mins>0?`<span style="color:var(--sub)">⏱ ${c.time_spent_mins}m</span>`:''}
+      ${c.dispute_status?`<span style="font-size:.7rem;background:var(--amber);color:#fff;border-radius:4px;padding:.1rem .35rem">${c.dispute_status}</span>`:''}
+    </div>`;
+    if(c.assessment)html+=`<p style="margin-bottom:.5rem">${esc(c.assessment)}</p>`;
+    if(c.commentary)html+=`<p style="color:var(--purple);font-style:italic">💬 ${esc(c.commentary)}</p>`;
+    if(c.assessment_id){
+      html+=`<button class="dispute-btn" onclick="toggleDispute()">⚠️ Dispute this assessment</button>
+        <div class="dispute-form" id="dfForm">
+          <textarea placeholder="Explain why you disagree with this assessment…"></textarea>
+          <button class="dispute-submit" onclick="submitDispute(${c.assessment_id},this)">Submit Dispute</button>
+        </div>`;
+    }
+    showDetail(esc(c.chore_name),html);
+  }catch(e){console.error(e);}
+}
+
+async function reworkClick_p(person){
+  const viols=await fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({violations:[]}));
+  const mine=(viols.violations||[]).filter(v=>v.person_name===person);
+  if(!mine.length){showDetail(`${person} — Rework`,'No violations today! 🎉');return;}
+  const html=`<p style="margin-bottom:.7rem;font-size:.75rem;color:var(--sub)">${mine.length} violation${mine.length!==1?'s':''} recorded today</p>`+
+    mine.map(v=>`
+    <div style="margin-bottom:.7rem;padding:.6rem;background:var(--bg);border-radius:8px;border-left:3px solid var(--orange)">
+      ${v.thumbnail_url?`<img src="${esc(v.thumbnail_url)}" style="width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin-bottom:.4rem;cursor:pointer" onclick="openLB('${esc(v.thumbnail_url)}')">`:'' }
+      <div style="font-size:.68rem;font-weight:700;color:var(--orange)">${esc(v.violation_code)}</div>
+      <div style="font-size:.75rem;color:var(--text);margin:.18rem 0">${esc(v.description||'')}</div>
+      <div style="font-size:.7rem;color:var(--purple);font-style:italic">${esc(v.callout||'')}</div>
+      <div style="font-size:.6rem;color:var(--faint);margin-top:.2rem">${new Date(v.timestamp+'Z').toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} · ${esc(v.location||'')}</div>
+    </div>`).join('');
+  const actBtn=`<button class="btn" style="margin-top:.5rem" onclick="closeDetail();goToActivity('','${person}')">→ View in Activity Stream</button>`;
+  showDetail(`${person} — Rework Violations`,html+actBtn);
+}
+
+function toggleDispute(){
+  const f=document.getElementById('dfForm');
+  if(f)f.style.display=f.style.display==='block'?'none':'block';
+}
+async function submitDispute(id,btn){
+  const form=btn.closest('.dispute-form');
+  const note=form.querySelector('textarea').value.trim();
+  if(!note)return;
+  btn.disabled=true;btn.textContent='Submitting…';
+  const fd=new FormData();fd.append('assessment_id',id);fd.append('disputed_by','User');fd.append('dispute_note',note);
+  try{
+    await fetch(`${API}/api/disputes`,{method:'POST',body:fd});
+    form.innerHTML='<p style="color:var(--green)">✓ Dispute submitted.</p>';
+  }catch(e){btn.disabled=false;btn.textContent='Submit Dispute';}
+}
+
+// ── Recalculate ───────────────────────────────────────────────────────────────
+async function recalculate(){
+  const btn=document.querySelector('.btn-sm-act.recalc');
+  if(btn){btn.textContent='Recalculating…';btn.disabled=true;}
+  await fetch(`${API}/api/stats/recalculate`,{method:'POST'}).catch(()=>{});
+  await loadFeed();
+  if(btn){btn.textContent='🔄 Recalc';btn.disabled=false;}
+}
+
+// ── Notifications panel ───────────────────────────────────────────────────────
+async function loadNotifications(viols){
+  const body=document.getElementById('notifBody');
+  try{
+    let html='';
+    const vs=(viols.violations||[]);
+    if(vs.length){
+      html+=`<div class="ns-title">⚠️ Rework Violations Today (${vs.length})</div>`;
+      html+=vs.slice(0,6).map(v=>`<div class="ni ni-viol" onclick="${v.thumbnail_url?`openLB('${esc(v.thumbnail_url)}')`:`reworkClick_p('${esc(v.person_name)}')`}">
+        <span class="ni-badge">${esc(v.person_name)}</span><strong>${esc(v.violation_code)}</strong> — ${esc((v.description||'').slice(0,70))}
+      </div>`).join('');
+    }
+    const sightings=await fetch(`${API}/api/sightings?limit=8`).then(r=>r.json()).catch(()=>[]);
+    const obs=sightings.filter(s=>s.person_name!=='Unknown');
+    if(obs.length){
+      html+=`<div class="ns-title">👁️ Recent Observations</div>`;
+      html+=obs.slice(0,3).map(s=>`<div class="ni ni-obs" onclick="goToActivity('${s.activity_type||''}','${esc(s.person_name)}')">
+        <span class="ni-badge">${esc(s.person_name)}</span>${ACT_ICONS[s.activity_type]||'💼'} ${esc((s.task||'').slice(0,65))}
+      </div>`).join('');
+    }
+    const trend=await fetch(`${API}/api/trends/latest`).then(r=>r.json()).catch(()=>({report:null}));
+    if(trend.report){
+      html+=`<div class="ns-title">📈 Trend Observations</div>
+        <div class="ni ni-trend" onclick="showDetail('Trend Report','<pre style=white-space:pre-wrap;font-size:.78rem;line-height:1.6>${esc(trend.report)}</pre>')">${esc(trend.report.slice(0,120))}…</div>`;
+    }
+    if(!html)html='<div class="empty" style="padding:1rem">All clear — no notifications.</div>';
+    body.innerHTML=html;
+  }catch(e){body.innerHTML='<div class="empty" style="padding:1rem">Unable to load.</div>';}
+}
+
+async function generateTrends(){
+  const body=document.getElementById('notifBody');
+  body.innerHTML='<div class="empty" style="padding:1rem">Generating trend report…</div>';
+  const data=await fetch(`${API}/api/trends/generate`,{method:'POST'}).then(r=>r.json()).catch(()=>({ok:false}));
+  if(data.ok)showDetail('Trend Report',`<pre style="white-space:pre-wrap;font-size:.8rem;line-height:1.6">${esc(data.report)}</pre>`);
+  loadNotifications({violations:[]});
+}
+
+// ── Mini Calendar ─────────────────────────────────────────────────────────────
+function mcNav(d){mcM+=d;if(mcM>12){mcM=1;mcY++;}if(mcM<1){mcM=12;mcY--;}renderMiniCal();}
+async function renderMiniCal(){
+  const ms=`${mcY}-${p2(mcM)}`;
+  document.getElementById('mcTitle').textContent=`${MONTHS[mcM-1].slice(0,3)} ${mcY}`;
+  const data=await fetch(`${API}/api/chores/calendar?month=${ms}`).then(r=>r.json()).catch(()=>({days:{},person_max:{}}));
+  const persons=Object.keys(data.person_max||{}).sort();
+  const fd=(new Date(Date.UTC(mcY,mcM-1,1)).getUTCDay()+6)%7;
+  const dim=new Date(Date.UTC(mcY,mcM,0)).getUTCDate();
+  const today=todayStr();
+  let html=['M','T','W','T','F','S','S'].map(d=>`<div class="mc-dow">${d}</div>`).join('');
+  for(let i=0;i<fd;i++)html+=`<div></div>`;
+  for(let d=1;d<=dim;d++){
+    const ds=`${mcY}-${p2(mcM)}-${p2(d)}`;
+    const fut=ds>today;
+    const info=data.days?.[ds]||{};
+    const bars=persons.map(p=>{
+      const pi=info[p];
+      const col=pi?gaugeColor(pi.pct):'#e2e8f0';
+      return `<div class="mc-bar" style="background:${col}" title="${p}: ${pi?pi.pct:0}%"></div>`;
+    }).join('');
+    const cls=`mc-day${ds===today?' is-today':''}${fut?' is-future':''}`;
+    const oc=fut?'':`onclick="openCal('${ds}')"`;
+    html+=`<div class="${cls}" ${oc}><span class="mc-day-n">${d}</span><div class="mc-bars">${bars}</div></div>`;
+  }
+  document.getElementById('mcGrid').innerHTML=html;
+}
+
+// ── Full Calendar ─────────────────────────────────────────────────────────────
+function calNav(d){calM+=d;if(calM>12){calM=1;calY++;}if(calM<1){calM=12;calY--;}selDay=null;document.getElementById('dayDetail').innerHTML='';renderCal();}
+async function renderCal(){
+  const ms=`${calY}-${p2(calM)}`;
+  document.getElementById('calTitle').textContent=`${MONTHS[calM-1]} ${calY}`;
+  calData=await fetch(`${API}/api/chores/calendar?month=${ms}`).then(r=>r.json()).catch(()=>({days:{},person_max:{}}));
+  const persons=Object.keys(calData.person_max||{}).sort();
+  const fd=(new Date(Date.UTC(calY,calM-1,1)).getUTCDay()+6)%7;
+  const dim=new Date(Date.UTC(calY,calM,0)).getUTCDate();
+  const today=todayStr();
+  let html=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  for(let i=0;i<fd;i++)html+=`<div></div>`;
+  for(let d=1;d<=dim;d++){
+    const ds=`${calY}-${p2(calM)}-${p2(d)}`;
+    const fut=ds>today,isSel=ds===selDay,isT=ds===today;
+    const info=calData.days?.[ds]||{};
+    const badges=persons.map(p=>{
+      const pi=info[p];
+      const col=pi?gaugeColor(pi.pct):'var(--faint)';
+      return `<span class="cal-badge" style="color:${col}">${p[0]} ${pi?pi.pct:0}%</span>`;
+    }).join('');
+    const cls=`cal-day${isT?' is-today':''}${isSel?' is-sel':''}${fut?' is-future':''}`;
+    html+=`<div class="${cls}" ${fut?'':` onclick="selectDay('${ds}')"` }><span class="cal-day-n" style="font-weight:${isT?700:400}">${d}</span>${badges}</div>`;
+  }
+  document.getElementById('calGrid').innerHTML=html;
+}
+async function selectDay(ds){
+  selDay=ds;renderCal();
+  const ass=await fetch(`${API}/api/chores/assessments?date=${ds}`).then(r=>r.json()).catch(()=>[]);
+  const el=document.getElementById('dayDetail');
+  if(!ass.length){el.innerHTML=`<div class="empty">No assessments on ${ds}</div>`;return;}
+  const html=ass.map(a=>{
+    const sc=a.score>=7?'sc-hi':a.score>=4?'sc-mi':'sc-lo';
+    const ts=new Date(a.timestamp+'Z').toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    return `<div style="background:var(--bg);border-radius:8px;padding:.6rem;margin-bottom:.4rem;display:flex;gap:.6rem">
+      ${a.thumbnail_url?`<img src="${a.thumbnail_url}" style="width:52px;height:39px;object-fit:cover;border-radius:5px;cursor:pointer;flex-shrink:0" onclick="openLB('${a.thumbnail_url}')">`:'' }
+      <div><div style="display:flex;align-items:center;gap:.35rem;margin-bottom:.15rem;flex-wrap:wrap">
+        <strong style="font-size:.8rem">${esc(a.person_name)}</strong>
+        <span class="sc-badge ${sc}" style="font-size:.65rem">${a.score}/10</span>
+        <span style="font-size:.65rem;color:var(--sub)">+${a.points_earned}pts</span>
+        ${a.time_spent_mins>0?`<span style="font-size:.62rem;color:var(--faint)">⏱ ${a.time_spent_mins}m</span>`:''}
+        ${a.dispute_status?`<span style="font-size:.58rem;background:var(--amber);color:#fff;border-radius:4px;padding:.05rem .3rem">${a.dispute_status}</span>`:''}
+      </div>
+      <div style="font-size:.76rem;font-weight:600">${esc(a.chore_name)}</div>
+      <div style="font-size:.7rem;color:var(--sub);margin-top:.15rem">${esc(a.assessment||'')} <span style="color:var(--faint)">(${ts})</span></div>
+      ${a.commentary?`<div style="font-size:.68rem;color:var(--purple);font-style:italic;margin-top:.15rem">💬 ${esc(a.commentary)}</div>`:''}
+      </div></div>`;
+  }).join('');
+  el.innerHTML=`<h4 style="font-size:.82rem;margin-bottom:.5rem;color:var(--text)">📋 ${ds}</h4>${html}`;
+}
+
+// ── Push notifications ────────────────────────────────────────────────────────
+function checkPushNotif(){
+  if(!('Notification' in window))return;
+  if(Notification.permission!=='granted'){Notification.requestPermission();return;}
+  const h=new Date().getHours(),today=todayStr();
+  const amKey=`notif_${today}_am`,pmKey=`notif_${today}_pm`;
+  if(h>=7&&h<11&&!localStorage.getItem(amKey)){
+    new Notification('🌅 Morning Chores!',{body:'Your chores for today are assigned. Check the dashboard!'});
+    localStorage.setItem(amKey,'1');
+  }else if(h>=17&&h<21&&!localStorage.getItem(pmKey)){
+    new Notification('🌙 Evening Check-in',{body:"How did today's chores go? Don't forget evening tasks!"});
+    localStorage.setItem(pmKey,'1');
+  }
+}
+
+// ── Chore table (grouped by person, no Person column, renamed rotating_with) ──
+async function loadChoreTable(){
+  const chores=await fetch(`${API}/api/chores/list`).then(r=>r.json()).catch(()=>[]);
+  // Group by person_name
+  const groups={};
+  chores.forEach(c=>{
+    const g=c.person_name||'Other';
+    if(!groups[g])groups[g]=[];
+    groups[g].push(c);
+  });
+  const FREQ_OPTIONS=['daily','every-2-days','weekly','when-suits','monthly','once'];
+  let html='';
+  for(const [person,pChores] of Object.entries(groups)){
+    const col=person==='Liam'?'#3b82f6':person==='Rachel'?'#a855f7':person==='both'?'#22c55e':'#64748b';
+    html+=`<tr class="person-section"><td colspan="7" style="color:${col}">👤 ${esc(person)}</td></tr>`;
+    html+=pChores.map(c=>{
+      // "Person" column: for rotating show partner, for others show person_name (already shown in header, so show partner or "—")
+      const personCol=c.chore_type==='rotating'&&c.rotating_with?c.rotating_with:(person==='both'?'both':'—');
+      return `<tr>
+        <td><input class="editable" value="${esc(c.chore_name)}" onblur="updChore(${c.id},'chore_name',this.value)" style="min-width:120px"></td>
+        <td><select class="freq-sel" onchange="updChore(${c.id},'frequency',this.value)">
+          ${FREQ_OPTIONS.map(f=>`<option${f===c.frequency?' selected':''}>${f}</option>`).join('')}
+        </select></td>
+        <td><select class="type-sel" onchange="updChore(${c.id},'chore_type',this.value)">
+          ${['standard','core','rotating'].map(t=>`<option${t===c.chore_type?' selected':''}>${t}</option>`).join('')}
+        </select></td>
+        <td><select class="person-sel" onchange="updChore(${c.id},'rotating_with',this.value)">
+          <option value="">—</option>
+          <option value="Liam"${personCol==='Liam'?' selected':''}>Liam</option>
+          <option value="Rachel"${personCol==='Rachel'?' selected':''}>Rachel</option>
+          <option value="both"${personCol==='both'?' selected':''}>both</option>
+        </select></td>
+        <td style="text-align:center"><input class="pts-num" type="number" value="${c.points}" min="1" max="300" onblur="updChore(${c.id},'points',this.value)"></td>
+        <td style="text-align:center"><input type="checkbox" ${c.show_on_dashboard!==false?'checked':''} onchange="updChore(${c.id},'show_on_dashboard',this.checked?'1':'0')" title="Show on dashboard"></td>
+        <td><button class="btn-del" onclick="delChore(${c.id})">✕</button></td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('choreBody').innerHTML=html;
+}
+
+async function updChore(id,field,val){
+  const fd=new FormData();fd.append(field,val);
+  await fetch(`${API}/api/chores/list/${id}`,{method:'PUT',body:fd});
+}
+async function delChore(id){
+  if(!confirm('Remove this chore?'))return;
+  await fetch(`${API}/api/chores/list/${id}`,{method:'DELETE'});
+  loadChoreTable();
+}
+function toggleRot(){}
+
+document.getElementById('addChoreForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const fd=new FormData();
+  fd.append('chore_name',document.getElementById('newName').value.trim());
+  fd.append('person_name',document.getElementById('newPerson').value);
+  fd.append('frequency',document.getElementById('newFreq').value);
+  fd.append('chore_type',document.getElementById('newType').value);
+  fd.append('points',document.getElementById('newPts').value);
+  const msg=document.getElementById('choreMsg');
+  try{
+    const res=await fetch(`${API}/api/chores/list`,{method:'POST',body:fd});
+    if(!res.ok)throw new Error(await res.text());
+    msg.className='msg';msg.textContent='✓ Added!';
+    document.getElementById('addChoreForm').reset();
+    loadChoreTable();
+    setTimeout(()=>msg.textContent='',2500);
+  }catch(err){msg.className='msg err';msg.textContent='✗ '+err.message;}
+});
+
+async function loadCarry(){
+  const plan=await fetch(`${API}/api/chores/daily-plan`).then(r=>r.json()).catch(()=>({plan:{}}));
+  const items=[];
+  Object.entries(plan.plan||{}).forEach(([p,d])=>{
+    (d.chores||[]).filter(c=>c.carried_forward).forEach(c=>{
+      items.push(`<div style="display:flex;align-items:center;gap:.5rem;padding:.22rem 0;border-bottom:1px solid var(--border);font-size:.77rem">
+        <span>🔄</span><span style="flex:1"><strong>${esc(p)}</strong>: ${esc(c.chore_name)}</span>
+        <span style="color:var(--amber)">${Math.floor(c.points*.5)} pts (50%)</span>
+      </div>`);
+    });
+  });
+  document.getElementById('carryList').innerHTML=items.length
+    ?`<div style="background:var(--bg);border-radius:8px;padding:.6rem">${items.join('')}</div>`
+    :'<div class="empty">No carry-forward today.</div>';
+}
+
+async function loadChoreDL(){
+  const chores=await fetch(`${API}/api/chores/list`).then(r=>r.json()).catch(()=>[]);
+  document.getElementById('choreDL').innerHTML=chores.map(c=>`<option value="${esc(c.chore_name)}">`).join('');
+}
+
+// ── AI buttons ─────────────────────────────────────────────────────────────────
+async function suggestPoints(){
+  const box=document.getElementById('compBox');
+  const wb=document.getElementById('weightBox');
+  box.style.display='block';box.textContent='✨ AI is calculating fair point values…';
+  try{
+    const d=await fetch(`${API}/api/chores/suggest-points`,{method:'POST'}).then(r=>r.json());
+    box.textContent=`✓ Updated ${d.updated||0} chore point values.`;
+    loadChoreTable();
+    // Show weight feedback if any issues found
+    const feedback=d.weight_feedback||[];
+    if(feedback.length){
+      wb.style.display='block';
+      wb.innerHTML=`<div class="card-title" style="margin-bottom:.5rem">⚠️ Potentially Mis-weighted Items</div>`+
+        feedback.map(f=>`<div class="weight-item">
+          <span class="wi-name">${esc(f.person)}: ${esc(f.chore_name)}</span>
+          <span class="wi-reason">${f.current_points}pts → suggest ${f.suggested_points}pts — ${esc(f.reason)}</span>
+        </div>`).join('');
+    }else{
+      wb.style.display='none';
+    }
+    setTimeout(()=>{box.style.display='none';},3000);
+  }catch(e){box.textContent='✗ Error: '+e.message;}
+}
+
+async function loadComparison(){
+  const box=document.getElementById('compBox');
+  box.style.display='block';box.textContent='📊 AI is comparing chore performance…';
+  try{
+    const d=await fetch(`${API}/api/chores/comparison`).then(r=>r.json()).catch(()=>({report:'Error'}));
+    box.textContent=d.report;
+    showDetail('📊 AI Chore Comparison',`<div style="white-space:pre-wrap;font-size:.8rem;line-height:1.7">${esc(d.report)}</div>`);
+  }catch(e){box.textContent='✗ '+e.message;}
+}
+
+async function loadSummary(){
+  const box=document.getElementById('compBox');
+  box.style.display='block';box.textContent='📋 Generating summary…';
+  try{
+    const d=await fetch(`${API}/api/chores/summary?period=daily`).then(r=>r.json()).catch(()=>({summary:'Error'}));
+    box.style.display='none';
+    showDetail('📋 Daily Summary',`<div style="white-space:pre-wrap;font-size:.8rem;line-height:1.7">${esc(d.summary)}</div>`);
+  }catch(e){box.textContent='✗ '+e.message;}
+}
+
+// ── Activity feed ──────────────────────────────────────────────────────────────
+function setFilter(el,type){
+  _showViolations=false;
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');activeType=type;loadFeed();
+}
+function setViolFilter(el){
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');_showViolations=true;activeType='';loadFeed();
+}
+async function manualRefresh(){
+  const btn=document.getElementById('refreshBtn');btn.classList.add('spinning');
+  await loadFeed();setTimeout(()=>btn.classList.remove('spinning'),500);
+}
+async function loadFeed(){
+  if(_feedLoading)return;_feedLoading=true;
+  const feed=document.getElementById('feed'),status=document.getElementById('feedStatus');
+  try{
+    // If violations filter active, show violations as feed items
+    if(_showViolations){
+      const viols=await fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({violations:[]}));
+      const vArr=viols.violations||[];
+      if(!vArr.length){feed.innerHTML='<div class="empty">No violations today 🎉</div>';}
+      else{
+        feed.innerHTML=vArr.map(v=>{
+          const ts=new Date(v.timestamp+'Z').toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+          return `<div class="feed-item type-violation">
+            ${v.thumbnail_url?`<img src="${v.thumbnail_url}" onclick="openLB('${v.thumbnail_url}')" title="Click to enlarge">` :''}
+            <div>
+              <div class="fi-who"><span class="ni-badge" style="background:var(--orange)">${esc(v.person_name)}</span> ⚠️ Violation</div>
+              <div class="fi-task"><strong>${esc(v.violation_code)}</strong> — ${esc(v.description||'')}</div>
+              <div style="font-size:.7rem;color:var(--purple);font-style:italic;margin-top:.1rem">${esc(v.callout||'')}</div>
+              <div class="fi-meta">📍 ${esc(v.location||'')} · ${ts}</div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+      return;
+    }
+
+    const loc=document.getElementById('filterLoc').value;
+    const pid=document.getElementById('filterPerson').value;
+    let url=`${API}/api/sightings?limit=80`;
+    if(loc)url+=`&location=${encodeURIComponent(loc)}`;
+    if(pid)url+=`&person_id=${pid}`;
+    if(activeType)url+=`&activity_type=${activeType}`;
+
+    // Fetch sightings + today's assessments for enrichment
+    const [items,todayAss,todayViols]=await Promise.all([
+      fetch(url).then(r=>{if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();}),
+      fetch(`${API}/api/chores/assessments`).then(r=>r.json()).catch(()=>[]),
+      fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({violations:[]})),
+    ]);
+
+    // Build a quick violation set (person+approx_time) for tagging
+    const violSet=new Set((todayViols.violations||[]).map(v=>v.person_name+'|'+v.timestamp.slice(0,16)));
+
+    status.style.display='none';
+    if(!items.length){feed.innerHTML='<div class="empty">No activity recorded yet.</div>';return;}
+
+    // Update location dropdown
+    const ls=document.getElementById('filterLoc');
+    const known=new Set([...ls.querySelectorAll('option')].map(o=>o.value).filter(Boolean));
+    items.forEach(s=>{if(s.location&&!known.has(s.location)){const o=document.createElement('option');o.value=s.location;o.textContent=s.location;ls.appendChild(o);known.add(s.location);}});
+
+    feed.innerHTML=items.map(s=>{
+      const t=s.activity_type||'other';
+      const conf=s.confidence;
+      const bc=conf>=.75?'cd-hi':conf>=.45?'cd-mi':'cd-lo';
+      const ts=new Date(s.timestamp+'Z').toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      const img=s.thumbnail_url?`<img src="${s.thumbnail_url}" onclick="openLB('${s.thumbnail_url}')" title="Click to enlarge">` :'';
+
+      // Check for linked chore assessment (within 5 min, same person)
+      const sTime=new Date(s.timestamp+'Z').getTime();
+      const linkedAss=todayAss.find(a=>a.person_name===s.person_name&&Math.abs(new Date(a.timestamp+'Z').getTime()-sTime)<5*60*1000);
+
+      // Traceability badge
+      let traceBadge='';
+      if(t==='cleaning'||linkedAss) traceBadge=`<span class="trace-badge tb-chores" onclick="goToActivity('cleaning','${esc(s.person_name)}')">→ Chores</span>`;
+      else if(t==='family') traceBadge=`<span class="trace-badge tb-family" onclick="goToActivity('family','${esc(s.person_name)}')">→ Family Time</span>`;
+      else if(t==='personal') traceBadge=`<span class="trace-badge tb-personal" onclick="goToActivity('personal','${esc(s.person_name)}')">→ Personal Time</span>`;
+      else if(t==='cooking'||t==='eating') traceBadge=`<span class="trace-badge tb-kitchen" onclick="goToActivity('cooking','${esc(s.person_name)}')">→ Kitchen</span>`;
+
+      // Violation tag: check if this sighting has a linked violation
+      const sMin=s.timestamp.slice(0,16);
+      const hasViol=violSet.has(s.person_name+'|'+sMin);
+      const violTag=hasViol?`<span class="trace-badge tb-viol">⚠️ Violation</span>`:'';
+
+      // Chore type tag + points if linked assessment
+      let choreTag='';
+      if(linkedAss){
+        const ctypeLabel=linkedAss.chore_type||'standard';
+        choreTag=`<span class="chore-type-tag ctt-${ctypeLabel}">${ctypeLabel}</span>
+          <span class="pts-tag">+${linkedAss.points_earned||0}pts</span>`;
+      }
+
+      return `<div class="feed-item type-${t}${hasViol?' type-violation':''}">${img}<div style="flex:1;min-width:0">
+        <div class="fi-who">${ACT_ICONS[t]||'💼'} ${esc(s.person_name)}<span class="conf-dot ${bc}">${Math.round(conf*100)}%</span>${choreTag}${violTag}</div>
+        <div class="fi-task">${esc(s.task||'')}</div>
+        <div class="fi-meta">📍 ${esc(s.location||'')} · ${ts}${traceBadge?` · ${traceBadge}`:''}</div>
+        ${linkedAss?`<div style="font-size:.68rem;color:var(--sub);margin-top:.1rem">📋 ${esc(linkedAss.chore_name)}: <strong>${linkedAss.score}/10</strong>${linkedAss.commentary?` — ${esc(linkedAss.commentary.slice(0,60))}`:''}</div>`:''}
+      </div></div>`;
+    }).join('');
+  }catch(e){
+    status.style.display='block';status.textContent='⚠️ '+e.message;
+    feed.innerHTML='<div class="empty">Unable to load feed.</div>';
+  }finally{_feedLoading=false;}
+}
+
+async function loadPersons(){
+  const persons=await fetch(`${API}/api/persons`).then(r=>r.json()).catch(()=>[]);
+  _persons=persons;
+  const list=document.getElementById('personList'),sel=document.getElementById('filterPerson');
+  sel.innerHTML='<option value="">All people</option>';
+  list.innerHTML=persons.length?'':'<p class="empty">No people enrolled yet.</p>';
+  persons.forEach(p=>{
+    const el=document.createElement('div');el.className='person-item';
+    el.innerHTML=`${p.photo_url?`<img src="${p.photo_url}" onclick="openLB('${p.photo_url}')">`:'<div style="width:32px;height:32px;background:var(--border);border-radius:50%"></div>'}
+      <span class="pname">${esc(p.name)}</span>
+      <button class="btn-del" onclick="delPerson(${p.id},'${esc(p.name)}')">✕</button>`;
+    list.appendChild(el);
+    const opt=document.createElement('option');opt.value=p.id;opt.textContent=p.name;sel.appendChild(opt);
+  });
+}
+async function delPerson(id,name){if(!confirm(`Remove ${name}?`))return;await fetch(`${API}/api/persons/${id}`,{method:'DELETE'});loadPersons();}
+
+document.getElementById('enrolForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('enrolBtn'),msg=document.getElementById('enrolMsg');
+  btn.disabled=true;msg.className='msg';msg.textContent='Analysing face…';
+  const fd=new FormData();
+  fd.append('name',document.getElementById('enrolName').value.trim());
+  fd.append('photo',document.getElementById('enrolPhoto').files[0]);
+  try{
+    const res=await fetch(`${API}/api/persons`,{method:'POST',body:fd});
+    if(!res.ok)throw new Error(await res.text());
+    msg.textContent='✓ Enrolled!';document.getElementById('enrolForm').reset();loadPersons();
+  }catch(err){msg.className='msg err';msg.textContent='✗ '+err.message;}
+  finally{btn.disabled=false;}
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+loadDashboard();
+setInterval(loadDashboard,60000);
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+backend/static/uploads/
+*.egg-info/
+dist/
+.DS_Store
