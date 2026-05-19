@@ -1143,10 +1143,10 @@ function renderPanel(person,data,viols,ds,ms){
     </div>
 
     <div class="hd-row">
-      ${halfDonut(pct,         'Jobs',        `${data.earned_points||0}/${data.total_points||0} pts`, choreOnclick, `g-${px}-jobs`, GRADS.jobs)}
-      ${halfDonut(dayFamPct,   'Family Time', fmtM(ds.family_mins||0),                               famOnclick,   `g-${px}-fam`,  GRADS.fam)}
-      ${halfDonut(reworkPct,   'Rework',      violCount ? `${violCount} flag${violCount!==1?'s':''}` : 'clean ✓',  rewOnclick,   `g-${px}-rew`,  GRADS.rew)}
-      ${halfDonut(dayPersonPct,'Relaxing',    fmtM(ds.personal_mins||0),                             persOnclick,  `g-${px}-rel`,  GRADS.rel)}
+      ${halfDonut(pct,         'Jobs',        pct+'%',         choreOnclick, `g-${px}-jobs`, GRADS.jobs)}
+      ${halfDonut(dayFamPct,   'Family Time', dayFamPct+'%',   famOnclick,   `g-${px}-fam`,  GRADS.fam)}
+      ${halfDonut(reworkPct,   'Rework',      reworkPct+'%',   rewOnclick,   `g-${px}-rew`,  GRADS.rew)}
+      ${halfDonut(dayPersonPct,'Relaxing',    dayPersonPct+'%',persOnclick,  `g-${px}-rel`,  GRADS.rel)}
     </div>
 
     <div class="chore-list-hdr">
