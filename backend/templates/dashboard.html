@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>Home Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root{
   --bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#1e293b;--sub:#64748b;--faint:#94a3b8;
@@ -28,8 +29,24 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 /* Layout */
 .tab-pane{display:none;height:calc(100vh - var(--hdr));margin-top:var(--hdr);overflow:hidden}
 .tab-pane.active{display:flex;flex-direction:column}
-/* Dashboard grid — full width, no right panel */
-.dash-layout{display:grid;grid-template-columns:1fr;gap:8px;padding:8px;height:100%;overflow:hidden}
+/* Dashboard scroll wrapper */
+.dash-scroll{flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:0}
+/* ── KPI stat strip ── */
+.stats-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:8px 8px 0;flex-shrink:0}
+.stat-kpi{background:var(--card);border-radius:10px;border:1px solid var(--border);box-shadow:var(--sh);padding:.55rem .75rem;position:relative;overflow:hidden;cursor:default;min-width:0}
+.stat-kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:10px 10px 0 0}
+.sk-blue::before{background:var(--blue)}.sk-purple::before{background:var(--purple)}.sk-green::before{background:var(--green)}
+.sk-cyan::before{background:var(--cyan)}.sk-amber::before{background:var(--amber)}.sk-orange::before{background:var(--orange)}
+.sk-label{font-size:.55rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.18rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk-value{font-size:1.15rem;font-weight:800;color:var(--text);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk-sub{font-size:.58rem;color:var(--faint);margin-top:.12rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ── Charts row ── */
+.charts-row{display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;padding:6px 8px 0;flex-shrink:0;height:170px}
+.chart-card{background:var(--card);border-radius:10px;border:1px solid var(--border);box-shadow:var(--sh);padding:.5rem .7rem;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.chart-title{font-size:.6rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;margin-bottom:.25rem}
+.chart-inner{position:relative;flex:1;min-height:0}
+/* ── Person panels side by side ── */
+.panels-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px 8px 8px;flex:1;min-height:320px}
 /* Person panel */
 .person-panel{background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .pp-head{padding:.55rem .8rem .3rem;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -284,14 +301,65 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 
 <!-- ══ DASHBOARD ══ -->
 <div id="tab-dashboard" class="tab-pane active">
-  <div class="dash-layout">
-    <!-- Single merged panel for both people -->
-    <div id="dashMain" style="display:flex;flex-direction:column;gap:8px;overflow:hidden;min-height:0">
-      <div id="unassignedStrip" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.45rem .7rem;box-shadow:var(--sh);flex-shrink:0"></div>
+  <div class="dash-scroll">
+
+    <!-- ── KPI stat boxes ─────────────────────────────────────────────── -->
+    <div class="stats-strip">
+      <div class="stat-kpi sk-blue">
+        <div class="sk-label">⏰ Liam — Rise Time</div>
+        <div class="sk-value" id="kv-riseL">—</div>
+        <div class="sk-sub" id="ks-riseL">avg this month</div>
+      </div>
+      <div class="stat-kpi sk-purple">
+        <div class="sk-label">⏰ Rachel — Rise Time</div>
+        <div class="sk-value" id="kv-riseR">—</div>
+        <div class="sk-sub" id="ks-riseR">avg this month</div>
+      </div>
+      <div class="stat-kpi sk-green">
+        <div class="sk-label">🏆 Jobs Leader</div>
+        <div class="sk-value" id="kv-jobsL">—</div>
+        <div class="sk-sub" id="ks-jobsL">today's points</div>
+      </div>
+      <div class="stat-kpi sk-cyan">
+        <div class="sk-label">❤️ Family Time Leader</div>
+        <div class="sk-value" id="kv-famL">—</div>
+        <div class="sk-sub" id="ks-famL">this month</div>
+      </div>
+      <div class="stat-kpi sk-amber">
+        <div class="sk-label">👁️ Most Present</div>
+        <div class="sk-value" id="kv-presL">—</div>
+        <div class="sk-sub" id="ks-presL">days seen this month</div>
+      </div>
+      <div class="stat-kpi sk-orange">
+        <div class="sk-label">🔄 Carry-overs Today</div>
+        <div class="sk-value" id="kv-carry">—</div>
+        <div class="sk-sub" id="ks-carry">jobs not done yesterday</div>
+      </div>
+    </div>
+
+    <!-- ── Charts row ─────────────────────────────────────────────────── -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">📈 Jobs Completion — This Month</div>
+        <div class="chart-inner"><canvas id="chartJobs"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">❤️ Family Time — This Month</div>
+        <div class="chart-inner" id="chartFamilyWrap"><canvas id="chartFamily"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">⚠️ Rework Flags — Today</div>
+        <div class="chart-inner" id="chartReworkWrap"><canvas id="chartRework"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── Person panels side by side ────────────────────────────────── -->
+    <div class="panels-row">
+      <div id="unassignedStrip" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.45rem .7rem;box-shadow:var(--sh);grid-column:1/-1;align-self:start"></div>
       <div class="person-panel" id="panel-Liam"></div>
       <div class="person-panel" id="panel-Rachel"></div>
     </div>
-    <!-- notifications panel removed (#6) -->
+
   </div>
 </div>
 
@@ -639,13 +707,109 @@ document.getElementById('addTodayForm').addEventListener('submit',async e=>{
   }catch(err){msg.className='msg err';msg.textContent='✗ '+err.message;}
 });
 
+// ── Chart instances (kept to allow destroy/recreate) ──────────────────────────
+let _chartJobs=null,_chartFamily=null,_chartRework=null;
+
+const CHART_DEFAULTS={
+  responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{labels:{font:{size:9},boxWidth:10,padding:6}}},
+};
+
+function renderCharts(plan, viols, monthly, calendar){
+  const calDays=calendar.days||{};
+  const dayNums=Object.keys(calDays).sort();
+
+  // ── 1. Jobs line chart ───────────────────────────────────────────────────
+  if(_chartJobs){_chartJobs.destroy();_chartJobs=null;}
+  const ctxJ=document.getElementById('chartJobs');
+  if(ctxJ){
+    if(dayNums.length){
+      const labels=dayNums.map(d=>parseInt(d.split('-')[2]));
+      const liamLine=dayNums.map(d=>calDays[d]?.Liam?.pct||0);
+      const rachelLine=dayNums.map(d=>calDays[d]?.Rachel?.pct||0);
+      _chartJobs=new Chart(ctxJ,{
+        type:'line',
+        data:{labels,datasets:[
+          {label:'Liam',data:liamLine,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.12)',tension:.35,fill:true,pointRadius:2,borderWidth:2},
+          {label:'Rachel',data:rachelLine,borderColor:'#a855f7',backgroundColor:'rgba(168,85,247,.12)',tension:.35,fill:true,pointRadius:2,borderWidth:2},
+        ]},
+        options:{...CHART_DEFAULTS,
+          plugins:{...CHART_DEFAULTS.plugins,tooltip:{mode:'index',intersect:false}},
+          scales:{
+            x:{ticks:{font:{size:8},maxRotation:0},grid:{display:false}},
+            y:{min:0,max:100,ticks:{font:{size:8},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,.05)'}},
+          }
+        }
+      });
+    } else {
+      ctxJ.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--faint);font-size:.72rem">No job data this month yet</div>';
+    }
+  }
+
+  // ── 2. Family time bar chart ─────────────────────────────────────────────
+  if(_chartFamily){_chartFamily.destroy();_chartFamily=null;}
+  const ctxF=document.getElementById('chartFamily');
+  if(ctxF){
+    const liamH=Math.round((monthly.persons?.Liam?.family_mins||0)/60*10)/10;
+    const rachelH=Math.round((monthly.persons?.Rachel?.family_mins||0)/60*10)/10;
+    _chartFamily=new Chart(ctxF,{
+      type:'bar',
+      data:{
+        labels:['Liam','Rachel'],
+        datasets:[{
+          data:[liamH,rachelH],
+          backgroundColor:['rgba(59,130,246,.82)','rgba(168,85,247,.82)'],
+          borderRadius:6,borderSkipped:false,
+        }]
+      },
+      options:{...CHART_DEFAULTS,
+        plugins:{...CHART_DEFAULTS.plugins,legend:{display:false},
+          tooltip:{callbacks:{label:ctx=>`${ctx.raw}h family time`}}},
+        scales:{
+          x:{ticks:{font:{size:9}},grid:{display:false}},
+          y:{min:0,ticks:{font:{size:8},callback:v=>v+'h'},grid:{color:'rgba(0,0,0,.05)'}},
+        }
+      }
+    });
+  }
+
+  // ── 3. Rework donut ──────────────────────────────────────────────────────
+  if(_chartRework){_chartRework.destroy();_chartRework=null;}
+  const wrapR=document.getElementById('chartReworkWrap');
+  const ctxR=document.getElementById('chartRework');
+  const liamV=viols.by_person?.Liam||0, rachelV=viols.by_person?.Rachel||0;
+  if(ctxR&&wrapR){
+    if(liamV+rachelV===0){
+      wrapR.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:.3rem"><div style="font-size:1.6rem">✅</div><div style="color:var(--green);font-size:.72rem;font-weight:700">All clean today!</div></div>';
+    } else {
+      _chartRework=new Chart(ctxR,{
+        type:'doughnut',
+        data:{
+          labels:['Liam','Rachel'],
+          datasets:[{
+            data:[liamV,rachelV],
+            backgroundColor:['#3b82f6','#a855f7'],
+            borderWidth:2,borderColor:'#fff',hoverOffset:4,
+          }]
+        },
+        options:{...CHART_DEFAULTS,cutout:'62%',
+          plugins:{...CHART_DEFAULTS.plugins,
+            tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw} flag${ctx.raw!==1?'s':''}`}}
+          }
+        }
+      });
+    }
+  }
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 async function loadDashboard(){
-  const [plan,viols,daily,monthly]=await Promise.all([
+  const [plan,viols,daily,monthly,calendar]=await Promise.all([
     fetch(`${API}/api/chores/daily-plan`).then(r=>r.json()).catch(()=>({plan:{},unassigned:[]})),
     fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({by_person:{},violations:[]})),
     fetch(`${API}/api/stats/daily`).then(r=>r.json()).catch(()=>({})),
     fetch(`${API}/api/stats/monthly`).then(r=>r.json()).catch(()=>({persons:{}})),
+    fetch(`${API}/api/chores/calendar`).then(r=>r.json()).catch(()=>({days:{}})),
   ]);
   // Render unassigned chores strip
   const uArr=plan.unassigned||[];
@@ -658,6 +822,43 @@ async function loadDashboard(){
     uEl.style.display='block';
   }else if(uEl){uEl.style.display='none';}
   if(!_persons.length) _persons=await fetch(`${API}/api/persons`).then(r=>r.json()).catch(()=>[]);
+  // ── KPI stat boxes ────────────────────────────────────────────────────────
+  const kv=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  function avgTimeStr(arr){
+    const valid=(arr||[]).filter(t=>t&&/^\d{2}:\d{2}/.test(t));
+    if(!valid.length)return null;
+    const mins=valid.map(t=>{const[h,m]=t.split(':').map(Number);return h*60+m;});
+    const avg=Math.round(mins.reduce((a,b)=>a+b,0)/mins.length);
+    return `${String(Math.floor(avg/60)).padStart(2,'0')}:${String(avg%60).padStart(2,'0')} UTC`;
+  }
+  kv('kv-riseL', avgTimeStr(monthly.persons?.Liam?.arrivals)||'—');
+  kv('kv-riseR', avgTimeStr(monthly.persons?.Rachel?.arrivals)||'—');
+  kv('ks-riseL', `${(monthly.persons?.Liam?.arrivals||[]).length} days tracked`);
+  kv('ks-riseR', `${(monthly.persons?.Rachel?.arrivals||[]).length} days tracked`);
+  // Jobs leader
+  const liamPts=plan.plan?.Liam?.earned_points||0, rachelPts=plan.plan?.Rachel?.earned_points||0;
+  if(liamPts===0&&rachelPts===0){kv('kv-jobsL','—');kv('ks-jobsL','no points yet today');}
+  else if(liamPts>=rachelPts){kv('kv-jobsL','Liam 🏆');kv('ks-jobsL',liamPts+'pts vs Rachel '+rachelPts);}
+  else{kv('kv-jobsL','Rachel 🏆');kv('ks-jobsL',rachelPts+'pts vs Liam '+liamPts);}
+  // Family time leader
+  const liamFam=monthly.persons?.Liam?.family_mins||0, rachelFam=monthly.persons?.Rachel?.family_mins||0;
+  if(liamFam>=rachelFam){kv('kv-famL','Liam');kv('ks-famL',fmtM(liamFam)+' vs Rachel '+fmtM(rachelFam));}
+  else{kv('kv-famL','Rachel');kv('ks-famL',fmtM(rachelFam)+' vs Liam '+fmtM(liamFam));}
+  // Most present
+  const liamDays=monthly.persons?.Liam?.days_seen||0, rachelDays=monthly.persons?.Rachel?.days_seen||0;
+  if(liamDays===0&&rachelDays===0){kv('kv-presL','—');kv('ks-presL','no data this month');}
+  else if(liamDays>=rachelDays){kv('kv-presL','Liam');kv('ks-presL',liamDays+' days vs Rachel '+rachelDays);}
+  else{kv('kv-presL','Rachel');kv('ks-presL',rachelDays+' days vs Liam '+liamDays);}
+  // Carry-overs
+  const liamCarry=(plan.plan?.Liam?.chores||[]).filter(c=>c.carried_forward).length;
+  const rachelCarry=(plan.plan?.Rachel?.chores||[]).filter(c=>c.carried_forward).length;
+  const totalCarry=liamCarry+rachelCarry;
+  kv('kv-carry', totalCarry||'0');
+  kv('ks-carry', totalCarry?`Liam ${liamCarry} · Rachel ${rachelCarry}`:'All clear today ✓');
+
+  // ── Charts ────────────────────────────────────────────────────────────────
+  renderCharts(plan, viols, monthly, calendar);
+
   // ── Carry-forward badges ──────────────────────────────────────────────────
   ['Liam','Rachel'].forEach(person=>{
     const chores=(plan.plan?.[person]?.chores)||[];
