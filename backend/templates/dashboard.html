@@ -32,7 +32,7 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 /* Dashboard scroll wrapper */
 .dash-scroll{flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:0}
 /* ── KPI stat strip ── */
-.stats-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:8px 8px 0;flex-shrink:0}
+.stats-strip{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;padding:8px 8px 0;flex-shrink:0}
 .stat-kpi{background:var(--card);border-radius:10px;border:1px solid var(--border);box-shadow:var(--sh);padding:.55rem .75rem;position:relative;overflow:hidden;cursor:default;min-width:0}
 .stat-kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:10px 10px 0 0}
 .sk-blue::before{background:var(--blue)}.sk-purple::before{background:var(--purple)}.sk-green::before{background:var(--green)}
@@ -306,12 +306,22 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
     <!-- ── KPI stat boxes ─────────────────────────────────────────────── -->
     <div class="stats-strip">
       <div class="stat-kpi sk-blue">
-        <div class="sk-label">⏰ Liam — Rise Time</div>
+        <div class="sk-label">🌅 Liam — Today</div>
+        <div class="sk-value" id="kv-todayL">—</div>
+        <div class="sk-sub" id="ks-todayL">today's wake time</div>
+      </div>
+      <div class="stat-kpi sk-purple">
+        <div class="sk-label">🌅 Rachel — Today</div>
+        <div class="sk-value" id="kv-todayR">—</div>
+        <div class="sk-sub" id="ks-todayR">today's wake time</div>
+      </div>
+      <div class="stat-kpi sk-blue" style="opacity:.8">
+        <div class="sk-label">⏰ Liam — Avg Rise</div>
         <div class="sk-value" id="kv-riseL">—</div>
         <div class="sk-sub" id="ks-riseL">avg this month</div>
       </div>
-      <div class="stat-kpi sk-purple">
-        <div class="sk-label">⏰ Rachel — Rise Time</div>
+      <div class="stat-kpi sk-purple" style="opacity:.8">
+        <div class="sk-label">⏰ Rachel — Avg Rise</div>
         <div class="sk-value" id="kv-riseR">—</div>
         <div class="sk-sub" id="ks-riseR">avg this month</div>
       </div>
@@ -330,7 +340,7 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
         <div class="sk-value" id="kv-presL">—</div>
         <div class="sk-sub" id="ks-presL">days seen this month</div>
       </div>
-      <div class="stat-kpi sk-orange">
+      <div class="stat-kpi sk-orange" onclick="carryOverClick()" style="cursor:pointer" title="Click to see what's carried over">
         <div class="sk-label">🔄 Carry-overs Today</div>
         <div class="sk-value" id="kv-carry">—</div>
         <div class="sk-sub" id="ks-carry">jobs not done yesterday</div>
@@ -699,13 +709,113 @@ document.getElementById('addTodayForm').addEventListener('submit',async e=>{
     document.getElementById('atChore').value='';
     document.getElementById('atNotes').value='';
     document.getElementById('atMeal').value='';
+    const completedScore=parseInt(document.getElementById('atScore').value||10);
     document.getElementById('atScore').value='10';
     document.getElementById('atMeal').style.display='none';
     document.getElementById('atMealLabel').style.display='none';
+    // 🎵 Play sound based on score
+    if(completedScore>=8) playMarioFanfare();
+    else if(completedScore>=4) playMarioCoin();
     setTimeout(()=>closeAddToday(),1800);
     loadDashboard();
   }catch(err){msg.className='msg err';msg.textContent='✗ '+err.message;}
 });
+
+// ── Sound engine (Web Audio API — no files needed) ────────────────────────────
+let _audioCtx=null;
+function _ac(){
+  if(!_audioCtx) _audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  // Resume if suspended (browser autoplay policy)
+  if(_audioCtx.state==='suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
+// 😢 Sad trombone — wa wa waaaa (plays on carry-over click)
+function playSadTrombone(){
+  const ctx=_ac(), t=ctx.currentTime;
+  // Four descending notes with trombone-like timbre
+  [[494,0,.38],[440,.32,.38],[392,.64,.38],[330,.96,1.1]].forEach(([freq,start,dur])=>{
+    const osc=ctx.createOscillator(), gain=ctx.createGain();
+    // Add a second oscillator for richness
+    const osc2=ctx.createOscillator(), gain2=ctx.createGain();
+    osc.type='sawtooth'; osc2.type='sawtooth';
+    osc.frequency.setValueAtTime(freq,t+start);
+    osc.frequency.linearRampToValueAtTime(freq*.95,t+start+dur); // slide down
+    osc2.frequency.setValueAtTime(freq*1.005,t+start); // slight detune for warmth
+    osc2.frequency.linearRampToValueAtTime(freq*.946,t+start+dur);
+    gain.gain.setValueAtTime(0,t+start);
+    gain.gain.linearRampToValueAtTime(.22,t+start+.06);
+    gain.gain.setValueAtTime(.22,t+start+dur-.12);
+    gain.gain.linearRampToValueAtTime(0,t+start+dur);
+    gain2.gain.setValueAtTime(0,t+start);
+    gain2.gain.linearRampToValueAtTime(.1,t+start+.06);
+    gain2.gain.setValueAtTime(.1,t+start+dur-.12);
+    gain2.gain.linearRampToValueAtTime(0,t+start+dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc2.connect(gain2); gain2.connect(ctx.destination);
+    osc.start(t+start); osc.stop(t+start+dur+.02);
+    osc2.start(t+start); osc2.stop(t+start+dur+.02);
+  });
+}
+
+// 🪙 Mario coin — quick ascending double-beep (plays on chore completed)
+function playMarioCoin(){
+  const ctx=_ac(), t=ctx.currentTime;
+  [[988,.0,.08],[1319,.09,.22]].forEach(([freq,start,dur])=>{
+    const osc=ctx.createOscillator(), gain=ctx.createGain();
+    osc.type='square';
+    osc.frequency.setValueAtTime(freq,t+start);
+    gain.gain.setValueAtTime(.28,t+start);
+    gain.gain.exponentialRampToValueAtTime(.001,t+start+dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t+start); osc.stop(t+start+dur+.01);
+  });
+}
+
+// 🎺 Mario fanfare — short jingle (plays when full chore marked done score≥7)
+function playMarioFanfare(){
+  const ctx=_ac(), t=ctx.currentTime;
+  // Classic short fanfare approximation
+  [[523,.00,.12],[523,.13,.12],[523,.26,.12],[523,.39,.18],[659,.57,.18],[523,.75,.18],[659,.94,.5]].forEach(([freq,start,dur])=>{
+    const osc=ctx.createOscillator(), gain=ctx.createGain();
+    osc.type='square';
+    osc.frequency.setValueAtTime(freq,t+start);
+    gain.gain.setValueAtTime(.2,t+start);
+    gain.gain.exponentialRampToValueAtTime(.001,t+start+dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t+start); osc.stop(t+start+dur+.01);
+  });
+}
+
+// ── Carry-over click handler ───────────────────────────────────────────────────
+function carryOverClick(){
+  const plan=window._lastPlan||{};
+  const liamItems=(plan.plan?.Liam?.chores||[]).filter(c=>c.carried_forward);
+  const rachelItems=(plan.plan?.Rachel?.chores||[]).filter(c=>c.carried_forward);
+  const total=liamItems.length+rachelItems.length;
+  playSadTrombone();
+  if(!total){
+    showDetail('🎉 No Carry-overs!','<div style="text-align:center;padding:1.5rem 0"><div style="font-size:2rem;margin-bottom:.5rem">✅</div><div style="font-weight:700;color:var(--green)">All clean — nothing carried over today!</div></div>');
+    return;
+  }
+  function itemList(arr,color){
+    if(!arr.length) return '<div style="color:var(--faint);font-size:.75rem">None</div>';
+    return arr.map(c=>`<div style="display:flex;align-items:center;gap:.5rem;padding:.32rem 0;border-bottom:1px solid var(--border);font-size:.78rem">
+      <span>🔄</span><span style="flex:1">${esc(c.chore_name)}</span>
+      <span style="color:${color};font-weight:700">${c.points}pts <span style="font-size:.65rem;opacity:.7">(50% penalty)</span></span>
+    </div>`).join('');
+  }
+  showDetail(`🔄 Carry-overs Today (${total} jobs)`,`
+    <div style="font-size:.72rem;color:var(--orange);background:#fff7ed;border-radius:8px;padding:.55rem .75rem;margin-bottom:.8rem">
+      ⚠️ These jobs weren't done yesterday and carry forward at 50% points.
+    </div>
+    <div style="font-weight:700;font-size:.8rem;color:var(--blue);margin-bottom:.3rem">Liam (${liamItems.length})</div>
+    ${itemList(liamItems,'var(--blue)')}
+    <div style="font-weight:700;font-size:.8rem;color:var(--purple);margin:.7rem 0 .3rem">Rachel (${rachelItems.length})</div>
+    ${itemList(rachelItems,'var(--purple)')}
+    <button class="btn" style="margin-top:1rem" onclick="closeDetail();openAddToday()">📅 Record a job now →</button>
+  `);
+}
 
 // ── Chart instances (kept to allow destroy/recreate) ──────────────────────────
 let _chartJobs=null,_chartFamily=null,_chartRework=null;
@@ -831,6 +941,13 @@ async function loadDashboard(){
     const avg=Math.round(mins.reduce((a,b)=>a+b,0)/mins.length);
     return `${String(Math.floor(avg/60)).padStart(2,'0')}:${String(avg%60).padStart(2,'0')} UTC`;
   }
+  // Today's actual wake time
+  const todayL=daily?.Liam?.morning_arrival, todayR=daily?.Rachel?.morning_arrival;
+  kv('kv-todayL', todayL||'not seen yet');
+  kv('kv-todayR', todayR||'not seen yet');
+  kv('ks-todayL', todayL?'first seen today':'waiting…');
+  kv('ks-todayR', todayR?'first seen today':'waiting…');
+  // Monthly avg rise time
   kv('kv-riseL', avgTimeStr(monthly.persons?.Liam?.arrivals)||'—');
   kv('kv-riseR', avgTimeStr(monthly.persons?.Rachel?.arrivals)||'—');
   kv('ks-riseL', `${(monthly.persons?.Liam?.arrivals||[]).length} days tracked`);
@@ -849,12 +966,13 @@ async function loadDashboard(){
   if(liamDays===0&&rachelDays===0){kv('kv-presL','—');kv('ks-presL','no data this month');}
   else if(liamDays>=rachelDays){kv('kv-presL','Liam');kv('ks-presL',liamDays+' days vs Rachel '+rachelDays);}
   else{kv('kv-presL','Rachel');kv('ks-presL',rachelDays+' days vs Liam '+liamDays);}
-  // Carry-overs
-  const liamCarry=(plan.plan?.Liam?.chores||[]).filter(c=>c.carried_forward).length;
-  const rachelCarry=(plan.plan?.Rachel?.chores||[]).filter(c=>c.carried_forward).length;
-  const totalCarry=liamCarry+rachelCarry;
+  // Carry-overs — store plan for modal use
+  window._lastPlan=plan;
+  const liamCarryItems=(plan.plan?.Liam?.chores||[]).filter(c=>c.carried_forward);
+  const rachelCarryItems=(plan.plan?.Rachel?.chores||[]).filter(c=>c.carried_forward);
+  const totalCarry=liamCarryItems.length+rachelCarryItems.length;
   kv('kv-carry', totalCarry||'0');
-  kv('ks-carry', totalCarry?`Liam ${liamCarry} · Rachel ${rachelCarry}`:'All clear today ✓');
+  kv('ks-carry', totalCarry?`Liam ${liamCarryItems.length} · Rachel ${rachelCarryItems.length}`:'All clear today ✓');
 
   // ── Charts ────────────────────────────────────────────────────────────────
   renderCharts(plan, viols, monthly, calendar);
@@ -993,6 +1111,9 @@ function renderPanel(person,data,viols,ds,ms){
 function choreClick(el){
   try{
     const c=JSON.parse(el.dataset.chore.replace(/&#39;/g,"'"));
+    // 🎵 Play sound based on completion status
+    if(c.done && c.score>=8) playMarioFanfare();
+    else if(c.done || c.status==='partial') playMarioCoin();
     let html='';
     if(c.thumbnail_url)html+=`<img src="${esc(c.thumbnail_url)}" class="dm-photo" onclick="openLB('${esc(c.thumbnail_url)}')">`;
     const sc=c.score>=7?'sc-hi':c.score>=4?'sc-mi':'sc-lo';
