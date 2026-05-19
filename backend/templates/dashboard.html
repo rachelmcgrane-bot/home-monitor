@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>Home Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root{
@@ -13,7 +15,7 @@
   --hdr:50px;--sh:0 2px 12px rgba(0,0,0,.5);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;font-weight:400;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
 header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1rem;gap:0;box-shadow:0 2px 20px rgba(0,0,0,.7);position:fixed;top:0;left:0;right:0;z-index:100}
 .h-brand{font-size:.9rem;font-weight:800;background:linear-gradient(90deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;white-space:nowrap;margin-right:1rem;padding-right:1rem;border-right:1px solid var(--border)}
 .tab-nav{display:flex;gap:0;flex:1}
@@ -61,22 +63,26 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .pp-name-row{display:flex;align-items:center;gap:.55rem;margin-bottom:.2rem}
 .pp-photo{width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid var(--border);cursor:pointer}
 .pp-photo-ph{width:38px;height:38px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
-.pp-name{font-size:.95rem;font-weight:800;color:var(--text)}
-.pp-arrival{font-size:.68rem;color:var(--sub)}
-.pp-arrival strong{color:var(--blue)}
-.pp-first{font-size:.65rem;color:var(--faint);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp-name{font-size:1rem;font-weight:700;color:var(--text)}
+.pp-arrival{font-size:.68rem;color:var(--sub);font-weight:400}
+.pp-arrival strong{color:var(--blue);font-weight:600}
 /* ── Gauge row ── */
-.hd-row{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:.3rem .4rem .1rem;flex-shrink:0}
-.hd-wrap{display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:8px;padding:3px 2px 1px;transition:background .15s;position:relative}
+.hd-row{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:.5rem .5rem .2rem;flex-shrink:0}
+.hd-wrap{display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:10px;padding:5px 3px 2px;transition:background .15s}
 .hd-wrap:hover{background:rgba(255,255,255,.04)}
 .hd-svg{width:100%}
-.hd-label{font-size:.58rem;color:var(--sub);text-align:center;margin-top:-2px;line-height:1.2}
-/* ── Monthly mini bars ── */
-.month-row{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;padding:0 .6rem .3rem;flex-shrink:0}
-.mb{display:flex;flex-direction:column;align-items:center;gap:2px}
-.mb-track{width:100%;background:var(--border);border-radius:3px;height:5px;overflow:hidden;cursor:pointer}
-.mb-fill{height:100%;border-radius:3px;transition:width .4s}
-.mb-lbl{font-size:.52rem;color:var(--faint)}
+.hd-label{font-size:.72rem;font-weight:600;text-align:center;margin-bottom:2px;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+/* ── Chore chips (horizontal list) ── */
+.chore-chips{display:flex;flex-wrap:wrap;gap:.3rem;padding:.35rem .55rem .5rem;overflow-y:auto;flex:1;align-content:flex-start}
+.cc-item{display:inline-flex;align-items:center;gap:.28rem;padding:.26rem .55rem;border-radius:20px;font-size:.7rem;font-weight:500;cursor:default;border:1px solid;transition:opacity .15s;line-height:1.2}
+.cc-item[onclick]{cursor:pointer}.cc-item[onclick]:hover{opacity:.8}
+.cc-done{background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.4);color:var(--green)}
+.cc-pending{background:rgba(255,255,255,.04);border-color:var(--border);color:var(--sub)}
+.cc-partial{background:rgba(251,146,60,.1);border-color:rgba(251,146,60,.4);color:var(--orange)}
+.cc-carried{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.4);color:var(--amber)}
+.cc-tag{font-size:.52rem;background:rgba(96,165,250,.15);color:var(--blue);border-radius:3px;padding:.02rem .22rem;margin-left:.1rem;font-weight:600}
+.cc-rot{background:rgba(192,132,252,.15);color:var(--purple)}
+.cc-ws{background:rgba(251,191,36,.15);color:var(--amber)}
 /* ── Pie + kitchen ── */
 .pp-mid{display:flex;align-items:center;gap:.5rem;padding:.25rem .7rem .3rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border);flex-shrink:0}
 .pie-wrap{flex-shrink:0;cursor:pointer}
@@ -591,23 +597,27 @@ function gaugeColorInv(pct){
   return '#ef4444';               // red    — 3+ violations
 }
 
-// ── Improved half-donut gauge ─────────────────────────────────────────────────
-function halfDonut(pct,label,sublabel,onclickFn,colorOverride){
-  const R=40,W=100,CX=50,CY=50,circ=Math.PI*R;
+// ── Half-donut gauge — gradient arc, label on top, sharp edges ───────────────
+// stops: [{pct:'0%',color:'#hex'}, ...]   gradId: unique per gauge
+function halfDonut(pct,label,onclickFn,gradId,stops){
+  const R=36,CX=50,CY=44,circ=Math.PI*R;
   const p=Math.min(Math.max(pct||0,0),100);
   const offset=circ*(1-p/100);
-  const color=colorOverride||gaugeColor(p);
-  const bgCol=color+'28';
+  // track: very dim version of first stop color
+  const trackCol=stops[0].color+'15';
+  const midCol=stops[Math.floor(stops.length/2)].color;
+  const labelGrad=`linear-gradient(90deg,${stops[0].color},${stops[stops.length-1].color})`;
   const oc=onclickFn?`onclick="${onclickFn}"` :'';
+  const gradDef=`<linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">${stops.map(s=>`<stop offset="${s.pct}" stop-color="${s.color}"/>`).join('')}</linearGradient>`;
   return `<div class="hd-wrap" ${oc} title="${p}%">
-    <svg viewBox="0 0 ${W} 56" class="hd-svg">
-      <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="${bgCol}" stroke-width="12" fill="none" stroke-linecap="round"/>
-      <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="${color}" stroke-width="12" fill="none" stroke-linecap="round"
-        stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" style="transition:stroke-dashoffset .5s,stroke .4s"/>
-      <text x="${CX}" y="${CY-16}" text-anchor="middle" font-size="14" font-weight="900" fill="#e2e8f0">${p}%</text>
-      ${sublabel?`<text x="${CX}" y="${CY-5}" text-anchor="middle" font-size="6.5" fill="#94a3b8">${esc(String(sublabel))}</text>`:''}
+    <div class="hd-label" style="background:${labelGrad};-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${esc(label)}</div>
+    <svg viewBox="0 0 100 50" class="hd-svg">
+      <defs>${gradDef}</defs>
+      <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="${trackCol}" stroke-width="8" fill="none" stroke-linecap="butt"/>
+      <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="url(#${gradId})" stroke-width="8" fill="none" stroke-linecap="butt"
+        stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"
+        style="transition:stroke-dashoffset .6s;filter:drop-shadow(0 0 4px ${midCol})"/>
     </svg>
-    <div class="hd-label" style="color:${color};font-weight:700">${esc(label)}</div>
   </div>`;
 }
 
@@ -929,36 +939,45 @@ function renderCharts(plan, viols, monthly, calendar){
     });
   }
 
-  // ── 3. Rework donut — always 3 colours (Liam cyan, Rachel pink, Clean green)
+  // ── 3. Rework donut — colour per violation type, rainbow when clean
   if(_chartRework){_chartRework.destroy();_chartRework=null;}
   const wrapR=document.getElementById('chartReworkWrap');
   const ctxR=document.getElementById('chartRework');
   const liamV=viols.by_person?.Liam||0, rachelV=viols.by_person?.Rachel||0;
+  const NEON=['#f472b6','#60a5fa','#fb923c','#c084fc','#fbbf24','#22d3ee','#4ade80','#f87171','#a78bfa','#34d399'];
   if(ctxR&&wrapR){
-    // Always render the donut — when clean, show 3 equal green segments for visual interest
-    const noViolations=(liamV+rachelV===0);
-    const donutData=noViolations
-      ?{labels:['Liam ✅','Rachel ✅','Team ✅'],
-        data:[33,33,34],colors:['#4ade80','#34d399','#86efac'],
-        title:'All clean!'}
-      :{labels:['Liam','Rachel','Clean'],
-        data:[liamV, rachelV, Math.max(0, 6-(liamV+rachelV))],
-        colors:['#60a5fa','#f472b6','#4ade80'],
-        title:null};
+    const total=liamV+rachelV;
+    let labels,data,colors;
+    if(total===0){
+      // Rainbow "all clean" donut
+      labels=['Mon','Tue','Wed','Thu','Fri','Sat'];
+      data=[1,1,1,1,1,1];
+      colors=['#60a5fa','#f472b6','#4ade80','#fbbf24','#c084fc','#22d3ee'];
+    } else {
+      // Group violations by type code
+      const byCode={};
+      (viols.violations||[]).forEach(v=>{
+        const k=(v.violation_code||'other').replace(/_/g,' ');
+        byCode[k]=(byCode[k]||0)+1;
+      });
+      // If no individual violations data, fall back to by-person
+      if(!Object.keys(byCode).length){
+        labels=['Liam','Rachel','Clean'];
+        data=[liamV,rachelV,Math.max(0,6-total)];
+        colors=['#60a5fa','#f472b6','#4ade80'];
+      } else {
+        labels=Object.keys(byCode);
+        data=labels.map(k=>byCode[k]);
+        colors=labels.map((_,i)=>NEON[i%NEON.length]);
+      }
+    }
     _chartRework=new Chart(ctxR,{
       type:'doughnut',
-      data:{
-        labels:donutData.labels,
-        datasets:[{
-          data:donutData.data,
-          backgroundColor:donutData.colors,
-          borderWidth:2,borderColor:'#191d30',hoverOffset:6,
-        }]
-      },
-      options:{...CHART_DEFAULTS,cutout:'60%',
+      data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#191d30',hoverOffset:6}]},
+      options:{...CHART_DEFAULTS,cutout:'58%',
         plugins:{...CHART_DEFAULTS.plugins,
-          legend:{labels:{font:{size:8},boxWidth:9,padding:5,color:'#94a3b8'}},
-          tooltip:{callbacks:{label:ctx=>noViolations?`${ctx.label}`:`${ctx.label}: ${ctx.raw} flag${ctx.raw!==1?'s':''}`}}
+          legend:{labels:{font:{size:7},boxWidth:8,padding:3,color:'#94a3b8'}},
+          tooltip:{callbacks:{label:ctx=>total===0?'All clean ✓':`${ctx.label}: ${ctx.raw}×`}}
         }
       }
     });
@@ -994,12 +1013,16 @@ async function loadDashboard(){
     const avg=Math.round(mins.reduce((a,b)=>a+b,0)/mins.length);
     return `${String(Math.floor(avg/60)).padStart(2,'0')}:${String(avg%60).padStart(2,'0')} UTC`;
   }
-  // Today's actual wake time
+  // Today's actual wake time — persist last seen via localStorage
   const todayL=daily?.Liam?.morning_arrival, todayR=daily?.Rachel?.morning_arrival;
-  kv('kv-todayL', todayL||'not seen yet');
-  kv('kv-todayR', todayR||'not seen yet');
-  kv('ks-todayL', todayL?'first seen today':'waiting…');
-  kv('ks-todayR', todayR?'first seen today':'waiting…');
+  if(todayL){localStorage.setItem('lastWakeL',todayL);}
+  if(todayR){localStorage.setItem('lastWakeR',todayR);}
+  const shownL=todayL||localStorage.getItem('lastWakeL');
+  const shownR=todayR||localStorage.getItem('lastWakeR');
+  kv('kv-todayL', shownL||'—');
+  kv('kv-todayR', shownR||'—');
+  kv('ks-todayL', todayL?'first seen today':shownL?'yesterday\'s time':'waiting…');
+  kv('ks-todayR', todayR?'first seen today':shownR?'yesterday\'s time':'waiting…');
   // Monthly avg rise time
   kv('kv-riseL', avgTimeStr(monthly.persons?.Liam?.arrivals)||'—');
   kv('kv-riseR', avgTimeStr(monthly.persons?.Rachel?.arrivals)||'—');
@@ -1012,13 +1035,16 @@ async function loadDashboard(){
   else{kv('kv-jobsL','Rachel 🏆');kv('ks-jobsL',rachelPts+'pts vs Liam '+liamPts);}
   // Family time leader
   const liamFam=monthly.persons?.Liam?.family_mins||0, rachelFam=monthly.persons?.Rachel?.family_mins||0;
-  if(liamFam>=rachelFam){kv('kv-famL','Liam');kv('ks-famL',fmtM(liamFam)+' vs Rachel '+fmtM(rachelFam));}
-  else{kv('kv-famL','Rachel');kv('ks-famL',fmtM(rachelFam)+' vs Liam '+fmtM(liamFam));}
+  if(liamFam===0&&rachelFam===0){kv('kv-famL','—');kv('ks-famL','no data yet');}
+  else if(liamFam>rachelFam){kv('kv-famL','Liam 🏆');kv('ks-famL',fmtM(liamFam)+' vs Rachel '+fmtM(rachelFam));}
+  else if(rachelFam>liamFam){kv('kv-famL','Rachel 🏆');kv('ks-famL',fmtM(rachelFam)+' vs Liam '+fmtM(liamFam));}
+  else{kv('kv-famL','Tied');kv('ks-famL',fmtM(liamFam)+' each');}
   // Most present
   const liamDays=monthly.persons?.Liam?.days_seen||0, rachelDays=monthly.persons?.Rachel?.days_seen||0;
   if(liamDays===0&&rachelDays===0){kv('kv-presL','—');kv('ks-presL','no data this month');}
-  else if(liamDays>=rachelDays){kv('kv-presL','Liam');kv('ks-presL',liamDays+' days vs Rachel '+rachelDays);}
-  else{kv('kv-presL','Rachel');kv('ks-presL',rachelDays+' days vs Liam '+liamDays);}
+  else if(liamDays>rachelDays){kv('kv-presL','Liam 🏆');kv('ks-presL',liamDays+' days vs Rachel '+rachelDays);}
+  else if(rachelDays>liamDays){kv('kv-presL','Rachel 🏆');kv('ks-presL',rachelDays+' days vs Liam '+liamDays);}
+  else{kv('kv-presL','Tied');kv('ks-presL',liamDays+' days each');}
   // Carry-overs — store plan for modal use
   window._lastPlan=plan;
   const liamCarryItems=(plan.plan?.Liam?.chores||[]).filter(c=>c.carried_forward);
@@ -1090,23 +1116,30 @@ function renderPanel(person,data,viols,ds,ms){
 
   const shown=(data.chores||[]).filter(c=>c.chore_type==='core'||c.chore_type==='rotating'||(c.when_suits));
 
-  function choreRow(c){
-    let icon='⏳';
-    if(c.done)icon='✅';
-    else if(c.status==='partial')icon='⚠️';
-    else if(c.carried_forward)icon='🔄';
-    else if(c.when_suits)icon='🕐';
-    const typeClass=c.when_suits?'type-when-suits':`type-${c.chore_type}`;
-    const badge=c.chore_type==='core'?`<span class="cl-badge cb-core">core</span>`:
-                c.chore_type==='rotating'?`<span class="cl-badge cb-rot">↻</span>`:
-                c.when_suits?`<span class="cl-badge cb-ws">flex</span>`:'';
-    const carryNote=c.carried_forward?` <span style="font-size:.56rem;color:var(--amber)">(50%)</span>`:'';
+  // Gradient stops for each metric
+  const px=person.toLowerCase();
+  const GRADS={
+    jobs:  [{pct:'0%',color:'#818cf8'},{pct:'50%',color:'#60a5fa'},{pct:'100%',color:'#22d3ee'}],
+    fam:   [{pct:'0%',color:'#22d3ee'},{pct:'50%',color:'#4ade80'},{pct:'100%',color:'#86efac'}],
+    rew:   reworkPct===0
+      ? [{pct:'0%',color:'#4ade80'},{pct:'50%',color:'#34d399'},{pct:'100%',color:'#86efac'}]
+      : [{pct:'0%',color:'#fbbf24'},{pct:'50%',color:'#fb923c'},{pct:'100%',color:'#f472b6'}],
+    rel:   [{pct:'0%',color:'#c084fc'},{pct:'50%',color:'#f472b6'},{pct:'100%',color:'#fb7185'}],
+  };
+
+  function choreChip(c){
+    let cls='cc-pending',icon='○';
+    if(c.done){cls='cc-done';icon='✓';}
+    else if(c.status==='partial'){cls='cc-partial';icon='◑';}
+    else if(c.carried_forward){cls='cc-carried';icon='↺';}
+    else if(c.when_suits){icon='◇';}
+    const tag=c.chore_type==='core'?`<span class="cc-tag">core</span>`:
+              c.chore_type==='rotating'?`<span class="cc-tag cc-rot">↻</span>`:
+              c.when_suits?`<span class="cc-tag cc-ws">flex</span>`:'';
     const hasDetail=!!(c.assessment||c.thumbnail_url);
     const ocAttr=hasDetail?` data-chore='${JSON.stringify(c).replace(/'/g,"&#39;")}'`:'';
-    return `<div class="cl-item ${typeClass}"${ocAttr} ${hasDetail?'onclick="choreClick(this)"':''}>
-      <span class="cl-icon">${icon}</span>
-      <span class="cl-name${c.carried_forward?' carried':''}">${esc(c.chore_name)}${carryNote}</span>
-      ${badge}<span class="cl-pts">${c.points_earned>0?'+'+c.points_earned:'0'}/${c.points}</span>
+    return `<div class="cc-item ${cls}"${ocAttr}${hasDetail?' onclick="choreClick(this)"':''}>
+      ${icon} ${esc(c.chore_name)}${tag}
     </div>`;
   }
 
@@ -1116,29 +1149,13 @@ function renderPanel(person,data,viols,ds,ms){
         <div class="pp-name">${esc(person)}</div>
         <div class="pp-arrival">🕐 ${arrTxt}</div>
       </div></div>
-      <div class="pp-first">"${esc((ds.first_activity||'—').slice(0,65))}"</div>
     </div>
 
     <div class="hd-row">
-      ${halfDonut(pct,'Jobs',choreSublabel,choreOnclick)}
-      ${halfDonut(dayFamPct,'Family Time',famSublabel,famOnclick)}
-      ${halfDonut(reworkPct,'Rework',rewSublabel,rewOnclick,gaugeColorInv(reworkPct))}
-      ${halfDonut(dayPersonPct,'Relaxing',persSublabel,persOnclick)}
-    </div>
-
-    <div class="month-row">
-      ${[
-        ['Jobs',       mthChoresPct, "goToActivity('cleaning','"+person+"')"],
-        ['Family Time',mthFamPct,   "goToActivity('family','"+person+"')"],
-        ['Rework',     reworkPct,   "reworkClick_p('"+person+"')"],
-        ['Relaxing',   mthPersonPct,"goToActivity('personal','"+person+"')"],
-      ].map(([l,p,oc])=>`
-        <div class="mb">
-          <div class="mb-track" onclick="${oc}">
-            <div class="mb-fill" style="width:${p}%;background:${(l==='Rework')?gaugeColorInv(p):gaugeColor(p)}"></div>
-          </div>
-          <div class="mb-lbl">↑ month</div>
-        </div>`).join('')}
+      ${halfDonut(pct,        'Jobs',        choreOnclick, `g-${px}-jobs`, GRADS.jobs)}
+      ${halfDonut(dayFamPct,  'Family Time', famOnclick,   `g-${px}-fam`,  GRADS.fam)}
+      ${halfDonut(reworkPct,  'Rework',      rewOnclick,   `g-${px}-rew`,  GRADS.rew)}
+      ${halfDonut(dayPersonPct,'Relaxing',   persOnclick,  `g-${px}-rel`,  GRADS.rel)}
     </div>
 
     <div class="pp-mid">
@@ -1147,18 +1164,11 @@ function renderPanel(person,data,viols,ds,ms){
       <div class="kitchen-stat">🍳 Kitchen<strong>${fmtM(ds.kitchen_mins||0)}</strong>today</div>
     </div>
 
-    <div class="chore-list-hdr"><span>Today's Jobs</span><span style="color:var(--blue)">${data.earned_points||0}/${data.total_points||0} pts</span></div>
-    <div class="chore-list">${shown.length?shown.map(choreRow).join(''):'<div class="empty" style="padding:.6rem">No chores assigned</div>'}</div>
-
-    <div class="rework-wrap">
-      <div class="rework-lbl">
-        <span>Rework <span class="rework-count">${violCount?`${violCount} flag${violCount!==1?'s':''}`:''}</span> ${!violCount?'(clean ✓)':''}</span>
-        <span style="font-size:.62rem;color:var(--sub);cursor:pointer" onclick="reworkClick_p('${person}')">→ view</span>
-      </div>
-      <div class="pb-track" data-person="${esc(person)}" onclick="reworkClick_p('${person}')">
-        <div class="pb-rework" style="width:${Math.min(reworkPct,100)}%"></div>
-      </div>
-    </div>`;
+    <div class="chore-list-hdr">
+      <span style="font-weight:600">Today's Jobs</span>
+      <span style="color:var(--blue);font-weight:600">${data.earned_points||0}/${data.total_points||0} pts</span>
+    </div>
+    <div class="chore-chips">${shown.length?shown.map(choreChip).join(''):'<div class="empty" style="padding:.6rem;font-size:.75rem">No chores assigned</div>'}</div>`;
 }
 
 function choreClick(el){
