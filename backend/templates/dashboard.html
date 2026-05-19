@@ -18,7 +18,12 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 .tab-btn{background:none;border:none;color:var(--sub);padding:.75rem 1.1rem;cursor:pointer;font-size:.83rem;font-weight:500;border-bottom:3px solid transparent;transition:all .15s}
 .tab-btn:hover{color:var(--blue);background:#3b82f608}
 .tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
-.cam-link{margin-left:auto;background:var(--border);color:var(--sub);padding:.3rem .8rem;border-radius:6px;text-decoration:none;font-size:.75rem}
+.carry-badges{display:flex;gap:.35rem;margin-left:auto;margin-right:.5rem}
+.carry-badge{background:var(--border);border:1px solid transparent;color:var(--sub);padding:.28rem .65rem;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;line-height:1}
+.carry-badge:hover{background:var(--amber);color:#fff;border-color:var(--amber)}
+.carry-badge.has-carry{background:#fff7ed;border-color:var(--amber);color:#b45309}
+.carry-badge.no-carry{background:#f0fdf4;border-color:var(--green);color:#15803d}
+.cam-link{background:var(--border);color:var(--sub);padding:.3rem .8rem;border-radius:6px;text-decoration:none;font-size:.75rem}
 .cam-link:hover{background:#cbd5e1}
 /* Layout */
 .tab-pane{display:none;height:calc(100vh - var(--hdr));margin-top:var(--hdr);overflow:hidden}
@@ -270,6 +275,10 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
     <button class="tab-btn" onclick="switchTab('activity')">📡 Activity</button>
     <button class="tab-btn" onclick="switchTab('chores')">🧹 Jobs</button>
   </nav>
+  <div class="carry-badges">
+    <button class="carry-badge" id="carryBadge-Liam" onclick="switchTab('chores')" title="Liam's carried-over jobs from yesterday">🔄 Liam <span id="carryCount-Liam">—</span></button>
+    <button class="carry-badge" id="carryBadge-Rachel" onclick="switchTab('chores')" title="Rachel's carried-over jobs from yesterday">🔄 Rachel <span id="carryCount-Rachel">—</span></button>
+  </div>
   <a class="cam-link" href="/camera" target="_blank">📷 Camera</a>
 </header>
 
@@ -649,8 +658,20 @@ async function loadDashboard(){
     uEl.style.display='block';
   }else if(uEl){uEl.style.display='none';}
   if(!_persons.length) _persons=await fetch(`${API}/api/persons`).then(r=>r.json()).catch(()=>[]);
+  // ── Carry-forward badges ──────────────────────────────────────────────────
+  ['Liam','Rachel'].forEach(person=>{
+    const chores=(plan.plan?.[person]?.chores)||[];
+    const n=chores.filter(c=>c.carried_forward).length;
+    const countEl=document.getElementById(`carryCount-${person}`);
+    const badgeEl=document.getElementById(`carryBadge-${person}`);
+    if(countEl) countEl.textContent=n>0?n:'✓';
+    if(badgeEl){
+      badgeEl.className='carry-badge '+(n>0?'has-carry':'no-carry');
+      badgeEl.title=n>0?`${person} has ${n} job${n>1?'s':''} carried over from yesterday — click to view Jobs tab`:`${person} has no carry-overs today`;
+    }
+  });
+
   ['Liam','Rachel'].forEach(p=>renderPanel(p,plan.plan?.[p]||{chores:[],total_points:100,earned_points:0,pct:0},viols,daily[p]||{},(monthly.persons||{})[p]||{}));
-  loadNotifications(viols);
   renderMiniCal();
   checkPushNotif();
 }
