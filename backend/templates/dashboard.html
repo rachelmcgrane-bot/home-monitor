@@ -383,8 +383,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 
     <!-- ── Person panels side by side ────────────────────────────────── -->
     <div class="panels-row">
-      <div id="unassignedStrip" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.45rem .7rem;box-shadow:var(--sh);grid-column:1/-1;align-self:start"></div>
-      <div class="person-panel" id="panel-Liam"></div>
+<div class="person-panel" id="panel-Liam"></div>
       <div class="person-panel" id="panel-Rachel"></div>
     </div>
 
@@ -993,16 +992,6 @@ async function loadDashboard(){
     fetch(`${API}/api/stats/monthly`).then(r=>r.json()).catch(()=>({persons:{}})),
     fetch(`${API}/api/chores/calendar`).then(r=>r.json()).catch(()=>({days:{}})),
   ]);
-  // Render unassigned chores strip
-  const uArr=plan.unassigned||[];
-  const uEl=document.getElementById('unassignedStrip');
-  if(uEl&&uArr.length){
-    const uHtml=uArr.map(c=>`<span style="display:inline-flex;align-items:center;gap:.3rem;background:${c.done?'#dcfce7':'var(--bg)'};border:1px solid ${c.done?'#86efac':'var(--border)'};border-radius:20px;padding:.18rem .55rem;font-size:.68rem;cursor:pointer;white-space:nowrap" onclick="openAddToday()" title="${c.done?'Done by '+c.done_by:'Click to record'}">
-      ${c.done?'✅':'⏳'} ${esc(c.chore_name)}${c.done?' <span style="color:var(--green);font-weight:700">('+esc(c.done_by)+')</span>':''}
-    </span>`).join('');
-    uEl.innerHTML=`<div style="font-size:.62rem;font-weight:700;color:var(--sub);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.05em">🏠 Anyone's tasks today</div><div style="display:flex;flex-wrap:wrap;gap:.3rem">${uHtml}</div>`;
-    uEl.style.display='block';
-  }else if(uEl){uEl.style.display='none';}
   if(!_persons.length) _persons=await fetch(`${API}/api/persons`).then(r=>r.json()).catch(()=>[]);
   // ── KPI stat boxes ────────────────────────────────────────────────────────
   const kv=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
