@@ -14,10 +14,10 @@
   header h1 { font-size: 1rem; font-weight: 700; color: #7c85ff; }
   .dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; margin-left: auto; }
   .dot.active { background: #22c55e; animation: pulse 1.5s infinite; }
-  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
 
   .setup { padding: 1.5rem 1.2rem; display: flex; flex-direction: column; gap: 1rem; }
-  .setup label { font-size: 0.85rem; color: #94a3b8; }
+  .setup label { font-size: 0.85rem; color: #94a3b8; margin-bottom: .2rem; display: block; }
   .setup input, .setup select { width: 100%; background: #1a1d2e; border: 1px solid #3b3f6e; color: #e2e8f0; padding: 0.65rem 0.9rem; border-radius: 8px; font-size: 1rem; }
   .btn { width: 100%; padding: 0.85rem; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; transition: background .2s; }
   .btn-start { background: #22c55e; color: #fff; }
@@ -25,18 +25,29 @@
   .btn-stop  { background: #ef4444; color: #fff; }
   .btn-stop:hover  { background: #dc2626; }
 
-  .camera-wrap { position: relative; flex: 1; background: #000; }
+  /* Rotation preview box */
+  .rot-preview { display: flex; align-items: center; gap: 1rem; background: #1a1d2e; border: 1px solid #3b3f6e; border-radius: 8px; padding: .75rem 1rem; }
+  .rot-diagram { width: 60px; height: 42px; border: 2px solid #3b3f6e; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; transition: transform .3s; flex-shrink: 0; background: #0f1117; }
+  .rot-info { flex: 1; font-size: .82rem; color: #94a3b8; }
+  .rot-info strong { color: #e2e8f0; display: block; margin-bottom: .15rem; }
+
+  .camera-wrap { position: relative; flex: 1; background: #000; min-height: 200px; }
   video { width: 100%; height: 100%; object-fit: cover; display: block; }
   canvas { display: none; }
+
+  /* Controls bar overlaid at top when live */
+  .live-controls { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: .5rem .8rem; background: linear-gradient(rgba(0,0,0,.7), transparent); }
+  .rot-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25); color: #fff; border-radius: 8px; padding: .35rem .7rem; font-size: .8rem; cursor: pointer; backdrop-filter: blur(4px); }
+  .rot-btn:hover { background: rgba(255,255,255,.3); }
+  .rot-display { font-size: .75rem; color: rgba(255,255,255,.7); }
 
   .overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.85)); padding: 1rem 1.2rem; }
   .last-result { font-size: 0.88rem; }
   .last-result .who { font-weight: 700; color: #a5b4fc; }
   .last-result .task { color: #cbd5e1; }
   .last-result .meta { font-size: 0.75rem; color: #64748b; margin-top: 0.2rem; }
-  .sending-indicator { position: absolute; top: 0.7rem; right: 0.9rem; font-size: 0.78rem; color: #fcd34d; background: rgba(0,0,0,.6); padding: 0.2rem 0.6rem; border-radius: 999px; opacity: 0; transition: opacity .3s; }
+  .sending-indicator { position: absolute; top: 2.8rem; right: 0.9rem; font-size: 0.78rem; color: #fcd34d; background: rgba(0,0,0,.6); padding: 0.2rem 0.6rem; border-radius: 999px; opacity: 0; transition: opacity .3s; }
   .sending-indicator.show { opacity: 1; }
-
   .hidden { display: none !important; }
 </style>
 </head>
@@ -49,7 +60,7 @@
 <!-- Setup screen -->
 <div class="setup" id="setupScreen">
   <div>
-    <label>Location name (what room / spot is this phone?)</label>
+    <label>Location name</label>
     <input type="text" id="locationInput" placeholder="e.g. Kitchen, Front Door, Living Room">
   </div>
   <div>
@@ -60,13 +71,29 @@
     </select>
   </div>
   <div>
-    <label>Capture interval (seconds)</label>
+    <label>Capture interval</label>
     <select id="intervalSelect">
       <option value="10">Every 10 s</option>
       <option value="20" selected>Every 20 s</option>
       <option value="30">Every 30 s</option>
       <option value="60">Every 60 s</option>
     </select>
+  </div>
+  <div>
+    <label>Image rotation — use if the camera is mounted sideways</label>
+    <select id="rotationSelect" onchange="updateRotPreview()">
+      <option value="0">No rotation (landscape, correct orientation)</option>
+      <option value="90">Rotate 90° clockwise (phone tilted left)</option>
+      <option value="270">Rotate 90° counter-clockwise (phone tilted right)</option>
+      <option value="180">Rotate 180° (camera mounted upside-down)</option>
+    </select>
+  </div>
+  <div class="rot-preview" id="rotPreview">
+    <div class="rot-diagram" id="rotDiagram">📷</div>
+    <div class="rot-info">
+      <strong id="rotTitle">No rotation</strong>
+      <span id="rotDesc">Image sent as captured — correct for a phone lying flat or mounted horizontally.</span>
+    </div>
   </div>
   <button class="btn btn-start" id="startBtn">Start Monitoring</button>
 </div>
@@ -75,6 +102,11 @@
 <div class="camera-wrap hidden" id="cameraScreen">
   <video id="video" autoplay playsinline muted></video>
   <canvas id="canvas"></canvas>
+  <div class="live-controls">
+    <button class="rot-btn" onclick="stepRotation(-90)">↺ Rotate left</button>
+    <span class="rot-display" id="liveRotDisplay">0°</span>
+    <button class="rot-btn" onclick="stepRotation(90)">↻ Rotate right</button>
+  </div>
   <span class="sending-indicator" id="sendingIndicator">Analysing…</span>
   <div class="overlay">
     <div class="last-result" id="lastResult">
@@ -89,12 +121,34 @@
 <script>
 let stream = null;
 let timer = null;
-
+let captureRotation = 0; // degrees: 0, 90, 180, 270
 const API_BASE = window.location.origin;
+
+const ROT_INFO = {
+  0:   { title: 'No rotation', desc: 'Image sent as captured — correct for a phone lying flat or mounted horizontally in landscape.' },
+  90:  { title: '90° clockwise', desc: 'Phone is tilted left (top pointing right). Image will be rotated so the scene appears upright.' },
+  180: { title: '180° (upside-down)', desc: 'Camera is mounted upside-down. Image will be flipped.' },
+  270: { title: '90° counter-clockwise', desc: 'Phone is tilted right (top pointing left). Image will be rotated so the scene appears upright.' },
+};
+
+function updateRotPreview() {
+  captureRotation = parseInt(document.getElementById('rotationSelect').value);
+  const info = ROT_INFO[captureRotation];
+  document.getElementById('rotTitle').textContent = info.title;
+  document.getElementById('rotDesc').textContent = info.desc;
+  const diag = document.getElementById('rotDiagram');
+  diag.style.transform = captureRotation ? `rotate(${captureRotation}deg)` : '';
+}
+
+function stepRotation(delta) {
+  captureRotation = (captureRotation + delta + 360) % 360;
+  document.getElementById('liveRotDisplay').textContent = captureRotation + '°';
+}
 
 document.getElementById('startBtn').addEventListener('click', async () => {
   const location = document.getElementById('locationInput').value.trim();
   if (!location) { alert('Please enter a location name.'); return; }
+  captureRotation = parseInt(document.getElementById('rotationSelect').value);
 
   const facing = document.getElementById('cameraSelect').value;
   try {
@@ -112,9 +166,10 @@ document.getElementById('startBtn').addEventListener('click', async () => {
   document.getElementById('cameraScreen').classList.remove('hidden');
   document.getElementById('stopWrap').classList.remove('hidden');
   document.getElementById('statusDot').classList.add('active');
+  document.getElementById('liveRotDisplay').textContent = captureRotation + '°';
 
   const interval = parseInt(document.getElementById('intervalSelect').value, 10) * 1000;
-  captureAndSend(location); // immediate first capture
+  captureAndSend(location);
   timer = setInterval(() => captureAndSend(location), interval);
 });
 
@@ -127,15 +182,46 @@ document.getElementById('stopBtn').addEventListener('click', () => {
   document.getElementById('statusDot').classList.remove('active');
 });
 
-async function captureAndSend(location) {
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('canvas');
-  canvas.width = video.videoWidth || 640;
-  canvas.height = video.videoHeight || 480;
+// Apply rotation to canvas before converting to blob
+function drawRotated(video, canvas) {
+  const vw = video.videoWidth  || 640;
+  const vh = video.videoHeight || 480;
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
 
+  if (captureRotation === 90) {
+    // Portrait→Landscape (phone tilted left): swap dims
+    canvas.width  = vh;
+    canvas.height = vw;
+    ctx.translate(vh, 0);
+    ctx.rotate(Math.PI / 2);
+  } else if (captureRotation === 270) {
+    // Portrait→Landscape (phone tilted right): swap dims
+    canvas.width  = vh;
+    canvas.height = vw;
+    ctx.translate(0, vw);
+    ctx.rotate(-Math.PI / 2);
+  } else if (captureRotation === 180) {
+    canvas.width  = vw;
+    canvas.height = vh;
+    ctx.translate(vw, vh);
+    ctx.rotate(Math.PI);
+  } else {
+    // 0° — no rotation
+    canvas.width  = vw;
+    canvas.height = vh;
+  }
+
+  ctx.drawImage(video, 0, 0, vw, vh);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // reset after draw
+}
+
+async function captureAndSend(location) {
+  const video   = document.getElementById('video');
+  const canvas  = document.getElementById('canvas');
   const indicator = document.getElementById('sendingIndicator');
+
+  drawRotated(video, canvas);
   indicator.classList.add('show');
 
   canvas.toBlob(async (blob) => {
@@ -149,28 +235,26 @@ async function captureAndSend(location) {
         const data = await res.json();
         showResult(data);
       } else {
-        // Show error so we can diagnose what's wrong
         let errText = `Server error ${res.status}`;
-        try { const errData = await res.json(); errText = errData.detail || errText; } catch(e2){}
+        try { const e = await res.json(); errText = e.detail || errText; } catch(_){}
         showError(errText);
-        console.error('API error', res.status, errText);
       }
     } catch (e) {
-      showError('Network error — is the server running? ' + e.message);
-      console.error('Send error', e);
+      showError('Network error — ' + e.message);
     } finally {
       indicator.classList.remove('show');
     }
-  }, 'image/jpeg', 0.8);
+  }, 'image/jpeg', 0.85);
 }
 
 function showResult(data) {
   const conf = Math.round((data.confidence || 0) * 100);
-  const skipped = data.skipped ? `<span style="color:#f59e0b;font-size:.75rem"> ⚡ ${data.skipped}</span>` : '';
+  const skipped = data.skipped ? `<span style="color:#f59e0b"> ⚡ ${data.skipped}</span>` : '';
   const violCount = (data.violations || []).length;
-  const violStr = violCount ? `<span style="color:#f97316"> ⚠️ ${violCount} rework flag${violCount>1?'s':''}</span>` : '';
+  const violStr = violCount ? `<span style="color:#f97316"> ⚠️ ${violCount} rework flag${violCount > 1 ? 's' : ''}</span>` : '';
+  const rot = captureRotation ? ` <span style="color:#64748b;font-size:.7rem">↻${captureRotation}°</span>` : '';
   document.getElementById('lastResult').innerHTML = `
-    <div class="who">${data.person_name || '—'} &nbsp;<small style="color:#64748b">${conf}% match</small>${skipped}</div>
+    <div class="who">${data.person_name || '—'} &nbsp;<small style="color:#64748b">${conf}% match</small>${skipped}${rot}</div>
     <div class="task">${data.task || ''}${violStr}</div>
     <div class="meta">${data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}</div>
   `;
@@ -180,7 +264,7 @@ function showError(msg) {
   document.getElementById('lastResult').innerHTML = `
     <div class="who" style="color:#ef4444">⚠️ Error</div>
     <div class="task" style="color:#fca5a5;font-size:.82rem">${msg}</div>
-    <div class="meta" style="color:#ef4444">Check console (F12) for details. May need to top up API credits.</div>
+    <div class="meta" style="color:#ef4444">Check F12 console. May need to top up API credits at console.anthropic.com</div>
   `;
 }
 </script>

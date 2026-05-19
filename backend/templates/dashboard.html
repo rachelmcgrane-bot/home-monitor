@@ -234,8 +234,12 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 /* ── Lightbox ── */
 #lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;flex-direction:column;gap:.7rem}
 #lightbox.open{display:flex}
-#lightbox img{max-width:96vw;max-height:88vh;border-radius:10px;object-fit:contain;box-shadow:0 0 80px rgba(0,0,0,.7);border:2px solid rgba(255,255,255,.1)}
+#lightbox img{max-width:96vw;max-height:88vh;border-radius:10px;object-fit:contain;box-shadow:0 0 80px rgba(0,0,0,.7);border:2px solid rgba(255,255,255,.1);transition:transform .3s ease}
 #lightbox-hint{color:rgba(255,255,255,.45);font-size:.75rem;font-family:system-ui,sans-serif}
+.lb-controls{display:flex;align-items:center;gap:.8rem}
+.lb-rot-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:10px;padding:.45rem 1rem;font-size:.9rem;cursor:pointer;backdrop-filter:blur(6px);font-family:system-ui,sans-serif;transition:background .2s}
+.lb-rot-btn:hover{background:rgba(255,255,255,.3)}
+.lb-rot-label{color:rgba(255,255,255,.5);font-size:.78rem;min-width:2.5rem;text-align:center;font-family:system-ui,sans-serif}
 /* ── Detail modal ── */
 #detailModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9990;align-items:center;justify-content:center}
 #detailModal.open{display:flex}
@@ -471,7 +475,15 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 </div>
 
 <!-- Lightbox -->
-<div id="lightbox" onclick="closeLightbox()"><img id="lbImg" src="" alt=""><span id="lightbox-hint">Tap anywhere to close</span></div>
+<div id="lightbox">
+  <img id="lbImg" src="" alt="" onclick="closeLightbox()">
+  <div class="lb-controls" onclick="event.stopPropagation()">
+    <button class="lb-rot-btn" onclick="rotateLB(-90)">↺ Rotate left</button>
+    <span class="lb-rot-label" id="lbRotLabel">0°</span>
+    <button class="lb-rot-btn" onclick="rotateLB(90)">↻ Rotate right</button>
+  </div>
+  <span id="lightbox-hint" onclick="closeLightbox()">Tap image or press Esc to close</span>
+</div>
 
 <!-- Detail Modal -->
 <div id="detailModal">
@@ -638,9 +650,22 @@ function switchTab(name){
 }
 
 // ── Lightbox ──────────────────────────────────────────────────────────────────
-function openLB(url){document.getElementById('lbImg').src=url;document.getElementById('lightbox').classList.add('open')}
+let _lbRot=0;
+function openLB(url){
+  _lbRot=0;
+  const img=document.getElementById('lbImg');
+  img.src=url;
+  img.style.transform='';
+  document.getElementById('lbRotLabel').textContent='0°';
+  document.getElementById('lightbox').classList.add('open');
+}
 function closeLightbox(){document.getElementById('lightbox').classList.remove('open')}
-document.getElementById('lightbox').addEventListener('click',closeLightbox);
+function rotateLB(delta){
+  _lbRot=(_lbRot+delta+360)%360;
+  document.getElementById('lbImg').style.transform=_lbRot?`rotate(${_lbRot}deg)`:'';
+  document.getElementById('lbRotLabel').textContent=_lbRot+'°';
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLightbox();});
 
 // ── Detail modal ──────────────────────────────────────────────────────────────
 function showDetail(title,html){
