@@ -7,25 +7,26 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root{
-  --bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#1e293b;--sub:#64748b;--faint:#94a3b8;
-  --blue:#3b82f6;--green:#22c55e;--orange:#f97316;--purple:#a855f7;--amber:#f59e0b;--cyan:#06b6d4;
-  --hdr:50px;--sh:0 1px 4px rgba(0,0,0,.07);
+  --bg:#0d0f1a;--card:#141726;--border:#1e2540;--text:#e2e8f0;--sub:#94a3b8;--faint:#4a5578;
+  --blue:#60a5fa;--green:#4ade80;--orange:#fb923c;--purple:#c084fc;--amber:#fbbf24;--cyan:#22d3ee;
+  --pink:#f472b6;--rose:#fb7185;--indigo:#818cf8;
+  --hdr:50px;--sh:0 2px 12px rgba(0,0,0,.5);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
-header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1rem;gap:0;box-shadow:var(--sh);position:fixed;top:0;left:0;right:0;z-index:100}
-.h-brand{font-size:.9rem;font-weight:800;color:var(--blue);white-space:nowrap;margin-right:1rem;padding-right:1rem;border-right:1px solid var(--border)}
+header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1rem;gap:0;box-shadow:0 2px 20px rgba(0,0,0,.7);position:fixed;top:0;left:0;right:0;z-index:100}
+.h-brand{font-size:.9rem;font-weight:800;background:linear-gradient(90deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;white-space:nowrap;margin-right:1rem;padding-right:1rem;border-right:1px solid var(--border)}
 .tab-nav{display:flex;gap:0;flex:1}
 .tab-btn{background:none;border:none;color:var(--sub);padding:.75rem 1.1rem;cursor:pointer;font-size:.83rem;font-weight:500;border-bottom:3px solid transparent;transition:all .15s}
-.tab-btn:hover{color:var(--blue);background:#3b82f608}
+.tab-btn:hover{color:var(--blue);background:rgba(96,165,250,.08)}
 .tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
 .carry-badges{display:flex;gap:.35rem;margin-left:auto;margin-right:.5rem}
 .carry-badge{background:var(--border);border:1px solid transparent;color:var(--sub);padding:.28rem .65rem;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;line-height:1}
-.carry-badge:hover{background:var(--amber);color:#fff;border-color:var(--amber)}
-.carry-badge.has-carry{background:#fff7ed;border-color:var(--amber);color:#b45309}
-.carry-badge.no-carry{background:#f0fdf4;border-color:var(--green);color:#15803d}
+.carry-badge:hover{background:var(--amber);color:#0d0f1a;border-color:var(--amber)}
+.carry-badge.has-carry{background:rgba(251,191,36,.15);border-color:var(--amber);color:var(--amber)}
+.carry-badge.no-carry{background:rgba(74,222,128,.12);border-color:var(--green);color:var(--green)}
 .cam-link{background:var(--border);color:var(--sub);padding:.3rem .8rem;border-radius:6px;text-decoration:none;font-size:.75rem}
-.cam-link:hover{background:#cbd5e1}
+.cam-link:hover{background:#252a45}
 /* Layout */
 .tab-pane{display:none;height:calc(100vh - var(--hdr));margin-top:var(--hdr);overflow:hidden}
 .tab-pane.active{display:flex;flex-direction:column}
@@ -33,22 +34,29 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 .dash-scroll{flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:0}
 /* ── KPI stat strip ── */
 .stats-strip{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;padding:8px 8px 0;flex-shrink:0}
-.stat-kpi{background:var(--card);border-radius:10px;border:1px solid var(--border);box-shadow:var(--sh);padding:.55rem .75rem;position:relative;overflow:hidden;cursor:default;min-width:0}
-.stat-kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:10px 10px 0 0}
-.sk-blue::before{background:var(--blue)}.sk-purple::before{background:var(--purple)}.sk-green::before{background:var(--green)}
-.sk-cyan::before{background:var(--cyan)}.sk-amber::before{background:var(--amber)}.sk-orange::before{background:var(--orange)}
-.sk-label{font-size:.55rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.18rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sk-value{font-size:1.15rem;font-weight:800;color:var(--text);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sk-sub{font-size:.58rem;color:var(--faint);margin-top:.12rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-kpi{border-radius:12px;border:1px solid transparent;box-shadow:var(--sh);padding:.6rem .85rem;position:relative;overflow:hidden;cursor:default;min-width:0}
+.stat-kpi::before{display:none}
+.sk-blue{background:linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%)}
+.sk-purple{background:linear-gradient(135deg,#4c1d95 0%,#8b5cf6 100%)}
+.sk-green{background:linear-gradient(135deg,#065f46 0%,#10b981 100%)}
+.sk-cyan{background:linear-gradient(135deg,#0c4a6e 0%,#0ea5e9 100%)}
+.sk-amber{background:linear-gradient(135deg,#78350f 0%,#f59e0b 100%)}
+.sk-orange{background:linear-gradient(135deg,#7c2d12 0%,#ef4444 100%)}
+.sk-pink{background:linear-gradient(135deg,#831843 0%,#ec4899 100%)}
+.sk-indigo{background:linear-gradient(135deg,#312e81 0%,#6366f1 100%)}
+.stat-kpi::after{content:attr(data-icon);position:absolute;right:.5rem;top:.4rem;font-size:1.4rem;opacity:.25}
+.sk-label{font-size:.55rem;font-weight:700;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.18rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk-value{font-size:1.2rem;font-weight:900;color:#fff;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px rgba(0,0,0,.3)}
+.sk-sub{font-size:.58rem;color:rgba(255,255,255,.6);margin-top:.12rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* ── Charts row ── */
 .charts-row{display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;padding:6px 8px 0;flex-shrink:0;height:170px}
-.chart-card{background:var(--card);border-radius:10px;border:1px solid var(--border);box-shadow:var(--sh);padding:.5rem .7rem;display:flex;flex-direction:column;min-width:0;overflow:hidden}
-.chart-title{font-size:.6rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;margin-bottom:.25rem}
+.chart-card{background:#191d30;border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);padding:.6rem .8rem;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.chart-title{font-size:.6rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;margin-bottom:.3rem}
 .chart-inner{position:relative;flex:1;min-height:0}
 /* ── Person panels side by side ── */
 .panels-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px 8px 8px;flex:1;min-height:320px}
 /* Person panel */
-.person-panel{background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.person-panel{background:#191d30;border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .pp-head{padding:.55rem .8rem .3rem;border-bottom:1px solid var(--border);flex-shrink:0}
 .pp-name-row{display:flex;align-items:center;gap:.55rem;margin-bottom:.2rem}
 .pp-photo{width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid var(--border);cursor:pointer}
@@ -60,7 +68,7 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 /* ── Gauge row ── */
 .hd-row{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:.3rem .4rem .1rem;flex-shrink:0}
 .hd-wrap{display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:8px;padding:3px 2px 1px;transition:background .15s;position:relative}
-.hd-wrap:hover{background:var(--bg)}
+.hd-wrap:hover{background:rgba(255,255,255,.04)}
 .hd-svg{width:100%}
 .hd-label{font-size:.58rem;color:var(--sub);text-align:center;margin-top:-2px;line-height:1.2}
 /* ── Monthly mini bars ── */
@@ -93,9 +101,9 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 .cl-name.carried{color:var(--amber)}
 .cl-pts{font-size:.62rem;font-weight:700;color:var(--blue);white-space:nowrap;flex-shrink:0}
 .cl-badge{font-size:.5rem;padding:.06rem .22rem;border-radius:4px;font-weight:700;flex-shrink:0;text-transform:uppercase}
-.cb-core{background:#dbeafe;color:var(--blue)}
-.cb-rot{background:#f3e8ff;color:var(--purple)}
-.cb-ws{background:#fef9c3;color:#a16207}
+.cb-core{background:rgba(96,165,250,.18);color:var(--blue)}
+.cb-rot{background:rgba(192,132,252,.18);color:var(--purple)}
+.cb-ws{background:rgba(251,191,36,.18);color:var(--amber)}
 /* ── Rework bar ── */
 .rework-wrap{padding:.25rem .7rem .4rem;flex-shrink:0;border-top:1px solid var(--border)}
 .rework-lbl{display:flex;justify-content:space-between;font-size:.62rem;color:var(--sub);margin-bottom:.2rem}
@@ -157,9 +165,9 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 .btn-del{background:none;border:1px solid var(--border);color:var(--sub);border-radius:5px;cursor:pointer;padding:.12rem .35rem;font-size:.65rem}
 .btn-del:hover{background:var(--orange);color:#fff;border-color:var(--orange)}
 .type-pills{display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.5rem}
-.pill{background:var(--bg);border:1px solid var(--border);color:var(--sub);border-radius:20px;padding:.2rem .6rem;font-size:.7rem;cursor:pointer;transition:all .15s}
-.pill.active,.pill:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
-.pill.p-viol.active,.pill.p-viol:hover{background:var(--orange);border-color:var(--orange)}
+.pill{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--sub);border-radius:20px;padding:.2rem .6rem;font-size:.7rem;cursor:pointer;transition:all .15s}
+.pill.active,.pill:hover{background:var(--blue);color:#0d0f1a;border-color:var(--blue)}
+.pill.p-viol.active,.pill.p-viol:hover{background:var(--orange);color:#0d0f1a;border-color:var(--orange)}
 .filter-row{display:flex;gap:.4rem;margin-bottom:.55rem;align-items:center;flex-wrap:wrap}
 .filter-row select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.32rem .55rem;font-size:.75rem;flex:1}
 .btn-sm-act{background:var(--bg);border:1px solid var(--border);color:var(--sub);border-radius:7px;padding:.32rem .65rem;cursor:pointer;font-size:.78rem;white-space:nowrap}
@@ -186,19 +194,19 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 .fi-task{color:var(--text);font-size:.75rem;margin:.08rem 0}
 .fi-meta{font-size:.62rem;color:var(--faint);display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
 .conf-dot{display:inline-block;font-size:.58rem;padding:.04rem .28rem;border-radius:999px;margin-left:.25rem}
-.cd-hi{background:#dcfce7;color:#15803d}
-.cd-mi{background:#fef3c7;color:#b45309}
-.cd-lo{background:#ffedd5;color:#c2410c}
+.cd-hi{background:rgba(74,222,128,.18);color:var(--green)}
+.cd-mi{background:rgba(251,191,36,.18);color:var(--amber)}
+.cd-lo{background:rgba(251,146,60,.18);color:var(--orange)}
 .trace-badge{display:inline-block;font-size:.58rem;padding:.04rem .25rem;border-radius:4px;font-weight:600;cursor:pointer}
-.tb-chores{background:#dbeafe;color:#1d4ed8}
-.tb-family{background:#dcfce7;color:#15803d}
-.tb-personal{background:#f3e8ff;color:#7e22ce}
-.tb-kitchen{background:#cffafe;color:#0e7490}
-.tb-viol{background:#ffedd5;color:#c2410c}
+.tb-chores{background:rgba(96,165,250,.18);color:var(--blue)}
+.tb-family{background:rgba(74,222,128,.18);color:var(--green)}
+.tb-personal{background:rgba(192,132,252,.18);color:var(--purple)}
+.tb-kitchen{background:rgba(34,211,238,.18);color:var(--cyan)}
+.tb-viol{background:rgba(251,146,60,.18);color:var(--orange)}
 .chore-type-tag{display:inline-block;font-size:.55rem;padding:.03rem .22rem;border-radius:3px;font-weight:700;margin-left:.15rem;text-transform:uppercase}
-.ctt-core{background:#dbeafe;color:#1d4ed8}
-.ctt-rotating{background:#f3e8ff;color:#7e22ce}
-.ctt-standard{background:#f1f5f9;color:#64748b}
+.ctt-core{background:rgba(96,165,250,.18);color:var(--blue)}
+.ctt-rotating{background:rgba(192,132,252,.18);color:var(--purple)}
+.ctt-standard{background:rgba(255,255,255,.08);color:var(--sub)}
 .pts-tag{display:inline-block;font-size:.6rem;color:var(--green);font-weight:700}
 /* ── Chores tab ── */
 .chores-scroll{flex:1;overflow-y:auto;padding:.8rem}
@@ -214,14 +222,14 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 .chore-table th{text-align:left;padding:.45rem .55rem;color:var(--sub);font-weight:600;border-bottom:2px solid var(--border);font-size:.67rem;text-transform:uppercase;letter-spacing:.04em}
 .chore-table td{padding:.4rem .55rem;border-bottom:1px solid var(--border);vertical-align:middle}
 .chore-table tr:hover td{background:var(--bg)}
-.person-section td{background:#f8fafc;font-size:.72rem;font-weight:800;color:var(--blue);padding:.3rem .55rem;border-bottom:1px solid var(--border)}
+.person-section td{background:rgba(96,165,250,.08);font-size:.72rem;font-weight:800;color:var(--blue);padding:.3rem .55rem;border-bottom:1px solid var(--border)}
 .editable{background:transparent;border:1px solid transparent;color:var(--text);border-radius:5px;padding:.18rem .35rem;font-size:.78rem;width:100%}
 .editable:focus{outline:none;border-color:var(--blue);background:var(--bg)}
 .freq-sel,.type-sel{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:.18rem .35rem;font-size:.73rem}
 .pts-num{background:var(--bg);border:1px solid var(--border);color:var(--amber);border-radius:5px;padding:.18rem .35rem;font-size:.78rem;width:58px;text-align:center}
 .pts-num:focus{outline:none;border-color:var(--amber)}
 .person-sel{background:var(--bg);border:1px solid var(--border);color:var(--purple);border-radius:5px;padding:.18rem .35rem;font-size:.73rem}
-.add-section{background:var(--bg);border-radius:10px;padding:.9rem;margin-top:.8rem;border:1px solid var(--border)}
+.add-section{background:#0d0f1a;border-radius:10px;padding:.9rem;margin-top:.8rem;border:1px solid var(--border)}
 .add-section h3{font-size:.78rem;font-weight:700;color:var(--sub);margin-bottom:.7rem;text-transform:uppercase;letter-spacing:.05em}
 .add-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:.45rem;align-items:end}
 .add-grid input,.add-grid select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:.4rem .55rem;border-radius:7px;font-size:.78rem}
@@ -251,9 +259,9 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 .dm-photo{width:100%;max-height:320px;object-fit:cover;border-radius:8px;margin-bottom:.7rem;cursor:pointer}
 .dm-score{display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem;flex-wrap:wrap}
 .sc-badge{font-size:.82rem;font-weight:700;padding:.18rem .55rem;border-radius:6px}
-.sc-hi{background:#dcfce7;color:#15803d}
-.sc-mi{background:#fef3c7;color:#b45309}
-.sc-lo{background:#ffedd5;color:#c2410c}
+.sc-hi{background:rgba(74,222,128,.18);color:var(--green)}
+.sc-mi{background:rgba(251,191,36,.18);color:var(--amber)}
+.sc-lo{background:rgba(251,146,60,.18);color:var(--orange)}
 .dispute-btn{background:var(--amber);color:#fff;border:none;border-radius:6px;padding:.3rem .7rem;font-size:.72rem;cursor:pointer;font-weight:600;margin-top:.6rem}
 .dispute-btn:hover{background:#d97706}
 .dispute-form{margin-top:.5rem;display:none}
@@ -279,7 +287,7 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 .cal-dow{font-size:.65rem;color:var(--faint);text-align:center;padding-bottom:3px;font-weight:600}
 .cal-day{text-align:center;border-radius:7px;padding:4px 2px;cursor:pointer;transition:background .1s}
 .cal-day:hover{background:var(--bg)}
-.cal-day.is-today{background:#dbeafe}
+.cal-day.is-today{background:rgba(96,165,250,.2)}
 .cal-day.is-sel{background:var(--blue);color:#fff}
 .cal-day.is-future{opacity:.35;pointer-events:none}
 .cal-day-n{font-size:.72rem;font-weight:400;display:block}
@@ -309,43 +317,43 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 
     <!-- ── KPI stat boxes ─────────────────────────────────────────────── -->
     <div class="stats-strip">
-      <div class="stat-kpi sk-blue">
-        <div class="sk-label">🌅 Liam — Today</div>
+      <div class="stat-kpi sk-blue" data-icon="🌅">
+        <div class="sk-label">Liam — Wake Time</div>
         <div class="sk-value" id="kv-todayL">—</div>
-        <div class="sk-sub" id="ks-todayL">today's wake time</div>
+        <div class="sk-sub" id="ks-todayL">today's first seen</div>
       </div>
-      <div class="stat-kpi sk-purple">
-        <div class="sk-label">🌅 Rachel — Today</div>
+      <div class="stat-kpi sk-pink" data-icon="🌅">
+        <div class="sk-label">Rachel — Wake Time</div>
         <div class="sk-value" id="kv-todayR">—</div>
-        <div class="sk-sub" id="ks-todayR">today's wake time</div>
+        <div class="sk-sub" id="ks-todayR">today's first seen</div>
       </div>
-      <div class="stat-kpi sk-blue" style="opacity:.8">
-        <div class="sk-label">⏰ Liam — Avg Rise</div>
+      <div class="stat-kpi sk-indigo" data-icon="⏰">
+        <div class="sk-label">Liam — Avg Rise</div>
         <div class="sk-value" id="kv-riseL">—</div>
         <div class="sk-sub" id="ks-riseL">avg this month</div>
       </div>
-      <div class="stat-kpi sk-purple" style="opacity:.8">
-        <div class="sk-label">⏰ Rachel — Avg Rise</div>
+      <div class="stat-kpi sk-purple" data-icon="⏰">
+        <div class="sk-label">Rachel — Avg Rise</div>
         <div class="sk-value" id="kv-riseR">—</div>
         <div class="sk-sub" id="ks-riseR">avg this month</div>
       </div>
-      <div class="stat-kpi sk-green">
-        <div class="sk-label">🏆 Jobs Leader</div>
+      <div class="stat-kpi sk-green" data-icon="🏆">
+        <div class="sk-label">Jobs Leader</div>
         <div class="sk-value" id="kv-jobsL">—</div>
         <div class="sk-sub" id="ks-jobsL">today's points</div>
       </div>
-      <div class="stat-kpi sk-cyan">
-        <div class="sk-label">❤️ Family Time Leader</div>
+      <div class="stat-kpi sk-cyan" data-icon="❤️">
+        <div class="sk-label">Family Time Leader</div>
         <div class="sk-value" id="kv-famL">—</div>
         <div class="sk-sub" id="ks-famL">this month</div>
       </div>
-      <div class="stat-kpi sk-amber">
-        <div class="sk-label">👁️ Most Present</div>
+      <div class="stat-kpi sk-amber" data-icon="👁️">
+        <div class="sk-label">Most Present</div>
         <div class="sk-value" id="kv-presL">—</div>
         <div class="sk-sub" id="ks-presL">days seen this month</div>
       </div>
-      <div class="stat-kpi sk-orange" onclick="carryOverClick()" style="cursor:pointer" title="Click to see what's carried over">
-        <div class="sk-label">🔄 Carry-overs Today</div>
+      <div class="stat-kpi sk-orange" data-icon="🔄" onclick="carryOverClick()" style="cursor:pointer" title="Click to see what's carried over">
+        <div class="sk-label">Carry-overs Today</div>
         <div class="sk-value" id="kv-carry">—</div>
         <div class="sk-sub" id="ks-carry">jobs not done yesterday</div>
       </div>
@@ -596,8 +604,8 @@ function halfDonut(pct,label,sublabel,onclickFn,colorOverride){
       <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="${bgCol}" stroke-width="12" fill="none" stroke-linecap="round"/>
       <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="${color}" stroke-width="12" fill="none" stroke-linecap="round"
         stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" style="transition:stroke-dashoffset .5s,stroke .4s"/>
-      <text x="${CX}" y="${CY-16}" text-anchor="middle" font-size="14" font-weight="900" fill="#1e293b">${p}%</text>
-      ${sublabel?`<text x="${CX}" y="${CY-5}" text-anchor="middle" font-size="6.5" fill="#64748b">${esc(String(sublabel))}</text>`:''}
+      <text x="${CX}" y="${CY-16}" text-anchor="middle" font-size="14" font-weight="900" fill="#e2e8f0">${p}%</text>
+      ${sublabel?`<text x="${CX}" y="${CY-5}" text-anchor="middle" font-size="6.5" fill="#94a3b8">${esc(String(sublabel))}</text>`:''}
     </svg>
     <div class="hd-label" style="color:${color};font-weight:700">${esc(label)}</div>
   </div>`;
@@ -614,7 +622,7 @@ function pie(segs,size=66){
     const d=`M50 50 L${x1.toFixed(1)} ${y1.toFixed(1)} A40 40 0 ${f>.5?1:0} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`;
     a=e;return `<path d="${d}" fill="${s.c}"/>`;
   }).join('');
-  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}">${paths}<circle cx="50" cy="50" r="18" fill="white"/></svg>`;
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}">${paths}<circle cx="50" cy="50" r="18" fill="#191d30"/></svg>`;
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -831,7 +839,7 @@ function carryOverClick(){
     </div>`).join('');
   }
   showDetail(`🔄 Carry-overs Today (${total} jobs)`,`
-    <div style="font-size:.72rem;color:var(--orange);background:#fff7ed;border-radius:8px;padding:.55rem .75rem;margin-bottom:.8rem">
+    <div style="font-size:.72rem;color:var(--orange);background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);border-radius:8px;padding:.55rem .75rem;margin-bottom:.8rem">
       ⚠️ These jobs weren't done yesterday and carry forward at 50% points.
     </div>
     <div style="font-weight:700;font-size:.8rem;color:var(--blue);margin-bottom:.3rem">Liam (${liamItems.length})</div>
@@ -845,16 +853,22 @@ function carryOverClick(){
 // ── Chart instances (kept to allow destroy/recreate) ──────────────────────────
 let _chartJobs=null,_chartFamily=null,_chartRework=null;
 
+// Set Chart.js global defaults for dark theme
+Chart.defaults.color='#94a3b8';
+Chart.defaults.borderColor='rgba(255,255,255,.06)';
+
 const CHART_DEFAULTS={
   responsive:true,maintainAspectRatio:false,
-  plugins:{legend:{labels:{font:{size:9},boxWidth:10,padding:6}}},
+  plugins:{legend:{labels:{font:{size:9},boxWidth:10,padding:6,color:'#94a3b8'}}},
 };
+const DARK_GRID={color:'rgba(255,255,255,.06)'};
+const DARK_TICK={font:{size:8},color:'#4a5578'};
 
 function renderCharts(plan, viols, monthly, calendar){
   const calDays=calendar.days||{};
   const dayNums=Object.keys(calDays).sort();
 
-  // ── 1. Jobs line chart ───────────────────────────────────────────────────
+  // ── 1. Jobs line chart — Liam (neon blue) + Rachel (neon pink) + Team avg (neon green)
   if(_chartJobs){_chartJobs.destroy();_chartJobs=null;}
   const ctxJ=document.getElementById('chartJobs');
   if(ctxJ){
@@ -862,17 +876,19 @@ function renderCharts(plan, viols, monthly, calendar){
       const labels=dayNums.map(d=>parseInt(d.split('-')[2]));
       const liamLine=dayNums.map(d=>calDays[d]?.Liam?.pct||0);
       const rachelLine=dayNums.map(d=>calDays[d]?.Rachel?.pct||0);
+      const avgLine=dayNums.map((_,i)=>Math.round((liamLine[i]+rachelLine[i])/2));
       _chartJobs=new Chart(ctxJ,{
         type:'line',
         data:{labels,datasets:[
-          {label:'Liam',data:liamLine,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.12)',tension:.35,fill:true,pointRadius:2,borderWidth:2},
-          {label:'Rachel',data:rachelLine,borderColor:'#a855f7',backgroundColor:'rgba(168,85,247,.12)',tension:.35,fill:true,pointRadius:2,borderWidth:2},
+          {label:'Liam',    data:liamLine,  borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.18)',tension:.4,fill:true,pointRadius:2,borderWidth:2.5,pointHoverRadius:4},
+          {label:'Rachel',  data:rachelLine,borderColor:'#f472b6',backgroundColor:'rgba(244,114,182,.18)',tension:.4,fill:true,pointRadius:2,borderWidth:2.5,pointHoverRadius:4},
+          {label:'Avg',     data:avgLine,   borderColor:'#4ade80',backgroundColor:'rgba(74,222,128,.06)',tension:.4,fill:true,pointRadius:0,borderWidth:1.5,borderDash:[4,3],pointHoverRadius:3},
         ]},
         options:{...CHART_DEFAULTS,
-          plugins:{...CHART_DEFAULTS.plugins,tooltip:{mode:'index',intersect:false}},
+          plugins:{...CHART_DEFAULTS.plugins,tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}%`}}},
           scales:{
-            x:{ticks:{font:{size:8},maxRotation:0},grid:{display:false}},
-            y:{min:0,max:100,ticks:{font:{size:8},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,.05)'}},
+            x:{ticks:{...DARK_TICK,maxRotation:0},grid:{display:false}},
+            y:{min:0,max:100,ticks:{...DARK_TICK,callback:v=>v+'%'},grid:DARK_GRID},
           }
         }
       });
@@ -881,59 +897,71 @@ function renderCharts(plan, viols, monthly, calendar){
     }
   }
 
-  // ── 2. Family time bar chart ─────────────────────────────────────────────
+  // ── 2. Family / Relaxing time grouped bar — 3 datasets, 3 colours
   if(_chartFamily){_chartFamily.destroy();_chartFamily=null;}
   const ctxF=document.getElementById('chartFamily');
   if(ctxF){
-    const liamH=Math.round((monthly.persons?.Liam?.family_mins||0)/60*10)/10;
-    const rachelH=Math.round((monthly.persons?.Rachel?.family_mins||0)/60*10)/10;
+    const liamFamH =Math.round((monthly.persons?.Liam?.family_mins||0)/60*10)/10;
+    const rachelFamH=Math.round((monthly.persons?.Rachel?.family_mins||0)/60*10)/10;
+    const liamRelH  =Math.round((monthly.persons?.Liam?.personal_mins||0)/60*10)/10;
+    const rachelRelH=Math.round((monthly.persons?.Rachel?.personal_mins||0)/60*10)/10;
+    const GOAL=30; // hrs/month goal per person per activity
     _chartFamily=new Chart(ctxF,{
       type:'bar',
       data:{
         labels:['Liam','Rachel'],
-        datasets:[{
-          data:[liamH,rachelH],
-          backgroundColor:['rgba(59,130,246,.82)','rgba(168,85,247,.82)'],
-          borderRadius:6,borderSkipped:false,
-        }]
+        datasets:[
+          {label:'Family',   data:[liamFamH, rachelFamH], backgroundColor:'rgba(34,211,238,.85)', borderRadius:5, borderSkipped:false},
+          {label:'Relaxing', data:[liamRelH,  rachelRelH],  backgroundColor:'rgba(192,132,252,.85)',borderRadius:5, borderSkipped:false},
+          {label:'Goal',     data:[GOAL,GOAL],               type:'line',borderColor:'#fbbf24',backgroundColor:'transparent',
+            borderDash:[5,3],pointRadius:4,pointStyle:'crossRot',borderWidth:2,pointBorderColor:'#fbbf24',
+            pointBorderWidth:2,fill:false,order:0},
+        ]
       },
       options:{...CHART_DEFAULTS,
-        plugins:{...CHART_DEFAULTS.plugins,legend:{display:false},
-          tooltip:{callbacks:{label:ctx=>`${ctx.raw}h family time`}}},
+        plugins:{...CHART_DEFAULTS.plugins,
+          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}h`}}},
         scales:{
-          x:{ticks:{font:{size:9}},grid:{display:false}},
-          y:{min:0,ticks:{font:{size:8},callback:v=>v+'h'},grid:{color:'rgba(0,0,0,.05)'}},
+          x:{ticks:{...DARK_TICK},grid:{display:false}},
+          y:{min:0,ticks:{...DARK_TICK,callback:v=>v+'h'},grid:DARK_GRID},
         }
       }
     });
   }
 
-  // ── 3. Rework donut ──────────────────────────────────────────────────────
+  // ── 3. Rework donut — always 3 colours (Liam cyan, Rachel pink, Clean green)
   if(_chartRework){_chartRework.destroy();_chartRework=null;}
   const wrapR=document.getElementById('chartReworkWrap');
   const ctxR=document.getElementById('chartRework');
   const liamV=viols.by_person?.Liam||0, rachelV=viols.by_person?.Rachel||0;
   if(ctxR&&wrapR){
-    if(liamV+rachelV===0){
-      wrapR.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:.3rem"><div style="font-size:1.6rem">✅</div><div style="color:var(--green);font-size:.72rem;font-weight:700">All clean today!</div></div>';
-    } else {
-      _chartRework=new Chart(ctxR,{
-        type:'doughnut',
-        data:{
-          labels:['Liam','Rachel'],
-          datasets:[{
-            data:[liamV,rachelV],
-            backgroundColor:['#3b82f6','#a855f7'],
-            borderWidth:2,borderColor:'#fff',hoverOffset:4,
-          }]
-        },
-        options:{...CHART_DEFAULTS,cutout:'62%',
-          plugins:{...CHART_DEFAULTS.plugins,
-            tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw} flag${ctx.raw!==1?'s':''}`}}
-          }
+    // Always render the donut — when clean, show 3 equal green segments for visual interest
+    const noViolations=(liamV+rachelV===0);
+    const donutData=noViolations
+      ?{labels:['Liam ✅','Rachel ✅','Team ✅'],
+        data:[33,33,34],colors:['#4ade80','#34d399','#86efac'],
+        title:'All clean!'}
+      :{labels:['Liam','Rachel','Clean'],
+        data:[liamV, rachelV, Math.max(0, 6-(liamV+rachelV))],
+        colors:['#60a5fa','#f472b6','#4ade80'],
+        title:null};
+    _chartRework=new Chart(ctxR,{
+      type:'doughnut',
+      data:{
+        labels:donutData.labels,
+        datasets:[{
+          data:donutData.data,
+          backgroundColor:donutData.colors,
+          borderWidth:2,borderColor:'#191d30',hoverOffset:6,
+        }]
+      },
+      options:{...CHART_DEFAULTS,cutout:'60%',
+        plugins:{...CHART_DEFAULTS.plugins,
+          legend:{labels:{font:{size:8},boxWidth:9,padding:5,color:'#94a3b8'}},
+          tooltip:{callbacks:{label:ctx=>noViolations?`${ctx.label}`:`${ctx.label}: ${ctx.raw} flag${ctx.raw!==1?'s':''}`}}
         }
-      });
-    }
+      }
+    });
   }
 }
 
@@ -1172,9 +1200,9 @@ function violationCardHtml(v){
     <div style="font-size:.7rem;color:var(--purple);font-style:italic">${esc(v.callout||'')}</div>
     <div style="font-size:.6rem;color:var(--faint);margin-top:.2rem">${ts} · ${esc(v.location||'')}</div>
     <div style="display:flex;gap:.35rem;margin-top:.45rem;flex-wrap:wrap">
-      <button class="btn-del" style="background:#fef3c7;color:#b45309;border-color:#fcd34d" onclick="disputeViol(${v.id},'peer','${esc(v.person_name)}')">👥 Ask other person</button>
-      <button class="btn-del" style="background:#ede9fe;color:#7c3aed;border-color:#c4b5fd" onclick="disputeViol(${v.id},'ai')">🤖 AI second opinion</button>
-      <button class="btn-del" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5" onclick="removeViol(${v.id})">🗑️ Remove</button>
+      <button class="btn-del" style="background:rgba(251,191,36,.15);color:var(--amber);border-color:rgba(251,191,36,.4)" onclick="disputeViol(${v.id},'peer','${esc(v.person_name)}')">👥 Ask other person</button>
+      <button class="btn-del" style="background:rgba(192,132,252,.15);color:var(--purple);border-color:rgba(192,132,252,.4)" onclick="disputeViol(${v.id},'ai')">🤖 AI second opinion</button>
+      <button class="btn-del" style="background:rgba(251,113,133,.15);color:var(--rose);border-color:rgba(251,113,133,.4)" onclick="removeViol(${v.id})">🗑️ Remove</button>
     </div>
     <div class="viol-review-status" id="vrs-${v.id}" style="font-size:.68rem;color:var(--sub);margin-top:.3rem;display:none"></div>
   </div>`;
@@ -1207,14 +1235,14 @@ async function reworkClick_p(person){
     </div>`).join('');
 
   let html=`
-    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:.8rem 1rem;margin-bottom:1rem">
+    <div style="background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.35);border-radius:10px;padding:.8rem 1rem;margin-bottom:1rem">
       <div style="font-size:.88rem;font-weight:700;color:var(--orange);margin-bottom:.4rem">
         ⚠️ ${mine.length} Rework Violation${mine.length!==1?'s':''} Today
       </div>
       <div style="font-size:.73rem;color:var(--sub);margin-bottom:.6rem">
         Each violation means something was spotted by the camera that needs attention or correction. Tap <strong>AI second opinion</strong> or <strong>Remove</strong> if any seem unfair.
       </div>
-      <div style="background:#fff;border-radius:7px;padding:.4rem .6rem">${summaryRows}</div>
+      <div style="background:rgba(255,255,255,.04);border-radius:7px;padding:.4rem .6rem">${summaryRows}</div>
     </div>
     <div style="font-size:.67rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem">Full Details</div>
     ${mine.map(violationCardHtml).join('')}
