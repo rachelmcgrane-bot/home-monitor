@@ -983,9 +983,12 @@ async function loadNotifications(viols){
     const vs=(viols.violations||[]);
     if(vs.length){
       html+=`<div class="ns-title">⚠️ Rework Violations Today (${vs.length})</div>`;
-      html+=vs.slice(0,6).map(v=>`<div class="ni ni-viol" onclick="${v.thumbnail_url?`openLB('${esc(v.thumbnail_url)}')`:`reworkClick_p('${esc(v.person_name)}')`}">
-        <span class="ni-badge">${esc(v.person_name)}</span><strong>${esc(v.violation_code)}</strong> — ${esc((v.description||'').slice(0,70))}
-      </div>`).join('');
+      html+=vs.slice(0,6).map(v=>{
+        const oc=v.thumbnail_url?"openLB('"+esc(v.thumbnail_url)+"')":" reworkClick_p('"+esc(v.person_name)+"')";
+        return `<div class="ni ni-viol" onclick="${oc}">
+          <span class="ni-badge">${esc(v.person_name)}</span><strong>${esc(v.violation_code)}</strong> — ${esc((v.description||'').slice(0,70))}
+        </div>`;
+      }).join('');
     }
 
     // ── Recent observations ──
