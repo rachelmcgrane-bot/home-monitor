@@ -311,8 +311,8 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     <button class="tab-btn" onclick="switchTab('chores')">🧹 Jobs</button>
   </nav>
   <div class="carry-badges">
-    <button class="carry-badge" id="carryBadge-Liam" onclick="switchTab('chores')" title="Liam's carried-over jobs from yesterday">🔄 Liam <span id="carryCount-Liam">—</span></button>
-    <button class="carry-badge" id="carryBadge-Rachel" onclick="switchTab('chores')" title="Rachel's carried-over jobs from yesterday">🔄 Rachel <span id="carryCount-Rachel">—</span></button>
+    <button class="carry-badge" id="carryBadge-Liam" onclick="carryOverClick()" title="Liam's carried-over jobs from yesterday">🔄 Liam <span id="carryCount-Liam">—</span></button>
+    <button class="carry-badge" id="carryBadge-Rachel" onclick="carryOverClick()" title="Rachel's carried-over jobs from yesterday">🔄 Rachel <span id="carryCount-Rachel">—</span></button>
   </div>
   <a class="cam-link" href="/camera" target="_blank">📷 Camera</a>
 </header>
@@ -596,26 +596,28 @@ function gaugeColorInv(pct){
   return '#ef4444';               // red    — 3+ violations
 }
 
-// ── Half-donut gauge — gradient arc, label on top, sharp edges ───────────────
+// ── Half-donut gauge — gradient arc, label on top, value below ───────────────
 // stops: [{pct:'0%',color:'#hex'}, ...]   gradId: unique per gauge
-function halfDonut(pct,label,onclickFn,gradId,stops){
-  const R=36,CX=50,CY=44,circ=Math.PI*R;
+// value: string shown beneath the arc (e.g. "45m", "0/156 pts", "clean ✓")
+function halfDonut(pct,label,value,onclickFn,gradId,stops){
+  const R=34,CX=50,CY=42,circ=Math.PI*R;
   const p=Math.min(Math.max(pct||0,0),100);
   const offset=circ*(1-p/100);
-  // track: very dim version of first stop color
   const trackCol=stops[0].color+'15';
   const midCol=stops[Math.floor(stops.length/2)].color;
   const labelGrad=`linear-gradient(90deg,${stops[0].color},${stops[stops.length-1].color})`;
   const oc=onclickFn?`onclick="${onclickFn}"` :'';
   const gradDef=`<linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">${stops.map(s=>`<stop offset="${s.pct}" stop-color="${s.color}"/>`).join('')}</linearGradient>`;
+  const valText=value?`<text x="50" y="54" text-anchor="middle" font-size="8.5" font-weight="500" fill="#94a3b8" font-family="Inter,system-ui">${esc(String(value))}</text>`:'';
   return `<div class="hd-wrap" ${oc} title="${p}%">
     <div class="hd-label" style="background:${labelGrad};-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${esc(label)}</div>
-    <svg viewBox="0 0 100 50" class="hd-svg">
+    <svg viewBox="0 0 100 58" class="hd-svg">
       <defs>${gradDef}</defs>
       <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="${trackCol}" stroke-width="8" fill="none" stroke-linecap="butt"/>
       <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="url(#${gradId})" stroke-width="8" fill="none" stroke-linecap="butt"
         stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"
         style="transition:stroke-dashoffset .6s;filter:drop-shadow(0 0 4px ${midCol})"/>
+      ${valText}
     </svg>
   </div>`;
 }
@@ -1141,10 +1143,10 @@ function renderPanel(person,data,viols,ds,ms){
     </div>
 
     <div class="hd-row">
-      ${halfDonut(pct,        'Jobs',        choreOnclick, `g-${px}-jobs`, GRADS.jobs)}
-      ${halfDonut(dayFamPct,  'Family Time', famOnclick,   `g-${px}-fam`,  GRADS.fam)}
-      ${halfDonut(reworkPct,  'Rework',      rewOnclick,   `g-${px}-rew`,  GRADS.rew)}
-      ${halfDonut(dayPersonPct,'Relaxing',   persOnclick,  `g-${px}-rel`,  GRADS.rel)}
+      ${halfDonut(pct,         'Jobs',        `${data.earned_points||0}/${data.total_points||0} pts`, choreOnclick, `g-${px}-jobs`, GRADS.jobs)}
+      ${halfDonut(dayFamPct,   'Family Time', fmtM(ds.family_mins||0),                               famOnclick,   `g-${px}-fam`,  GRADS.fam)}
+      ${halfDonut(reworkPct,   'Rework',      violCount ? `${violCount} flag${violCount!==1?'s':''}` : 'clean ✓',  rewOnclick,   `g-${px}-rew`,  GRADS.rew)}
+      ${halfDonut(dayPersonPct,'Relaxing',    fmtM(ds.personal_mins||0),                             persOnclick,  `g-${px}-rel`,  GRADS.rel)}
     </div>
 
     <div class="chore-list-hdr">
