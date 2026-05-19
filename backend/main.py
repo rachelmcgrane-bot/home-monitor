@@ -472,6 +472,24 @@ async def recalculate_stats(db: AsyncSession = Depends(get_db)):
     return {"ok": True, "message": "Totals refreshed from database"}
 
 
+# ── AI connectivity test ──────────────────────────────────────────────────────
+
+@app.get("/api/test-ai")
+async def test_ai():
+    """Quick sanity-check: sends a tiny text message to Anthropic and returns the result."""
+    import anthropic
+    try:
+        from ai import client as ai_client
+        msg = await ai_client.messages.create(
+            model="claude-3-5-haiku-20241022", max_tokens=20,
+            messages=[{"role": "user", "content": "Reply with just the word OK"}],
+        )
+        return {"status": "ok", "reply": msg.content[0].text.strip()}
+    except anthropic.APIStatusError as e:
+        return {"status": "error", "code": e.status_code, "message": str(e.message)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 # ── Camera frame ──────────────────────────────────────────────────────────────
 
 @app.post("/api/frame")
@@ -511,7 +529,11 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
     enrolled = [{"id": p.id, "name": p.name, "face_description": p.face_description or ""}
                 for p in result.scalars().all()]
 
-    analysis = await analyse_frame(data, enrolled)
+    try:
+        analysis = await analyse_frame(data, enrolled)
+    except Exception as exc:
+        err_str = str(exc)
+        raise HTTPException(status_code=500, detail=f"AI error: {err_str}")
     _last_ai_call[location] = datetime.utcnow()
     _last_ai_result[location] = {
         "id": None, "person_name": analysis.get("person_name", "Unknown"),
