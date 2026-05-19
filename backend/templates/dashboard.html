@@ -1147,12 +1147,6 @@ function renderPanel(person,data,viols,ds,ms){
       ${halfDonut(dayPersonPct,'Relaxing',   persOnclick,  `g-${px}-rel`,  GRADS.rel)}
     </div>
 
-    <div class="pp-mid">
-      <div class="pie-wrap" onclick="showDetail('${esc(person)} — Time Today','${esc(pieDetailHtml)}')">${pie(pieSegs)}</div>
-      <div class="pie-legend">${pieSegs.filter(s=>s.v>0).map(s=>`<div class="pl-item"><div class="pl-dot" style="background:${s.c}"></div>${esc(s.label)}: ${fmtM(s.v)}</div>`).join('')}</div>
-      <div class="kitchen-stat">🍳 Kitchen<strong>${fmtM(ds.kitchen_mins||0)}</strong>today</div>
-    </div>
-
     <div class="chore-list-hdr">
       <span style="font-weight:600">Today's Jobs</span>
       <span style="color:var(--blue);font-weight:600">${data.earned_points||0}/${data.total_points||0} pts</span>
