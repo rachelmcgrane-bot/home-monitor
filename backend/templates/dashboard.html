@@ -548,7 +548,7 @@ function goToActivity(type,person){
     const match=document.querySelector(`.pill[onclick*="'${type}'"]`);
     if(match)match.classList.add('active');
   }else{
-    const allPill=document.querySelector('.pill[onclick*="setFilter(this,\\'\\')"]');
+    const allPill=document.querySelector(".pill[onclick*=\"setFilter(this,'')\"]");
     if(allPill)allPill.classList.add('active');
     else document.querySelector('.pill')?.classList.add('active');
   }
