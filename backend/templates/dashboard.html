@@ -23,8 +23,8 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 /* Layout */
 .tab-pane{display:none;height:calc(100vh - var(--hdr));margin-top:var(--hdr);overflow:hidden}
 .tab-pane.active{display:flex;flex-direction:column}
-/* Dashboard grid — single wide column (no 2-person split; user removed one) */
-.dash-layout{display:grid;grid-template-columns:1fr 300px;gap:8px;padding:8px;height:100%;overflow:hidden}
+/* Dashboard grid — full width, no right panel */
+.dash-layout{display:grid;grid-template-columns:1fr;gap:8px;padding:8px;height:100%;overflow:hidden}
 /* Person panel */
 .person-panel{background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .pp-head{padding:.55rem .8rem .3rem;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -210,9 +210,10 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 .weight-item .wi-name{flex:1;font-weight:600}
 .weight-item .wi-reason{color:var(--sub);font-size:.7rem}
 /* ── Lightbox ── */
-#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out}
+#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;flex-direction:column;gap:.7rem}
 #lightbox.open{display:flex}
-#lightbox img{max-width:92vw;max-height:92vh;border-radius:10px;object-fit:contain;box-shadow:0 0 60px rgba(0,0,0,.5)}
+#lightbox img{max-width:96vw;max-height:88vh;border-radius:10px;object-fit:contain;box-shadow:0 0 80px rgba(0,0,0,.7);border:2px solid rgba(255,255,255,.1)}
+#lightbox-hint{color:rgba(255,255,255,.45);font-size:.75rem;font-family:system-ui,sans-serif}
 /* ── Detail modal ── */
 #detailModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9990;align-items:center;justify-content:center}
 #detailModal.open{display:flex}
@@ -221,7 +222,7 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 .dm-close:hover{background:var(--border)}
 .dm-title{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:.9rem;padding-right:2rem}
 .dm-content{font-size:.8rem;color:var(--sub);line-height:1.6}
-.dm-photo{width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:.7rem;cursor:pointer}
+.dm-photo{width:100%;max-height:320px;object-fit:cover;border-radius:8px;margin-bottom:.7rem;cursor:pointer}
 .dm-score{display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem;flex-wrap:wrap}
 .sc-badge{font-size:.82rem;font-weight:700;padding:.18rem .55rem;border-radius:6px}
 .sc-hi{background:#dcfce7;color:#15803d}
@@ -267,7 +268,7 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
   <nav class="tab-nav">
     <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Dashboard</button>
     <button class="tab-btn" onclick="switchTab('activity')">📡 Activity</button>
-    <button class="tab-btn" onclick="switchTab('chores')">🧹 Chores</button>
+    <button class="tab-btn" onclick="switchTab('chores')">🧹 Jobs</button>
   </nav>
   <a class="cam-link" href="/camera" target="_blank">📷 Camera</a>
 </header>
@@ -281,24 +282,7 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
       <div class="person-panel" id="panel-Liam"></div>
       <div class="person-panel" id="panel-Rachel"></div>
     </div>
-    <div class="info-panel">
-      <div class="notif-box">
-        <div class="notif-hdr">
-          <span>🔔 Notifications</span>
-          <button class="notif-gen-btn" onclick="generateTrends()" title="Generate bi-weekly trend report">📈 Trends</button>
-        </div>
-        <div class="notif-body" id="notifBody"><div class="empty">Loading…</div></div>
-      </div>
-      <div class="mini-cal">
-        <div class="mc-nav">
-          <button class="mc-btn" onclick="mcNav(-1)">‹</button>
-          <span class="mc-title" id="mcTitle"></span>
-          <button class="mc-btn" onclick="mcNav(1)">›</button>
-        </div>
-        <div class="mc-grid" id="mcGrid"></div>
-        <span class="cal-link" onclick="openCal()">📅 Full calendar →</span>
-      </div>
-    </div>
+    <!-- notifications panel removed (#6) -->
   </div>
 </div>
 
@@ -325,9 +309,9 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
           <span class="pill" onclick="setFilter(this,'eating')">🍽️ Eating</span>
           <span class="pill" onclick="setFilter(this,'tv')">📺 TV</span>
           <span class="pill" onclick="setFilter(this,'resting')">🛋️ Resting</span>
-          <span class="pill" onclick="setFilter(this,'personal')">📱 Personal</span>
-          <span class="pill" onclick="setFilter(this,'family')">👨‍👩‍👧‍👦 Family</span>
-          <span class="pill p-viol" onclick="setViolFilter(this)">⚠️ Violations</span>
+          <span class="pill" onclick="setFilter(this,'personal')">📱 Relaxing</span>
+          <span class="pill" onclick="setFilter(this,'family')">👨‍👩‍👧‍👦 Family Time</span>
+          <span class="pill p-viol" onclick="setViolFilter(this)">⚠️ Rework</span>
         </div>
         <div class="filter-row">
           <select id="filterLoc"><option value="">All locations</option></select>
@@ -346,13 +330,9 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 <div id="tab-chores" class="tab-pane">
   <div class="chores-scroll">
     <div class="chore-mgmt-hdr">
-      <h2>Chore Management</h2>
+      <h2>Jobs Management</h2>
       <div class="hdr-btns">
-        <button class="btn-sm btn-blue" onclick="loadComparison()">📊 AI Compare</button>
-        <button class="btn-sm btn-purple" onclick="suggestPoints()">✨ Suggest Points</button>
-        <button class="btn-sm btn-green" onclick="loadSummary()">📋 Summary</button>
         <button class="btn-sm btn-amber" onclick="openAddToday()">📅 Add Activity</button>
-        <button class="btn-sm" style="background:var(--cyan)" onclick="openCookingHistory()">🍳 Cooking Log</button>
       </div>
     </div>
     <div class="comparison-box" id="compBox"></div>
@@ -360,8 +340,8 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:.8rem">
       <table class="chore-table" id="choreTable">
         <thead><tr>
-          <th>Chore</th><th>Freq</th><th>Type</th>
-          <th>Person</th><th style="text-align:center">Pts</th>
+          <th>Job</th><th>Freq</th><th>Type</th>
+          <th>Assigned to</th><th style="text-align:center">Pts</th>
           <th style="text-align:center">📋</th><th></th>
         </tr></thead>
         <tbody id="choreBody"></tbody>
@@ -404,7 +384,7 @@ header{height:var(--hdr);background:var(--card);border-bottom:1px solid var(--bo
 </div>
 
 <!-- Lightbox -->
-<div id="lightbox" onclick="closeLightbox()"><img id="lbImg" src="" alt=""></div>
+<div id="lightbox" onclick="closeLightbox()"><img id="lbImg" src="" alt=""><span id="lightbox-hint">Tap anywhere to close</span></div>
 
 <!-- Detail Modal -->
 <div id="detailModal">
@@ -708,9 +688,9 @@ function renderPanel(person,data,viols,ds,ms){
   // Pie segments
   const choreMins=(data.chores||[]).reduce((s,c)=>s+(c.time_spent_mins||0),0);
   const pieSegs=[
-    {v:choreMins,c:C.chores,label:'Chores'},
-    {v:ds.family_mins||0,c:C.family,label:'Family'},
-    {v:ds.personal_mins||0,c:C.personal,label:'Personal'},
+    {v:choreMins,c:C.chores,label:'Jobs'},
+    {v:ds.family_mins||0,c:C.family,label:'Family Time'},
+    {v:ds.personal_mins||0,c:C.personal,label:'Relaxing'},
     {v:Math.max((ds.kitchen_mins||0)-choreMins,0),c:C.kitchen,label:'Kitchen'},
   ];
   const pieDetailHtml=pieSegs.filter(s=>s.v>0).map(s=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><div style="width:12px;height:12px;border-radius:50%;background:${s.c}"></div><span style="flex:1">${esc(s.label)}</span><strong>${fmtM(s.v)}</strong></div>`).join('');
@@ -747,22 +727,22 @@ function renderPanel(person,data,viols,ds,ms){
     </div>
 
     <div class="hd-row">
-      ${halfDonut(pct,'Chores',choreSublabel,choreOnclick)}
-      ${halfDonut(dayFamPct,'Family',famSublabel,famOnclick)}
+      ${halfDonut(pct,'Jobs',choreSublabel,choreOnclick)}
+      ${halfDonut(dayFamPct,'Family Time',famSublabel,famOnclick)}
       ${halfDonut(reworkPct,'Rework',rewSublabel,rewOnclick,gaugeColorInv(reworkPct))}
-      ${halfDonut(dayPersonPct,'Personal',persSublabel,persOnclick)}
+      ${halfDonut(dayPersonPct,'Relaxing',persSublabel,persOnclick)}
     </div>
 
     <div class="month-row">
       ${[
-        ['Chores',  mthChoresPct,  "goToActivity('cleaning','"+person+"')"],
-        ['Family',  mthFamPct,     "goToActivity('family','"+person+"')"],
-        ['Rework',  reworkPct,     "reworkClick_p('"+person+"')"],
-        ['Personal',mthPersonPct,  "goToActivity('personal','"+person+"')"],
+        ['Jobs',       mthChoresPct, "goToActivity('cleaning','"+person+"')"],
+        ['Family Time',mthFamPct,   "goToActivity('family','"+person+"')"],
+        ['Rework',     reworkPct,   "reworkClick_p('"+person+"')"],
+        ['Relaxing',   mthPersonPct,"goToActivity('personal','"+person+"')"],
       ].map(([l,p,oc])=>`
         <div class="mb">
           <div class="mb-track" onclick="${oc}">
-            <div class="mb-fill" style="width:${p}%;background:${l==='Rework'?gaugeColorInv(p):gaugeColor(p)}"></div>
+            <div class="mb-fill" style="width:${p}%;background:${(l==='Rework')?gaugeColorInv(p):gaugeColor(p)}"></div>
           </div>
           <div class="mb-lbl">↑ month</div>
         </div>`).join('')}
@@ -774,12 +754,12 @@ function renderPanel(person,data,viols,ds,ms){
       <div class="kitchen-stat">🍳 Kitchen<strong>${fmtM(ds.kitchen_mins||0)}</strong>today</div>
     </div>
 
-    <div class="chore-list-hdr"><span>Today's Chores</span><span style="color:var(--blue)">${data.earned_points||0}/${data.total_points||0} pts</span></div>
+    <div class="chore-list-hdr"><span>Today's Jobs</span><span style="color:var(--blue)">${data.earned_points||0}/${data.total_points||0} pts</span></div>
     <div class="chore-list">${shown.length?shown.map(choreRow).join(''):'<div class="empty" style="padding:.6rem">No chores assigned</div>'}</div>
 
     <div class="rework-wrap">
       <div class="rework-lbl">
-        <span>Rework <span class="rework-count">${violCount?`${violCount} violation${violCount!==1?'s':''}`:''}</span> ${!violCount?'(clean ✓)':''}</span>
+        <span>Rework <span class="rework-count">${violCount?`${violCount} flag${violCount!==1?'s':''}`:''}</span> ${!violCount?'(clean ✓)':''}</span>
         <span style="font-size:.62rem;color:var(--sub);cursor:pointer" onclick="reworkClick_p('${person}')">→ view</span>
       </div>
       <div class="pb-track" data-person="${esc(person)}" onclick="reworkClick_p('${person}')">
@@ -936,7 +916,7 @@ async function recalculate(){
   const btn=document.querySelector('.btn-sm-act.recalc');
   if(btn){btn.textContent='Recalculating…';btn.disabled=true;}
   await fetch(`${API}/api/stats/recalculate`,{method:'POST'}).catch(()=>{});
-  await loadFeed();
+  await Promise.all([loadFeed(), loadDashboard()]);
   if(btn){btn.textContent='🔄 Recalc';btn.disabled=false;}
 }
 
@@ -1171,11 +1151,11 @@ async function loadChoreTable(){
         <td><select class="type-sel" onchange="updChore(${c.id},'chore_type',this.value)">
           ${['standard','core','rotating'].map(t=>`<option${t===c.chore_type?' selected':''}>${t}</option>`).join('')}
         </select></td>
-        <td><select class="person-sel" onchange="updChore(${c.id},'rotating_with',this.value)">
-          <option value="">—</option>
-          <option value="Liam"${personCol==='Liam'?' selected':''}>Liam</option>
-          <option value="Rachel"${personCol==='Rachel'?' selected':''}>Rachel</option>
-          <option value="both"${personCol==='both'?' selected':''}>both</option>
+        <td><select class="person-sel" onchange="updChorePerson(${c.id},this.value)">
+          <option value="Liam"${person==='Liam'?' selected':''}>Liam</option>
+          <option value="Rachel"${person==='Rachel'?' selected':''}>Rachel</option>
+          <option value="both"${person==='both'?' selected':''}>Both</option>
+          <option value="unassigned"${person==='unassigned'?' selected':''}>Unassigned</option>
         </select></td>
         <td style="text-align:center;white-space:nowrap">
           <input class="pts-num" type="number" value="${c.points}" min="1" max="300" id="pts-${c.id}" style="width:52px">
@@ -1192,6 +1172,13 @@ async function loadChoreTable(){
 async function updChore(id,field,val){
   const fd=new FormData();fd.append(field,val);
   await fetch(`${API}/api/chores/list/${id}`,{method:'PUT',body:fd});
+}
+
+async function updChorePerson(id,newPerson){
+  // Change person_name assignment and reload table so chore moves to correct section
+  const fd=new FormData();fd.append('person_name',newPerson);
+  await fetch(`${API}/api/chores/list/${id}`,{method:'PUT',body:fd});
+  loadChoreTable();  // refresh groups — chore will appear in new section
 }
 
 async function proposePoints(choreId, choreName, currentPts){
@@ -1382,9 +1369,9 @@ async function loadFeed(){
 
       // Traceability badge
       let traceBadge='';
-      if(t==='cleaning'||linkedAss) traceBadge=`<span class="trace-badge tb-chores" onclick="goToActivity('cleaning','${esc(s.person_name)}')">→ Chores</span>`;
+      if(t==='cleaning'||linkedAss) traceBadge=`<span class="trace-badge tb-chores" onclick="goToActivity('cleaning','${esc(s.person_name)}')">→ Jobs</span>`;
       else if(t==='family') traceBadge=`<span class="trace-badge tb-family" onclick="goToActivity('family','${esc(s.person_name)}')">→ Family Time</span>`;
-      else if(t==='personal') traceBadge=`<span class="trace-badge tb-personal" onclick="goToActivity('personal','${esc(s.person_name)}')">→ Personal Time</span>`;
+      else if(t==='personal') traceBadge=`<span class="trace-badge tb-personal" onclick="goToActivity('personal','${esc(s.person_name)}')">→ Relaxing</span>`;
       else if(t==='cooking'||t==='eating') traceBadge=`<span class="trace-badge tb-kitchen" onclick="goToActivity('cooking','${esc(s.person_name)}')">→ Kitchen</span>`;
 
       // Violation tag: check if this sighting has a linked violation

@@ -148,8 +148,15 @@ async function captureAndSend(location) {
       if (res.ok) {
         const data = await res.json();
         showResult(data);
+      } else {
+        // Show error so we can diagnose what's wrong
+        let errText = `Server error ${res.status}`;
+        try { const errData = await res.json(); errText = errData.detail || errText; } catch(e2){}
+        showError(errText);
+        console.error('API error', res.status, errText);
       }
     } catch (e) {
+      showError('Network error — is the server running? ' + e.message);
       console.error('Send error', e);
     } finally {
       indicator.classList.remove('show');
@@ -159,10 +166,21 @@ async function captureAndSend(location) {
 
 function showResult(data) {
   const conf = Math.round((data.confidence || 0) * 100);
+  const skipped = data.skipped ? `<span style="color:#f59e0b;font-size:.75rem"> ⚡ ${data.skipped}</span>` : '';
+  const violCount = (data.violations || []).length;
+  const violStr = violCount ? `<span style="color:#f97316"> ⚠️ ${violCount} rework flag${violCount>1?'s':''}</span>` : '';
   document.getElementById('lastResult').innerHTML = `
-    <div class="who">${data.person_name} &nbsp;<small style="color:#64748b">${conf}% match</small></div>
-    <div class="task">${data.task}</div>
-    <div class="meta">${new Date(data.timestamp).toLocaleTimeString()}</div>
+    <div class="who">${data.person_name || '—'} &nbsp;<small style="color:#64748b">${conf}% match</small>${skipped}</div>
+    <div class="task">${data.task || ''}${violStr}</div>
+    <div class="meta">${data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}</div>
+  `;
+}
+
+function showError(msg) {
+  document.getElementById('lastResult').innerHTML = `
+    <div class="who" style="color:#ef4444">⚠️ Error</div>
+    <div class="task" style="color:#fca5a5;font-size:.82rem">${msg}</div>
+    <div class="meta" style="color:#ef4444">Check console (F12) for details. May need to top up API credits.</div>
   `;
 }
 </script>

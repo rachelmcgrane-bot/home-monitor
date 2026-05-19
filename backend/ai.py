@@ -28,14 +28,23 @@ Also scan for these REWORK VIOLATIONS and return them in the violations list:
 - LAUNDRY_NOT_SORTED: Laundry left as one big unsorted pile instead of sorted by person (Ben/Louis/Lidia/adults)
 - CLUTTER_HIDDEN: Items stuffed into a bag, box, pile or container to clear space rather than properly put away
 
-MARGIN RULE: Small temporary items are acceptable and should NOT be flagged:
-remote controls, books, plants, small furnishings, toys in the toy box.
-Only flag if the space looks genuinely untidy — visible piles on windowsills,
-couches, TV stands, or floors that make the room look clearly disorganised.
+MARGIN RULE — these must NEVER be flagged, even if clearly visible:
+- A few items on the kitchen counter (cups, appliances, condiments, keys) — counters are ALWAYS in use
+- A single dirty plate, glass or mug left in or near the sink temporarily
+- Children's toys anywhere — children make messes, that is normal
+- Remote controls, books, papers, bags, chargers, phones on surfaces
+- Any item that has an obvious, legitimate reason to be where it is
 
-CONFIDENCE REQUIREMENT: You must be at least 90% certain before flagging any violation.
-If you have any doubt about whether something truly qualifies, do NOT flag it.
-It is far better to miss a genuine violation than to falsely accuse someone.
+Only flag something if the space looks SEVERELY and OBVIOUSLY neglected — e.g. a sink
+completely full of dishes that have been there a long time, a pile of rubbish on the floor,
+a clearly soiled surface that nobody has touched in days.
+
+SURFACE_NOT_PROPERLY_WIPED: Only flag if the surface is visibly dirty with food, liquid or
+grease residue. Do NOT flag a counter just because there are items on it or it looks used.
+
+CONFIDENCE REQUIREMENT: You must be at least 95% certain before flagging any violation.
+If there is ANY reasonable interpretation that makes the scene acceptable, do NOT flag it.
+It is far better to miss 10 genuine violations than to falsely accuse someone once.
 
 For each violation: code, description (what you see), callout (fun 70s presenter message using person's name).
 Return empty list [] if no violations found.
@@ -77,7 +86,7 @@ def _strip_fences(text: str) -> str:
 async def describe_face(image_bytes: bytes) -> str:
     b64 = _to_jpeg_b64(image_bytes)
     msg = await client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=400,
+        model="claude-3-5-sonnet-20241022", max_tokens=400,
         messages=[{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
             {"type": "text", "text": (
@@ -127,7 +136,7 @@ async def analyse_frame(image_bytes: bytes, enrolled_persons: list[dict]) -> dic
     )
 
     msg = await client.messages.create(
-        model="claude-haiku-3-5", max_tokens=600,
+        model="claude-3-5-haiku-20241022", max_tokens=600,
         messages=[{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
             {"type": "text", "text": prompt},
@@ -176,7 +185,7 @@ async def assess_chore(image_bytes: bytes, person_name: str, chore_name: str,
         "Output only valid JSON, no markdown."
     )
     msg = await client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=700,
+        model="claude-3-5-sonnet-20241022", max_tokens=700,
         messages=[{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
             {"type": "text", "text": prompt},
@@ -217,7 +226,7 @@ async def suggest_chore_points(chores_by_person: dict[str, list[dict]]) -> dict:
         "Output only valid JSON."
     )
     msg = await client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=600,
+        model="claude-3-5-sonnet-20241022", max_tokens=600,
         messages=[{"role": "user", "content": prompt}],
     )
     raw = _strip_fences(msg.content[0].text)
@@ -248,7 +257,7 @@ async def announce_morning_chores(person_name: str, chores: list[dict]) -> str:
         f"{person_name}'s chores today:\n" + "\n".join(lines)
     )
     msg = await client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=200,
+        model="claude-3-5-sonnet-20241022", max_tokens=200,
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text.strip()
@@ -279,7 +288,7 @@ async def generate_comparison_report(chore_stats: dict) -> str:
         "Keep it fun, under 250 words. Plain text."
     )
     msg = await client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=500,
+        model="claude-3-5-sonnet-20241022", max_tokens=500,
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text.strip()
@@ -308,7 +317,7 @@ async def generate_summary(assessments_by_person: dict[str, list[dict]],
         "gently roast low scorers, end with an encouraging sign-off. Under 200 words. Plain text."
     )
     msg = await client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=400,
+        model="claude-3-5-sonnet-20241022", max_tokens=400,
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text.strip()
@@ -342,7 +351,7 @@ async def check_point_weights(chores_by_person: dict) -> list:
         "If everything looks fair, return []."
     )
     msg = await client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=600,
+        model="claude-3-5-sonnet-20241022", max_tokens=600,
         messages=[{"role": "user", "content": prompt}],
     )
     raw = _strip_fences(msg.content[0].text)
@@ -367,7 +376,7 @@ async def recheck_violation(image_bytes: bytes, violation_code: str,
         "Output only valid JSON."
     )
     msg = await client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=150,
+        model="claude-3-5-sonnet-20241022", max_tokens=150,
         messages=[{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
             {"type": "text", "text": prompt},
@@ -410,7 +419,7 @@ async def generate_trend_report(fact_data: dict) -> str:
         "Be specific with numbers. Use names. Under 300 words. Plain text."
     )
     msg = await client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=600,
+        model="claude-3-5-sonnet-20241022", max_tokens=600,
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text.strip()
