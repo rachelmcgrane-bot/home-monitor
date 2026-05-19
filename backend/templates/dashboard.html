@@ -703,7 +703,7 @@ function renderPanel(person,data,viols,ds,ms){
   const choreOnclick=`goToActivity('cleaning','${person}')`;
   const famOnclick=`goToActivity('family','${person}')`;
   const persOnclick=`goToActivity('personal','${person}')`;
-  const rewOnclick=`reworkClick(this,event)`;
+  const rewOnclick="reworkClick_p('"+person+"')";
 
   // Pie segments
   const choreMins=(data.chores||[]).reduce((s,c)=>s+(c.time_spent_mins||0),0);
@@ -749,14 +749,19 @@ function renderPanel(person,data,viols,ds,ms){
     <div class="hd-row">
       ${halfDonut(pct,'Chores',choreSublabel,choreOnclick)}
       ${halfDonut(dayFamPct,'Family',famSublabel,famOnclick)}
-      ${halfDonut(reworkPct,'Rework',rewSublabel,`reworkClick_p('${person}')`,gaugeColorInv(reworkPct))}
+      ${halfDonut(reworkPct,'Rework',rewSublabel,rewOnclick,gaugeColorInv(reworkPct))}
       ${halfDonut(dayPersonPct,'Personal',persSublabel,persOnclick)}
     </div>
 
     <div class="month-row">
-      ${[['Chores',mthChoresPct],['Family',mthFamPct],['Rework',reworkPct],['Personal',mthPersonPct]].map(([l,p])=>`
+      ${[
+        ['Chores',  mthChoresPct,  "goToActivity('cleaning','"+person+"')"],
+        ['Family',  mthFamPct,     "goToActivity('family','"+person+"')"],
+        ['Rework',  reworkPct,     "reworkClick_p('"+person+"')"],
+        ['Personal',mthPersonPct,  "goToActivity('personal','"+person+"')"],
+      ].map(([l,p,oc])=>`
         <div class="mb">
-          <div class="mb-track" onclick="${l==='Rework'?`reworkClick_p('${person}')`:` goToActivity('${l==='Chores'?'cleaning':l==='Family'?'family':l==='Personal'?'personal':''}','${person}')`}">
+          <div class="mb-track" onclick="${oc}">
             <div class="mb-fill" style="width:${p}%;background:${l==='Rework'?gaugeColorInv(p):gaugeColor(p)}"></div>
           </div>
           <div class="mb-lbl">↑ month</div>
