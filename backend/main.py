@@ -476,19 +476,33 @@ async def recalculate_stats(db: AsyncSession = Depends(get_db)):
 
 @app.get("/api/test-ai")
 async def test_ai():
-    """Quick sanity-check: sends a tiny text message to Anthropic and returns the result."""
+    """Probe multiple model names to find which ones work on this API key."""
     import anthropic
-    try:
-        from ai import client as ai_client
-        msg = await ai_client.messages.create(
-            model="claude-3-5-haiku-20241022", max_tokens=20,
-            messages=[{"role": "user", "content": "Reply with just the word OK"}],
-        )
-        return {"status": "ok", "reply": msg.content[0].text.strip()}
-    except anthropic.APIStatusError as e:
-        return {"status": "error", "code": e.status_code, "message": str(e.message)}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    from ai import client as ai_client
+    candidates = [
+        "claude-3-5-haiku-20241022",
+        "claude-3-5-sonnet-20241022",
+        "claude-3-7-sonnet-20250219",
+        "claude-3-5-haiku-latest",
+        "claude-3-5-sonnet-latest",
+        "claude-haiku-4-5",
+        "claude-sonnet-4-5",
+        "claude-opus-4-5",
+    ]
+    results = {}
+    for model in candidates:
+        try:
+            msg = await ai_client.messages.create(
+                model=model, max_tokens=10,
+                messages=[{"role": "user", "content": "Say OK"}],
+            )
+            results[model] = "✅ works"
+            break  # stop at first working model
+        except anthropic.APIStatusError as e:
+            results[model] = f"❌ {e.status_code}"
+        except Exception as e:
+            results[model] = f"❌ {str(e)[:60]}"
+    return {"results": results}
 
 # ── Camera frame ──────────────────────────────────────────────────────────────
 
