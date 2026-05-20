@@ -213,8 +213,8 @@ def _thumb(data: bytes, size=(320, 240)) -> str:
 def _uri(b64: str) -> str:
     return f"data:image/jpeg;base64,{b64}"
 
-def _read(upload: UploadFile) -> bytes:
-    return upload.file.read()
+async def _read(upload: UploadFile) -> bytes:
+    return await upload.read()
 
 def _today() -> str:
     """Return current chore-day date. Day starts at 06:00 UTC (≈ 7am Irish time).
@@ -283,7 +283,7 @@ def _rotating_assignee(chore: Chore, yest_ass: list, today_day: int) -> str:
 @app.post("/api/persons")
 async def enrol_person(name: str = Form(...), photo: UploadFile = File(...),
                        db: AsyncSession = Depends(get_db)):
-    data = _read(photo)
+    data = await _read(photo)
     face_desc = await describe_face(data)
     person = Person(name=name, photo_data=_thumb(data, (300, 300)), face_description=face_desc)
     db.add(person); await db.commit(); await db.refresh(person)
@@ -495,7 +495,7 @@ async def test_ai():
 @app.post("/api/frame")
 async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
                        db: AsyncSession = Depends(get_db)):
-    data = _read(frame)
+    data = await _read(frame)
 
     # ── Cost gates: dedup + motion + waking hours + minimum interval ─────────
     if _is_duplicate_frame(data):
