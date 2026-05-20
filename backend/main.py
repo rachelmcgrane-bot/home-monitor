@@ -497,12 +497,12 @@ async def test_ai():
                 messages=[{"role": "user", "content": "Say OK"}],
             )
             results[model] = "✅ works"
-            break  # stop at first working model
         except anthropic.APIStatusError as e:
             results[model] = f"❌ {e.status_code}"
         except Exception as e:
             results[model] = f"❌ {str(e)[:60]}"
-    return {"results": results}
+    working = [m for m,r in results.items() if r.startswith("✅")]
+    return {"results": results, "working": working}
 
 # ── Camera frame ──────────────────────────────────────────────────────────────
 

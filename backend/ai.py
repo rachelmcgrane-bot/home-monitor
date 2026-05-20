@@ -86,7 +86,7 @@ def _strip_fences(text: str) -> str:
 async def describe_face(image_bytes: bytes) -> str:
     b64 = _to_jpeg_b64(image_bytes)
     msg = await client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=400,
+        model="claude-haiku-4-5", max_tokens=400,
         messages=[{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
             {"type": "text", "text": (
@@ -136,7 +136,7 @@ async def analyse_frame(image_bytes: bytes, enrolled_persons: list[dict]) -> dic
     )
 
     msg = await client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=600,
+        model="claude-haiku-4-5", max_tokens=600,
         messages=[{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
             {"type": "text", "text": prompt},
@@ -185,7 +185,7 @@ async def assess_chore(image_bytes: bytes, person_name: str, chore_name: str,
         "Output only valid JSON, no markdown."
     )
     msg = await client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=700,
+        model="claude-haiku-4-5", max_tokens=700,
         messages=[{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
             {"type": "text", "text": prompt},
@@ -226,7 +226,7 @@ async def suggest_chore_points(chores_by_person: dict[str, list[dict]]) -> dict:
         "Output only valid JSON."
     )
     msg = await client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=600,
+        model="claude-haiku-4-5", max_tokens=600,
         messages=[{"role": "user", "content": prompt}],
     )
     raw = _strip_fences(msg.content[0].text)
@@ -257,7 +257,7 @@ async def announce_morning_chores(person_name: str, chores: list[dict]) -> str:
         f"{person_name}'s chores today:\n" + "\n".join(lines)
     )
     msg = await client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=200,
+        model="claude-haiku-4-5", max_tokens=200,
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text.strip()
@@ -288,7 +288,7 @@ async def generate_comparison_report(chore_stats: dict) -> str:
         "Keep it fun, under 250 words. Plain text."
     )
     msg = await client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=500,
+        model="claude-haiku-4-5", max_tokens=500,
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text.strip()
@@ -317,7 +317,7 @@ async def generate_summary(assessments_by_person: dict[str, list[dict]],
         "gently roast low scorers, end with an encouraging sign-off. Under 200 words. Plain text."
     )
     msg = await client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=400,
+        model="claude-haiku-4-5", max_tokens=400,
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text.strip()
@@ -351,7 +351,7 @@ async def check_point_weights(chores_by_person: dict) -> list:
         "If everything looks fair, return []."
     )
     msg = await client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=600,
+        model="claude-haiku-4-5", max_tokens=600,
         messages=[{"role": "user", "content": prompt}],
     )
     raw = _strip_fences(msg.content[0].text)
@@ -376,7 +376,7 @@ async def recheck_violation(image_bytes: bytes, violation_code: str,
         "Output only valid JSON."
     )
     msg = await client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=150,
+        model="claude-haiku-4-5", max_tokens=150,
         messages=[{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
             {"type": "text", "text": prompt},
@@ -419,7 +419,7 @@ async def generate_trend_report(fact_data: dict) -> str:
         "Be specific with numbers. Use names. Under 300 words. Plain text."
     )
     msg = await client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=600,
+        model="claude-haiku-4-5", max_tokens=600,
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text.strip()
