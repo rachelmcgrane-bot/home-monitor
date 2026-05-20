@@ -42,9 +42,9 @@ _last_frame_pixels: dict = {}   # {location: list[int]}  grayscale 80×60 pixels
 _last_ai_call: dict = {}        # {location: datetime}   time of last AI analysis
 _last_ai_result: dict = {}      # {location: dict}       cached last AI result
 
-MOTION_THRESHOLD = 12           # mean abs pixel diff (0–255) to count as motion
-MIN_AI_INTERVAL_SECS = 300      # min seconds between AI calls per camera (5 min)
-WAKING_HOURS = (6, 23)          # UTC hour range — 6:00–23:59 UTC ≈ 7am–midnight Irish
+MOTION_THRESHOLD = 8            # mean abs pixel diff (0–255) to count as motion
+MIN_AI_INTERVAL_SECS = 60       # min seconds between AI calls per camera (1 min)
+WAKING_HOURS = (5, 23)          # UTC hour range — 5:00–23:59 UTC ≈ 6am–midnight Irish
 
 # ── Frame deduplication ───────────────────────────────────────────────────────
 _processed_hashes: dict = {}    # {sha256_hex: datetime} — skip already-analysed frames
@@ -504,6 +504,53 @@ async def test_ai():
     working = [m for m,r in results.items() if r.startswith("✅")]
     return {"results": results, "working": working}
 
+# ── Debug / health ───────────────────────────────────────────────────────────
+
+@app.get("/api/debug")
+async def debug_info(db: AsyncSession = Depends(get_db)):
+    """Diagnostic endpoint — shows current system state at a glance."""
+    import anthropic as _ant
+    sdk_ver = getattr(_ant, "__version__", "unknown")
+
+    # DB counts
+    persons_res = await db.execute(select(func.count(Person.id)))
+    persons_count = int(persons_res.scalar() or 0)
+
+    sightings_res = await db.execute(select(func.count(Sighting.id)))
+    sightings_count = int(sightings_res.scalar() or 0)
+
+    today = _today()
+    today_sight_res = await db.execute(
+        select(func.count(Sighting.id)).where(
+            Sighting.timestamp >= datetime.utcnow() - timedelta(hours=24)))
+    today_sightings = int(today_sight_res.scalar() or 0)
+
+    # Last sighting
+    last_res = await db.execute(
+        select(Sighting).order_by(desc(Sighting.timestamp)).limit(1))
+    last = last_res.scalar_one_or_none()
+
+    return {
+        "ok": True,
+        "sdk_version": sdk_ver,
+        "persons_enrolled": persons_count,
+        "total_sightings": sightings_count,
+        "sightings_last_24h": today_sightings,
+        "last_sighting": {
+            "person": last.person_name,
+            "task": last.task_description,
+            "timestamp": last.timestamp.isoformat(),
+            "location": last.location,
+        } if last else None,
+        "waking_hours_now": _is_waking_hours(),
+        "utc_hour": datetime.utcnow().hour,
+        "min_ai_interval_secs": MIN_AI_INTERVAL_SECS,
+        "motion_threshold": MOTION_THRESHOLD,
+        "locations_tracked": list(_last_ai_call.keys()),
+        "today_date": today,
+    }
+
+
 # ── Camera frame ──────────────────────────────────────────────────────────────
 
 @app.post("/api/frame")
@@ -559,13 +606,7 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
         "morning_announcement": None, "chore_assessment": None,
     }
 
-    # Storage optimisation: skip saving if no known person detected
-    if analysis.get("person_name", "Unknown") == "Unknown" and not analysis.get("violations"):
-        return {"id": None, "person_name": "Unknown", "task": analysis.get("task", ""),
-                "activity_type": "other", "confidence": 0.0,
-                "timestamp": datetime.utcnow().isoformat(),
-                "etiquette_violation": None, "etiquette_nudge": None,
-                "violations": [], "morning_announcement": None, "chore_assessment": None}
+    # Always save sightings so the activity stream stays populated
 
     thumb = _thumb(data)
 
