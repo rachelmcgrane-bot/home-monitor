@@ -734,8 +734,8 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
             prev_act = tracking["last_activity_type"]
             if tracking["last_in_kitchen"]:
                 tracking["kitchen_mins"] += elapsed_mins
-            # personal_mins: passive/leisure time (tv, resting, personal)
-            if prev_act in ("tv", "resting", "personal"):
+            # personal_mins: passive/leisure time (tv, resting, personal, eating)
+            if prev_act in ("tv", "resting", "personal", "eating"):
                 tracking["personal_mins"] += elapsed_mins
             # family_mins: time with children
             elif prev_act == "family":

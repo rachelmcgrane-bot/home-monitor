@@ -983,7 +983,15 @@ async function drillFamilyTime(person, actType){
   const icon=actType==='family'?'❤️':'🛋️';
   showDetail(`${icon} ${dname} — ${label} (Today)`, '<div style="color:var(--sub);font-size:.8rem">Loading…</div>');
   const today=todayStr();
-  const sightings = await fetch(`${API}/api/sightings?limit=60&person_name=${encodeURIComponent(person)}&activity_type=${actType}&date=${today}`).then(r=>r.json()).catch(()=>[]);
+  // Relaxing = personal + tv + resting + eating all count toward this bucket
+  const relaxTypes = actType==='personal'
+    ? ['personal','tv','resting','eating']
+    : ['family'];
+  const fetches = relaxTypes.map(t=>
+    fetch(`${API}/api/sightings?limit=40&person_name=${encodeURIComponent(person)}&activity_type=${t}&date=${today}`).then(r=>r.json()).catch(()=>[])
+  );
+  const arrays = await Promise.all(fetches);
+  const sightings = arrays.flat().sort((a,b)=>b.timestamp.localeCompare(a.timestamp));
   let html='';
   if(sightings.length){
     html+=`<div style="font-size:.68rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem">📷 ${sightings.length} camera event${sightings.length!==1?'s':''} captured today</div>`;
@@ -991,7 +999,8 @@ async function drillFamilyTime(person, actType){
   }else{
     html=`<div style="color:var(--faint);font-size:.8rem;padding:1rem 0;text-align:center">No ${label.toLowerCase()} events captured by camera today.</div>`;
   }
-  html+=`<div style="margin-top:.8rem"><button class="btn-del" style="width:100%;background:rgba(34,211,238,.1);color:var(--cyan);border-color:var(--cyan)" onclick="closeDetail();goToActivity('${actType}','${person}')">View full activity feed →</button></div>`;
+  const feedType=actType==='family'?'family':'personal';
+  html+=`<div style="margin-top:.8rem"><button class="btn-del" style="width:100%;background:rgba(34,211,238,.1);color:var(--cyan);border-color:var(--cyan)" onclick="closeDetail();goToActivity('${feedType}','${person}')">View full activity feed →</button></div>`;
   showDetail(`${icon} ${dname} — ${label} (Today)`, html);
 }
 
