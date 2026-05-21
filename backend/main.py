@@ -260,13 +260,17 @@ def _date_minus(date_str: str, days: int) -> str:
     return (datetime.strptime(date_str, "%Y-%m-%d") - timedelta(days=days)).strftime("%Y-%m-%d")
 
 def _chore_matches(chore_name: str, task: str) -> bool:
-    stop = {"the","a","an","is","are","and","or","to","of","in","on"}
-    words = [w.strip(".,!").lower() for w in chore_name.split()
-             if w.lower() not in stop and len(w) > 2]
+    """Return True if the AI task description plausibly refers to this chore.
+    Uses 5-char word stems with a 60% match threshold to reduce false positives."""
+    stop = {"the","a","an","is","are","and","or","to","of","in","on","up","out","down"}
+    words = [w.strip(".,!?").lower() for w in chore_name.split()
+             if w.lower() not in stop and len(w) > 3]
     task_low = task.lower()
     if not words:
         return False
-    return sum(1 for w in words if w[:4] in task_low) / len(words) >= 0.5
+    # Use 5-char stem and require 60% of significant words to match
+    matched = sum(1 for w in words if w[:5] in task_low)
+    return matched / len(words) >= 0.6
 
 def _day_qualifies_every2(chore_id: int, today: str) -> bool:
     """Return True if an every-2-days chore should appear today."""
@@ -730,10 +734,13 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
             prev_act = tracking["last_activity_type"]
             if tracking["last_in_kitchen"]:
                 tracking["kitchen_mins"] += elapsed_mins
+            # personal_mins: passive/leisure time (tv, resting, personal)
             if prev_act in ("tv", "resting", "personal"):
                 tracking["personal_mins"] += elapsed_mins
+            # family_mins: time with children
             elif prev_act == "family":
                 tracking["family_mins"] += elapsed_mins
+            # cleaning time is tracked implicitly via ChoreAssessments — no separate bucket needed
 
         tracking["last_seen"] = now
         tracking["last_activity_type"] = act_type
@@ -758,14 +765,20 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
                 morning_announcement = ann_text
 
         # ── Chore assessment ──────────────────────────────────────────────────
+        # Only attempt to match a chore when the AI has classified this frame
+        # as active cleaning or cooking — this prevents passive activities
+        # (sitting on the couch, watching TV, etc.) from triggering assessments.
+        act_type_for_chore = analysis.get("activity_type", "other")
         chores_res = await db.execute(
             select(Chore).where(Chore.active == True))
         all_active = chores_res.scalars().all()
         # Include chores for this person, both, and unassigned
         person_chores = [c for c in all_active
                          if c.person_name in (person_name, "both", "unassigned")]
-        matched = next((c for c in person_chores
-                        if _chore_matches(c.chore_name, task_text)), None)
+        matched = None
+        if act_type_for_chore in ("cleaning", "cooking"):
+            matched = next((c for c in person_chores
+                            if _chore_matches(c.chore_name, task_text)), None)
         if matched:
             session = _chore_sessions.get(person_name, {})
             if session.get("chore_name") == matched.chore_name:
