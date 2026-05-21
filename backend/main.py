@@ -12,7 +12,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func, update as sql_update
-from PIL import Image
+try:
+    from PIL import Image
+    _PIL_AVAILABLE = True
+except ImportError:
+    _PIL_AVAILABLE = False
 
 from database import (init_db, get_db, SessionLocal,
                       Person, Sighting, Chore, ChoreAssessment, ChoreViolation,
@@ -65,6 +69,8 @@ def _is_duplicate_frame(data: bytes) -> bool:
 def _detect_motion(location: str, frame_bytes: bytes) -> bool:
     """Compare incoming frame against last stored frame. Returns True if motion detected."""
     try:
+        if not _PIL_AVAILABLE:
+            return True
         img = Image.open(io.BytesIO(frame_bytes)).convert("L").resize((80, 60))
         pixels = list(img.getdata())
         prev = _last_frame_pixels.get(location)
