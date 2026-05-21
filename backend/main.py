@@ -1036,10 +1036,19 @@ async def get_assessments(date: Optional[str] = None, person_name: Optional[str]
 
 @app.get("/api/chores/daily-plan")
 async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+    import calendar as cal_module
     today = date or _today()
     yesterday = _date_minus(today, 1)
     day_before = _date_minus(today, 2)
     today_day = int(today.split("-")[2])
+
+    # Saturday-only logic for rotating and monthly chores
+    weekday = datetime.strptime(today, "%Y-%m-%d").weekday()  # 5=Saturday
+    is_saturday = (weekday == 5)
+    first_day = datetime.strptime(today[:7] + '-01', '%Y-%m-%d')
+    days_to_sat = (5 - first_day.weekday()) % 7
+    first_saturday = (first_day + timedelta(days=days_to_sat)).strftime('%Y-%m-%d')
+    is_first_saturday = (today == first_saturday and is_saturday)
 
     chores_res = await db.execute(select(Chore).where(Chore.active == True))
     all_chores = chores_res.scalars().all()
@@ -1110,39 +1119,78 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
                 total_pts += c.points
                 earned_pts += pts_earned
 
-        # ── Rotating chores ───────────────────────────────────────────────────
-        for c in all_chores:
-            if c.chore_type == "rotating" and c.rotating_with:
-                # Check if this chore qualifies today (for every-2-days)
+        # ── Rotating chores (Saturdays only, up to 4 per person) ────────────
+        if is_saturday:
+            rotating_candidates = [
+                c for c in all_chores
+                if c.chore_type == "rotating" and c.rotating_with
+                and _rotating_assignee(c, yest_ass, today_day) == person
+            ]
+            # Sort by name for consistency, limit to 4
+            rotating_candidates.sort(key=lambda c: c.chore_name)
+            for c in rotating_candidates[:4]:
                 if c.frequency == "every-2-days" and not _day_qualifies_every2(c.id, today):
                     continue
-                if _rotating_assignee(c, yest_ass, today_day) == person:
-                    ta = best(today_ass, person, c.chore_name)
-                    score = ta.score if ta else 0
-                    pts_earned = ta.points_earned if ta else 0
-                    done = score >= 5
-                    chore_list.append({
-                        "id": c.id, "chore_name": c.chore_name,
-                        "frequency": c.frequency, "chore_type": "rotating",
-                        "rotating_with": c.rotating_with, "points": c.points,
-                        "points_earned": pts_earned, "score": score,
-                        "status": ta.status if ta else "pending", "done": done,
-                        "carried_forward": False,
-                        "when_suits": False, "is_weekly_target": False,
-                        "assessment": ta.assessment_text if ta else None,
-                        "commentary": ta.commentary_text if ta else None,
-                        "time_spent_mins": ta.time_spent_mins if ta else 0,
-                        "thumbnail_url": _uri(ta.thumbnail_data) if ta and ta.thumbnail_data else None,
-                        "assessment_id": ta.id if ta else None,
-                        "dispute_status": ta.dispute_status if ta else None,
-                    })
-                    total_pts += c.points
-                    earned_pts += pts_earned
+                ta = best(today_ass, person, c.chore_name)
+                score = ta.score if ta else 0
+                pts_earned = ta.points_earned if ta else 0
+                done = score >= 5
+                chore_list.append({
+                    "id": c.id, "chore_name": c.chore_name,
+                    "frequency": c.frequency, "chore_type": "rotating",
+                    "rotating_with": c.rotating_with, "points": c.points,
+                    "points_earned": pts_earned, "score": score,
+                    "status": ta.status if ta else "pending", "done": done,
+                    "carried_forward": False,
+                    "when_suits": False, "is_weekly_target": False,
+                    "assessment": ta.assessment_text if ta else None,
+                    "commentary": ta.commentary_text if ta else None,
+                    "time_spent_mins": ta.time_spent_mins if ta else 0,
+                    "thumbnail_url": _uri(ta.thumbnail_data) if ta and ta.thumbnail_data else None,
+                    "assessment_id": ta.id if ta else None,
+                    "dispute_status": ta.dispute_status if ta else None,
+                })
+                total_pts += c.points
+                earned_pts += pts_earned
 
-        # ── Standard and "both" chores ────────────────────────────────────────
+        # ── Monthly chores (first Saturday only, 1 per person) ───────────────
+        if is_first_saturday:
+            monthly_candidates = sorted(
+                [c for c in all_chores
+                 if c.chore_type == "standard" and c.frequency == "monthly"
+                 and c.person_name == person],
+                key=lambda c: c.id
+            )
+            if monthly_candidates:
+                c = monthly_candidates[0]
+                ta = best(today_ass, person, c.chore_name)
+                score = ta.score if ta else 0
+                pts_earned = ta.points_earned if ta else 0
+                done = score >= 5
+                chore_list.append({
+                    "id": c.id, "chore_name": c.chore_name,
+                    "frequency": c.frequency, "chore_type": "standard",
+                    "rotating_with": None, "points": c.points,
+                    "points_original": c.points,
+                    "person_name": c.person_name,
+                    "points_earned": pts_earned, "score": score,
+                    "status": ta.status if ta else "pending", "done": done,
+                    "carried_forward": False,
+                    "when_suits": False, "is_weekly_target": False,
+                    "assessment": ta.assessment_text if ta else None,
+                    "commentary": ta.commentary_text if ta else None,
+                    "time_spent_mins": ta.time_spent_mins if ta else 0,
+                    "thumbnail_url": _uri(ta.thumbnail_data) if ta and ta.thumbnail_data else None,
+                    "assessment_id": ta.id if ta else None,
+                    "dispute_status": ta.dispute_status if ta else None,
+                })
+                total_pts += c.points
+                earned_pts += pts_earned
+
+        # ── Standard and "both" chores (skip monthly here — handled above) ──
         for c in all_chores:
             is_for_person = (c.person_name == person or c.person_name == "both")
-            if c.chore_type == "standard" and is_for_person:
+            if c.chore_type == "standard" and is_for_person and c.frequency != "monthly":
                 ta = best(today_ass, person, c.chore_name)
                 ya = best(yest_ass, person, c.chore_name)
                 day_before_ya = best(day_before_ass, person, c.chore_name)
@@ -1584,6 +1632,96 @@ async def get_monthly_stats(month: Optional[str] = None, db: AsyncSession = Depe
             "days_seen": 0, "arrivals": [],
         })
     return {"month": month, "persons": output}
+
+
+# ── NFC tag endpoints ─────────────────────────────────────────────────────────
+
+NFC_SECRET = "hm2026"
+
+def _nfc_token(chore_id: int, person: str) -> str:
+    raw = f"{chore_id}{person}{NFC_SECRET}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:8]
+
+
+@app.get("/api/nfc/token")
+async def get_nfc_token(chore_id: int, person: str):
+    token = _nfc_token(chore_id, person)
+    return {"chore_id": chore_id, "person": person, "token": token,
+            "url": f"/nfc/complete?chore_id={chore_id}&person={person}&token={token}"}
+
+
+@app.get("/nfc/complete", response_class=HTMLResponse)
+async def nfc_complete(chore_id: int, person: str, token: str,
+                       db: AsyncSession = Depends(get_db)):
+    expected = _nfc_token(chore_id, person)
+    if token != expected:
+        return HTMLResponse("<html><body><h2>❌ Invalid token</h2></body></html>", status_code=403)
+    chore = await db.get(Chore, chore_id)
+    if not chore:
+        return HTMLResponse("<html><body><h2>❌ Chore not found</h2></body></html>", status_code=404)
+    chore_name = chore.chore_name
+    target_date = _today()
+    ca = ChoreAssessment(
+        person_name=person,
+        chore_name=chore_name,
+        status="done",
+        score=10,
+        points_earned=chore.points,
+        assessment_text="Recorded via NFC tag",
+        commentary_text="",
+        assessed_date=target_date,
+        time_spent_mins=0,
+    )
+    db.add(ca)
+    await db.commit()
+    display_person = "Dad" if person == "Liam" else "Mom" if person == "Rachel" else person
+    html = f"""<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="3;url=/">
+<title>NFC Complete</title>
+<style>body{{font-family:system-ui,sans-serif;background:#0d0f1a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}}
+.box{{background:#141726;border-radius:16px;padding:2rem 2.5rem;border:1px solid #1e2540;box-shadow:0 8px 32px rgba(0,0,0,.4)}}
+h1{{font-size:2.5rem;margin:.3rem 0}}.name{{color:#60a5fa;font-weight:700}}.chore{{color:#4ade80;font-weight:700}}
+p{{color:#94a3b8;font-size:.9rem}}</style></head>
+<body><div class="box">
+<h1>✅</h1>
+<h2><span class="chore">{chore_name}</span> marked complete<br>for <span class="name">{display_person}</span>!</h2>
+<p>+{chore.points} pts · Redirecting to dashboard in 3 seconds…</p>
+</div></body></html>"""
+    return HTMLResponse(html)
+
+
+@app.get("/nfc", response_class=HTMLResponse)
+async def nfc_setup_page(db: AsyncSession = Depends(get_db)):
+    chores_res = await db.execute(
+        select(Chore).where(Chore.active == True)
+        .order_by(Chore.person_name, Chore.chore_name))
+    chores = chores_res.scalars().all()
+
+    rows = ""
+    for c in chores:
+        if c.person_name in ("Liam", "Rachel"):
+            tok = _nfc_token(c.id, c.person_name)
+            url = f"/nfc/complete?chore_id={c.id}&person={c.person_name}&token={tok}"
+            display = "Dad" if c.person_name == "Liam" else "Mom"
+            rows += f"<tr><td>{display}</td><td>{c.chore_name}</td><td>{c.frequency}</td><td>{c.points}pts</td><td><a href='{url}' style='color:#60a5fa;word-break:break-all'>{url}</a></td></tr>\n"
+
+    html = f"""<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFC Setup</title>
+<style>body{{font-family:system-ui,sans-serif;background:#0d0f1a;color:#e2e8f0;padding:1.5rem;max-width:1100px;margin:0 auto}}
+h1{{color:#60a5fa;margin-bottom:1rem}}table{{width:100%;border-collapse:collapse;font-size:.85rem}}
+th{{text-align:left;padding:.5rem .7rem;color:#94a3b8;border-bottom:2px solid #1e2540;font-size:.78rem;text-transform:uppercase}}
+td{{padding:.45rem .7rem;border-bottom:1px solid #1e2540}}tr:hover td{{background:#141726}}
+a{{color:#60a5fa}}.back{{color:#94a3b8;font-size:.85rem;margin-bottom:1rem;display:block}}</style></head>
+<body>
+<a class="back" href="/">← Back to Dashboard</a>
+<h1>📡 NFC Tag Setup</h1>
+<p style="color:#94a3b8;margin-bottom:1rem">Copy a URL below and write it to an NFC tag. Tapping the tag will mark that chore as done.</p>
+<table><thead><tr><th>Person</th><th>Chore</th><th>Frequency</th><th>Points</th><th>NFC URL</th></tr></thead>
+<tbody>{rows}</tbody></table>
+</body></html>"""
+    return HTMLResponse(html)
 
 
 # ── Pages ─────────────────────────────────────────────────────────────────────

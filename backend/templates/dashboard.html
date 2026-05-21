@@ -51,7 +51,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .sk-value{font-size:1.2rem;font-weight:900;color:#fff;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px rgba(0,0,0,.3)}
 .sk-sub{font-size:.58rem;color:rgba(255,255,255,.6);margin-top:.12rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* ── Charts row ── */
-.charts-row{display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;padding:6px 8px 0;flex-shrink:0;height:170px}
+.charts-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:6px 8px 0;flex-shrink:0;height:240px}
 .chart-card{background:#191d30;border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);padding:.6rem .8rem;display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .chart-title{font-size:.6rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;margin-bottom:.3rem}
 .chart-inner{position:relative;flex:1;min-height:0}
@@ -311,8 +311,8 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     <button class="tab-btn" onclick="switchTab('chores')">🧹 Jobs</button>
   </nav>
   <div class="carry-badges">
-    <button class="carry-badge" id="carryBadge-Liam" onclick="carryOverClick()" title="Liam's carried-over jobs from yesterday">🔄 Liam <span id="carryCount-Liam">—</span></button>
-    <button class="carry-badge" id="carryBadge-Rachel" onclick="carryOverClick()" title="Rachel's carried-over jobs from yesterday">🔄 Rachel <span id="carryCount-Rachel">—</span></button>
+    <button class="carry-badge" id="carryBadge-Liam" onclick="carryOverClick()" title="Dad's carried-over jobs from yesterday">🔄 Dad <span id="carryCount-Liam">—</span></button>
+    <button class="carry-badge" id="carryBadge-Rachel" onclick="carryOverClick()" title="Mom's carried-over jobs from yesterday">🔄 Mom <span id="carryCount-Rachel">—</span></button>
   </div>
   <a class="cam-link" href="/camera" target="_blank">📷 Camera</a>
 </header>
@@ -324,22 +324,22 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     <!-- ── KPI stat boxes ─────────────────────────────────────────────── -->
     <div class="stats-strip">
       <div class="stat-kpi sk-blue" data-icon="🌅">
-        <div class="sk-label">Liam — Wake Time</div>
+        <div class="sk-label">Dad — Wake Time</div>
         <div class="sk-value" id="kv-todayL">—</div>
         <div class="sk-sub" id="ks-todayL">today's first seen</div>
       </div>
       <div class="stat-kpi sk-pink" data-icon="🌅">
-        <div class="sk-label">Rachel — Wake Time</div>
+        <div class="sk-label">Mom — Wake Time</div>
         <div class="sk-value" id="kv-todayR">—</div>
         <div class="sk-sub" id="ks-todayR">today's first seen</div>
       </div>
       <div class="stat-kpi sk-indigo" data-icon="⏰">
-        <div class="sk-label">Liam — Avg Rise</div>
+        <div class="sk-label">Dad — Avg Rise</div>
         <div class="sk-value" id="kv-riseL">—</div>
         <div class="sk-sub" id="ks-riseL">avg this month</div>
       </div>
       <div class="stat-kpi sk-purple" data-icon="⏰">
-        <div class="sk-label">Rachel — Avg Rise</div>
+        <div class="sk-label">Mom — Avg Rise</div>
         <div class="sk-value" id="kv-riseR">—</div>
         <div class="sk-sub" id="ks-riseR">avg this month</div>
       </div>
@@ -368,16 +368,16 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     <!-- ── Charts row ─────────────────────────────────────────────────── -->
     <div class="charts-row">
       <div class="chart-card">
-        <div class="chart-title">📈 Jobs Completion — This Month</div>
+        <div class="chart-title">📊 Job Completion — Today</div>
         <div class="chart-inner"><canvas id="chartJobs"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">❤️ Family Time — This Month</div>
+        <div class="chart-title">❤️ Family Time — Today</div>
         <div class="chart-inner" id="chartFamilyWrap"><canvas id="chartFamily"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">⚠️ Rework Flags — Today</div>
-        <div class="chart-inner" id="chartReworkWrap"><canvas id="chartRework"></canvas></div>
+        <div class="chart-title">📈 Job Completion — This Month</div>
+        <div class="chart-inner" id="chartMonthWrap"><canvas id="chartMonth"></canvas></div>
       </div>
     </div>
 
@@ -387,6 +387,27 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
       <div class="person-panel" id="panel-Rachel"></div>
     </div>
 
+    <!-- ── Unassigned chores strip ──────────────────────────────────── -->
+    <div id="unassignedStrip" style="display:none;padding:4px 8px 8px;flex-shrink:0">
+      <div style="background:#191d30;border-radius:10px;border:1px solid var(--border);padding:.5rem .75rem">
+        <div style="font-size:.62rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem">📋 Unassigned Jobs — first to do it gets the points!</div>
+        <div id="unassignedList" style="display:flex;flex-wrap:wrap;gap:.3rem"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Pick-up dialog -->
+<div id="pickupDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9960;align-items:center;justify-content:center">
+  <div style="background:var(--card);border-radius:14px;padding:1.2rem;max-width:320px;width:92vw;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.15)">
+    <button style="position:absolute;top:.7rem;right:.7rem;background:var(--bg);border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:.85rem" onclick="closePickup()">✕</button>
+    <h3 style="font-size:.88rem;font-weight:700;margin-bottom:.9rem" id="pickupTitle">Who picks this up?</h3>
+    <div style="display:flex;gap:.6rem;justify-content:center">
+      <button class="btn" style="background:#60a5fa;flex:1" onclick="doPickup('Liam')">👨 Dad</button>
+      <button class="btn" style="background:#f472b6;flex:1" onclick="doPickup('Rachel')">👩 Mom</button>
+    </div>
+    <div class="msg" id="pickupMsg" style="margin-top:.5rem;text-align:center"></div>
   </div>
 </div>
 
@@ -403,6 +424,17 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
           <button type="submit" class="btn" id="enrolBtn">Add Person</button>
         </form>
         <div class="person-list" id="personList"></div>
+        <!-- Kids section -->
+        <div style="margin-top:.9rem;border-top:1px solid var(--border);padding-top:.7rem">
+          <div class="card-title" style="margin-bottom:.5rem">👶 Kids</div>
+          <div style="font-size:.65rem;color:var(--sub);margin-bottom:.5rem">Kids are tracked for presence but have no chores assigned.</div>
+          <div id="kidsList" style="display:flex;flex-direction:column;gap:.3rem"></div>
+          <form id="addKidForm" style="display:flex;gap:.35rem;margin-top:.55rem;align-items:center;flex-wrap:wrap">
+            <input type="text" id="kidName" placeholder="Name" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.32rem .55rem;font-size:.75rem;flex:1;min-width:80px">
+            <input type="number" id="kidAge" placeholder="Age" min="0" max="17" step="0.5" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.32rem .4rem;font-size:.75rem;width:58px">
+            <button type="submit" class="btn-sm btn-green" style="padding:.32rem .65rem">+ Kid</button>
+          </form>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">Activity Stream</div>
@@ -479,10 +511,6 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
       </form>
       <div class="note">💡 <strong>Core</strong> = always this person · <strong>Rotating</strong> = alternates daily · <strong>Both</strong> = shared weekly task · <strong>When suits</strong> = anytime this week</div>
       <div class="msg" id="choreMsg" style="margin-top:.4rem"></div>
-    </div>
-    <div style="margin-top:.8rem;background:var(--bg);border-radius:10px;padding:.7rem;border:1px solid var(--border)">
-      <div class="card-title">Carry-Forward Today</div>
-      <div id="carryList"><div class="empty">No carry-forward today.</div></div>
     </div>
   </div>
 </div>
@@ -568,6 +596,8 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 
 <script>
 const API='';
+const DISPLAY={'Liam':'Dad','Rachel':'Mom'};
+function dn(n){return DISPLAY[n]||n;}
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const ACT_ICONS={cleaning:'🧹',cooking:'🍳',eating:'🍽️',tv:'📺',resting:'🛋️',personal:'📱',family:'👨‍👩‍👧‍👦',other:'💼'};
 const C={chores:'#3b82f6',family:'#22c55e',personal:'#a855f7',kitchen:'#06b6d4',amber:'#f59e0b'};
@@ -664,8 +694,8 @@ function switchTab(name){
   document.getElementById('tab-'+name).classList.add('active');
   if(feedTimer){clearInterval(feedTimer);feedTimer=null;}
   if(name==='dashboard') loadDashboard();
-  if(name==='activity'){loadPersons();loadFeed();feedTimer=setInterval(loadFeed,15000);}
-  if(name==='chores'){loadChoreTable();loadCarry();loadChoreDL();}
+  if(name==='activity'){loadPersons();loadFeed();renderKids();feedTimer=setInterval(loadFeed,15000);}
+  if(name==='chores'){loadChoreTable();loadChoreDL();}
 }
 
 // ── Lightbox ──────────────────────────────────────────────────────────────────
@@ -837,7 +867,6 @@ function carryOverClick(){
   const liamItems=(plan.plan?.Liam?.chores||[]).filter(c=>c.carried_forward);
   const rachelItems=(plan.plan?.Rachel?.chores||[]).filter(c=>c.carried_forward);
   const total=liamItems.length+rachelItems.length;
-  playSadTrombone();
   if(!total){
     showDetail('🎉 No Carry-overs!','<div style="text-align:center;padding:1.5rem 0"><div style="font-size:2rem;margin-bottom:.5rem">✅</div><div style="font-weight:700;color:var(--green)">All clean — nothing carried over today!</div></div>');
     return;
@@ -853,16 +882,16 @@ function carryOverClick(){
     <div style="font-size:.72rem;color:var(--orange);background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);border-radius:8px;padding:.55rem .75rem;margin-bottom:.8rem">
       ⚠️ These jobs weren't done yesterday and carry forward at 50% points.
     </div>
-    <div style="font-weight:700;font-size:.8rem;color:var(--blue);margin-bottom:.3rem">Liam (${liamItems.length})</div>
+    <div style="font-weight:700;font-size:.8rem;color:var(--blue);margin-bottom:.3rem">Dad (${liamItems.length})</div>
     ${itemList(liamItems,'var(--blue)')}
-    <div style="font-weight:700;font-size:.8rem;color:var(--purple);margin:.7rem 0 .3rem">Rachel (${rachelItems.length})</div>
+    <div style="font-weight:700;font-size:.8rem;color:var(--purple);margin:.7rem 0 .3rem">Mom (${rachelItems.length})</div>
     ${itemList(rachelItems,'var(--purple)')}
     <button class="btn" style="margin-top:1rem" onclick="closeDetail();openAddToday()">📅 Record a job now →</button>
   `);
 }
 
 // ── Chart instances (kept to allow destroy/recreate) ──────────────────────────
-let _chartJobs=null,_chartFamily=null,_chartRework=null;
+let _chartJobs=null,_chartFamily=null,_chartMonth=null;
 
 // Set Chart.js global defaults for dark theme
 Chart.defaults.color='#94a3b8';
@@ -875,25 +904,78 @@ const CHART_DEFAULTS={
 const DARK_GRID={color:'rgba(255,255,255,.06)'};
 const DARK_TICK={font:{size:8},color:'#4a5578'};
 
-function renderCharts(plan, viols, monthly, calendar){
+function renderCharts(plan, viols, daily, calendar){
   const calDays=calendar.days||{};
   const dayNums=Object.keys(calDays).sort();
 
-  // ── 1. Jobs line chart — Liam (neon blue) + Rachel (neon pink) + Team avg (neon green)
+  // ── 1. Job Completion — Today (grouped bar: Dad blue, Mom pink)
   if(_chartJobs){_chartJobs.destroy();_chartJobs=null;}
   const ctxJ=document.getElementById('chartJobs');
   if(ctxJ){
+    const dadPct=plan.plan?.Liam?.pct||0;
+    const momPct=plan.plan?.Rachel?.pct||0;
+    _chartJobs=new Chart(ctxJ,{
+      type:'bar',
+      data:{
+        labels:['Dad','Mom'],
+        datasets:[
+          {label:'Completed',data:[dadPct,momPct],backgroundColor:['rgba(96,165,250,.85)','rgba(244,114,182,.85)'],borderRadius:6,borderSkipped:false},
+          {label:'Goal',data:[100,100],type:'line',borderColor:'#4ade80',backgroundColor:'transparent',borderDash:[5,3],pointRadius:4,pointStyle:'crossRot',borderWidth:2,pointBorderColor:'#4ade80',pointBorderWidth:2,fill:false,order:0},
+        ]
+      },
+      options:{...CHART_DEFAULTS,
+        plugins:{...CHART_DEFAULTS.plugins,tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}%`}}},
+        scales:{
+          x:{ticks:{...DARK_TICK},grid:{display:false}},
+          y:{min:0,max:100,ticks:{...DARK_TICK,callback:v=>v+'%'},grid:DARK_GRID},
+        }
+      }
+    });
+  }
+
+  // ── 2. Family Time — Today (grouped bar: Family cyan, Relaxing purple) in minutes
+  if(_chartFamily){_chartFamily.destroy();_chartFamily=null;}
+  const ctxF=document.getElementById('chartFamily');
+  if(ctxF){
+    const dadFam=Math.round(daily?.Liam?.family_mins||0);
+    const momFam=Math.round(daily?.Rachel?.family_mins||0);
+    const dadRel=Math.round(daily?.Liam?.personal_mins||0);
+    const momRel=Math.round(daily?.Rachel?.personal_mins||0);
+    _chartFamily=new Chart(ctxF,{
+      type:'bar',
+      data:{
+        labels:['Dad','Mom'],
+        datasets:[
+          {label:'Family',   data:[dadFam,momFam], backgroundColor:'rgba(34,211,238,.85)', borderRadius:5, borderSkipped:false},
+          {label:'Relaxing', data:[dadRel,momRel],  backgroundColor:'rgba(192,132,252,.85)',borderRadius:5, borderSkipped:false},
+        ]
+      },
+      options:{...CHART_DEFAULTS,
+        plugins:{...CHART_DEFAULTS.plugins,
+          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}m`}}},
+        scales:{
+          x:{ticks:{...DARK_TICK},grid:{display:false}},
+          y:{min:0,ticks:{...DARK_TICK,callback:v=>v+'m'},grid:DARK_GRID},
+        }
+      }
+    });
+  }
+
+  // ── 3. Job Completion — This Month (line chart: Dad blue, Mom pink, Avg green)
+  if(_chartMonth){_chartMonth.destroy();_chartMonth=null;}
+  const ctxM=document.getElementById('chartMonth');
+  if(ctxM){
     if(dayNums.length){
       const labels=dayNums.map(d=>parseInt(d.split('-')[2]));
-      const liamLine=dayNums.map(d=>calDays[d]?.Liam?.pct||0);
-      const rachelLine=dayNums.map(d=>calDays[d]?.Rachel?.pct||0);
-      const avgLine=dayNums.map((_,i)=>Math.round((liamLine[i]+rachelLine[i])/2));
-      _chartJobs=new Chart(ctxJ,{
+      const dadLine=dayNums.map(d=>calDays[d]?.Liam?.pct||0);
+      const momLine=dayNums.map(d=>calDays[d]?.Rachel?.pct||0);
+      const avgLine=dayNums.map((_,i)=>Math.round((dadLine[i]+momLine[i])/2));
+      _chartMonth=new Chart(ctxM,{
         type:'line',
         data:{labels,datasets:[
-          {label:'Liam',    data:liamLine,  borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.18)',tension:.4,fill:true,pointRadius:2,borderWidth:2.5,pointHoverRadius:4},
-          {label:'Rachel',  data:rachelLine,borderColor:'#f472b6',backgroundColor:'rgba(244,114,182,.18)',tension:.4,fill:true,pointRadius:2,borderWidth:2.5,pointHoverRadius:4},
-          {label:'Avg',     data:avgLine,   borderColor:'#4ade80',backgroundColor:'rgba(74,222,128,.06)',tension:.4,fill:true,pointRadius:0,borderWidth:1.5,borderDash:[4,3],pointHoverRadius:3},
+          {label:'Dad',  data:dadLine,borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.18)',tension:.4,fill:true,pointRadius:2,borderWidth:2.5,pointHoverRadius:4},
+          {label:'Mom',  data:momLine,borderColor:'#f472b6',backgroundColor:'rgba(244,114,182,.18)',tension:.4,fill:true,pointRadius:2,borderWidth:2.5,pointHoverRadius:4},
+          {label:'Avg',  data:avgLine,borderColor:'#4ade80',backgroundColor:'rgba(74,222,128,.06)',tension:.4,fill:true,pointRadius:0,borderWidth:1.5,borderDash:[4,3],pointHoverRadius:3},
         ]},
         options:{...CHART_DEFAULTS,
           plugins:{...CHART_DEFAULTS.plugins,tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}%`}}},
@@ -904,84 +986,8 @@ function renderCharts(plan, viols, monthly, calendar){
         }
       });
     } else {
-      ctxJ.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--faint);font-size:.72rem">No job data this month yet</div>';
+      ctxM.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--faint);font-size:.72rem">No job data this month yet</div>';
     }
-  }
-
-  // ── 2. Family / Relaxing time grouped bar — 3 datasets, 3 colours
-  if(_chartFamily){_chartFamily.destroy();_chartFamily=null;}
-  const ctxF=document.getElementById('chartFamily');
-  if(ctxF){
-    const liamFamH =Math.round((monthly.persons?.Liam?.family_mins||0)/60*10)/10;
-    const rachelFamH=Math.round((monthly.persons?.Rachel?.family_mins||0)/60*10)/10;
-    const liamRelH  =Math.round((monthly.persons?.Liam?.personal_mins||0)/60*10)/10;
-    const rachelRelH=Math.round((monthly.persons?.Rachel?.personal_mins||0)/60*10)/10;
-    const GOAL=30; // hrs/month goal per person per activity
-    _chartFamily=new Chart(ctxF,{
-      type:'bar',
-      data:{
-        labels:['Liam','Rachel'],
-        datasets:[
-          {label:'Family',   data:[liamFamH, rachelFamH], backgroundColor:'rgba(34,211,238,.85)', borderRadius:5, borderSkipped:false},
-          {label:'Relaxing', data:[liamRelH,  rachelRelH],  backgroundColor:'rgba(192,132,252,.85)',borderRadius:5, borderSkipped:false},
-          {label:'Goal',     data:[GOAL,GOAL],               type:'line',borderColor:'#fbbf24',backgroundColor:'transparent',
-            borderDash:[5,3],pointRadius:4,pointStyle:'crossRot',borderWidth:2,pointBorderColor:'#fbbf24',
-            pointBorderWidth:2,fill:false,order:0},
-        ]
-      },
-      options:{...CHART_DEFAULTS,
-        plugins:{...CHART_DEFAULTS.plugins,
-          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}h`}}},
-        scales:{
-          x:{ticks:{...DARK_TICK},grid:{display:false}},
-          y:{min:0,ticks:{...DARK_TICK,callback:v=>v+'h'},grid:DARK_GRID},
-        }
-      }
-    });
-  }
-
-  // ── 3. Rework donut — colour per violation type, rainbow when clean
-  if(_chartRework){_chartRework.destroy();_chartRework=null;}
-  const wrapR=document.getElementById('chartReworkWrap');
-  const ctxR=document.getElementById('chartRework');
-  const liamV=viols.by_person?.Liam||0, rachelV=viols.by_person?.Rachel||0;
-  const NEON=['#f472b6','#60a5fa','#fb923c','#c084fc','#fbbf24','#22d3ee','#4ade80','#f87171','#a78bfa','#34d399'];
-  if(ctxR&&wrapR){
-    const total=liamV+rachelV;
-    let labels,data,colors;
-    if(total===0){
-      // Rainbow "all clean" donut
-      labels=['Mon','Tue','Wed','Thu','Fri','Sat'];
-      data=[1,1,1,1,1,1];
-      colors=['#60a5fa','#f472b6','#4ade80','#fbbf24','#c084fc','#22d3ee'];
-    } else {
-      // Group violations by type code
-      const byCode={};
-      (viols.violations||[]).forEach(v=>{
-        const k=(v.violation_code||'other').replace(/_/g,' ');
-        byCode[k]=(byCode[k]||0)+1;
-      });
-      // If no individual violations data, fall back to by-person
-      if(!Object.keys(byCode).length){
-        labels=['Liam','Rachel','Clean'];
-        data=[liamV,rachelV,Math.max(0,6-total)];
-        colors=['#60a5fa','#f472b6','#4ade80'];
-      } else {
-        labels=Object.keys(byCode);
-        data=labels.map(k=>byCode[k]);
-        colors=labels.map((_,i)=>NEON[i%NEON.length]);
-      }
-    }
-    _chartRework=new Chart(ctxR,{
-      type:'doughnut',
-      data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#191d30',hoverOffset:6}]},
-      options:{...CHART_DEFAULTS,cutout:'58%',
-        plugins:{...CHART_DEFAULTS.plugins,
-          legend:{labels:{font:{size:7},boxWidth:8,padding:3,color:'#94a3b8'}},
-          tooltip:{callbacks:{label:ctx=>total===0?'All clean ✓':`${ctx.label}: ${ctx.raw}×`}}
-        }
-      }
-    });
   }
 }
 
@@ -1022,19 +1028,19 @@ async function loadDashboard(){
   // Jobs leader
   const liamPts=plan.plan?.Liam?.earned_points||0, rachelPts=plan.plan?.Rachel?.earned_points||0;
   if(liamPts===0&&rachelPts===0){kv('kv-jobsL','—');kv('ks-jobsL','no points yet today');}
-  else if(liamPts>=rachelPts){kv('kv-jobsL','Liam 🏆');kv('ks-jobsL',liamPts+'pts vs Rachel '+rachelPts);}
-  else{kv('kv-jobsL','Rachel 🏆');kv('ks-jobsL',rachelPts+'pts vs Liam '+liamPts);}
+  else if(liamPts>=rachelPts){kv('kv-jobsL','Dad 🏆');kv('ks-jobsL',liamPts+'pts vs Mom '+rachelPts);}
+  else{kv('kv-jobsL','Mom 🏆');kv('ks-jobsL',rachelPts+'pts vs Dad '+liamPts);}
   // Family time leader
   const liamFam=monthly.persons?.Liam?.family_mins||0, rachelFam=monthly.persons?.Rachel?.family_mins||0;
   if(liamFam===0&&rachelFam===0){kv('kv-famL','—');kv('ks-famL','no data yet');}
-  else if(liamFam>rachelFam){kv('kv-famL','Liam 🏆');kv('ks-famL',fmtM(liamFam)+' vs Rachel '+fmtM(rachelFam));}
-  else if(rachelFam>liamFam){kv('kv-famL','Rachel 🏆');kv('ks-famL',fmtM(rachelFam)+' vs Liam '+fmtM(liamFam));}
+  else if(liamFam>rachelFam){kv('kv-famL','Dad 🏆');kv('ks-famL',fmtM(liamFam)+' vs Mom '+fmtM(rachelFam));}
+  else if(rachelFam>liamFam){kv('kv-famL','Mom 🏆');kv('ks-famL',fmtM(rachelFam)+' vs Dad '+fmtM(liamFam));}
   else{kv('kv-famL','Tied');kv('ks-famL',fmtM(liamFam)+' each');}
   // Most present
   const liamDays=monthly.persons?.Liam?.days_seen||0, rachelDays=monthly.persons?.Rachel?.days_seen||0;
   if(liamDays===0&&rachelDays===0){kv('kv-presL','—');kv('ks-presL','no data this month');}
-  else if(liamDays>rachelDays){kv('kv-presL','Liam 🏆');kv('ks-presL',liamDays+' days vs Rachel '+rachelDays);}
-  else if(rachelDays>liamDays){kv('kv-presL','Rachel 🏆');kv('ks-presL',rachelDays+' days vs Liam '+liamDays);}
+  else if(liamDays>rachelDays){kv('kv-presL','Dad 🏆');kv('ks-presL',liamDays+' days vs Mom '+rachelDays);}
+  else if(rachelDays>liamDays){kv('kv-presL','Mom 🏆');kv('ks-presL',rachelDays+' days vs Dad '+liamDays);}
   else{kv('kv-presL','Tied');kv('ks-presL',liamDays+' days each');}
   // Carry-overs — store plan for modal use
   window._lastPlan=plan;
@@ -1042,10 +1048,10 @@ async function loadDashboard(){
   const rachelCarryItems=(plan.plan?.Rachel?.chores||[]).filter(c=>c.carried_forward);
   const totalCarry=liamCarryItems.length+rachelCarryItems.length;
   kv('kv-carry', totalCarry||'0');
-  kv('ks-carry', totalCarry?`Liam ${liamCarryItems.length} · Rachel ${rachelCarryItems.length}`:'All clear today ✓');
+  kv('ks-carry', totalCarry?`Dad ${liamCarryItems.length} · Mom ${rachelCarryItems.length}`:'All clear today ✓');
 
   // ── Charts ────────────────────────────────────────────────────────────────
-  renderCharts(plan, viols, monthly, calendar);
+  renderCharts(plan, viols, daily, calendar);
 
   // ── Carry-forward badges ──────────────────────────────────────────────────
   ['Liam','Rachel'].forEach(person=>{
@@ -1056,13 +1062,58 @@ async function loadDashboard(){
     if(countEl) countEl.textContent=n>0?n:'✓';
     if(badgeEl){
       badgeEl.className='carry-badge '+(n>0?'has-carry':'no-carry');
-      badgeEl.title=n>0?`${person} has ${n} job${n>1?'s':''} carried over from yesterday — click to view Jobs tab`:`${person} has no carry-overs today`;
+      const dname=dn(person);
+      badgeEl.title=n>0?`${dname} has ${n} job${n>1?'s':''} carried over from yesterday — click to view Jobs tab`:`${dname} has no carry-overs today`;
     }
   });
 
   ['Liam','Rachel'].forEach(p=>renderPanel(p,plan.plan?.[p]||{chores:[],total_points:100,earned_points:0,pct:0},viols,daily[p]||{},(monthly.persons||{})[p]||{}));
+  renderUnassigned(plan.unassigned||[]);
   renderMiniCal();
   checkPushNotif();
+}
+
+// ── Unassigned chores strip ───────────────────────────────────────────────────
+let _pickupChore='';
+function renderUnassigned(unassigned){
+  const strip=document.getElementById('unassignedStrip');
+  const list=document.getElementById('unassignedList');
+  if(!strip||!list)return;
+  const todo=unassigned.filter(c=>!c.done);
+  if(!todo.length){strip.style.display='none';return;}
+  strip.style.display='';
+  list.innerHTML=todo.map(c=>`
+    <div style="display:inline-flex;align-items:center;gap:.3rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:20px;padding:.26rem .55rem;font-size:.7rem;font-weight:500;color:var(--sub)">
+      ○ ${esc(c.chore_name)}
+      <span style="color:var(--green);font-size:.62rem">${c.points}pts</span>
+      <button onclick="openPickup('${esc(c.chore_name).replace(/'/g,"\\'")}')" style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:.12rem .4rem;font-size:.6rem;cursor:pointer;font-weight:600;margin-left:.15rem">Pick up</button>
+    </div>`).join('');
+}
+
+function openPickup(choreName){
+  _pickupChore=choreName;
+  document.getElementById('pickupTitle').textContent=`Who picks up "${choreName}"?`;
+  document.getElementById('pickupMsg').textContent='';
+  document.getElementById('pickupDialog').style.display='flex';
+}
+function closePickup(){document.getElementById('pickupDialog').style.display='none';}
+document.getElementById('pickupDialog').addEventListener('click',e=>{if(e.target.id==='pickupDialog')closePickup();});
+
+async function doPickup(person){
+  const msg=document.getElementById('pickupMsg');
+  msg.className='msg';msg.textContent='Saving…';
+  const fd=new FormData();
+  fd.append('person_name',person);
+  fd.append('chore_name',_pickupChore);
+  fd.append('score',10);
+  try{
+    const res=await fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd});
+    const d=await res.json();
+    if(!res.ok)throw new Error(JSON.stringify(d));
+    playMarioCoin();
+    msg.className='msg';msg.textContent=`✓ +${d.points_earned}pts for ${dn(person)}!`;
+    setTimeout(()=>{closePickup();loadDashboard();},1200);
+  }catch(err){msg.className='msg err';msg.textContent='✗ '+err.message;}
 }
 
 function renderPanel(person,data,viols,ds,ms){
@@ -1105,7 +1156,8 @@ function renderPanel(person,data,viols,ds,ms){
   ];
   const pieDetailHtml=pieSegs.filter(s=>s.v>0).map(s=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><div style="width:12px;height:12px;border-radius:50%;background:${s.c}"></div><span style="flex:1">${esc(s.label)}</span><strong>${fmtM(s.v)}</strong></div>`).join('');
 
-  const shown=(data.chores||[]).filter(c=>c.chore_type==='core'||c.chore_type==='rotating'||(c.when_suits));
+  // Exclude carried-forward items from chip list
+  const shown=(data.chores||[]).filter(c=>!c.carried_forward&&(c.chore_type==='core'||c.chore_type==='rotating'||(c.when_suits)));
 
   // Gradient stops for each metric
   const px=person.toLowerCase();
@@ -1122,7 +1174,6 @@ function renderPanel(person,data,viols,ds,ms){
     let cls='cc-pending',icon='○';
     if(c.done){cls='cc-done';icon='✓';}
     else if(c.status==='partial'){cls='cc-partial';icon='◑';}
-    else if(c.carried_forward){cls='cc-carried';icon='↺';}
     else if(c.when_suits){icon='◇';}
     const tag=c.chore_type==='core'?`<span class="cc-tag">core</span>`:
               c.chore_type==='rotating'?`<span class="cc-tag cc-rot">↻</span>`:
@@ -1137,7 +1188,7 @@ function renderPanel(person,data,viols,ds,ms){
   el.innerHTML=`
     <div class="pp-head">
       <div class="pp-name-row">${photoHtml}<div>
-        <div class="pp-name">${esc(person)}</div>
+        <div class="pp-name">${esc(dn(person))}</div>
         <div class="pp-arrival">🕐 ${arrTxt}</div>
       </div></div>
     </div>
@@ -1807,6 +1858,38 @@ async function loadPersons(){
   });
 }
 async function delPerson(id,name){if(!confirm(`Remove ${name}?`))return;await fetch(`${API}/api/persons/${id}`,{method:'DELETE'});loadPersons();}
+
+// ── Kids (localStorage) ───────────────────────────────────────────────────────
+const DEFAULT_KIDS=[{name:'Ben',age:7},{name:'Louis',age:4},{name:'Lidia',age:1.5}];
+function loadKids(){
+  const raw=localStorage.getItem('hm_kids');
+  return raw?JSON.parse(raw):DEFAULT_KIDS;
+}
+function saveKids(kids){localStorage.setItem('hm_kids',JSON.stringify(kids));}
+function renderKids(){
+  const kids=loadKids();
+  const el=document.getElementById('kidsList');
+  if(!el)return;
+  el.innerHTML=kids.length?kids.map((k,i)=>`
+    <div style="display:flex;align-items:center;gap:.4rem;padding:.22rem .35rem;background:var(--bg);border-radius:7px">
+      <span style="font-size:.9rem">👶</span>
+      <span style="flex:1;font-size:.78rem;color:var(--text);font-weight:500">${esc(k.name)}</span>
+      <span style="font-size:.7rem;color:var(--sub)">${k.age} yrs</span>
+      <button class="btn-del" onclick="removeKid(${i})">✕</button>
+    </div>`).join(''):'<div style="font-size:.72rem;color:var(--faint);padding:.3rem">No kids added yet.</div>';
+}
+function removeKid(i){
+  const kids=loadKids();kids.splice(i,1);saveKids(kids);renderKids();
+}
+document.getElementById('addKidForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const name=document.getElementById('kidName').value.trim();
+  const age=parseFloat(document.getElementById('kidAge').value)||0;
+  if(!name)return;
+  const kids=loadKids();kids.push({name,age});saveKids(kids);
+  renderKids();
+  document.getElementById('addKidForm').reset();
+});
 
 document.getElementById('enrolForm').addEventListener('submit',async e=>{
   e.preventDefault();
