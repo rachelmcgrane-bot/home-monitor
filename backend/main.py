@@ -1020,12 +1020,14 @@ async def get_sightings(limit: int = 80, location: Optional[str] = None,
                         person_id: Optional[int] = None,
                         person_name: Optional[str] = None,
                         activity_type: Optional[str] = None,
+                        date: Optional[str] = None,
                         db: AsyncSession = Depends(get_db)):
     q = select(Sighting).order_by(desc(Sighting.timestamp)).limit(limit)
     if location: q = q.where(Sighting.location == location)
     if person_id: q = q.where(Sighting.person_id == person_id)
     if person_name: q = q.where(Sighting.person_name == person_name)
     if activity_type: q = q.where(Sighting.activity_type == activity_type)
+    if date: q = q.where(func.date(Sighting.timestamp) == date)
     result = await db.execute(q)
     return [{"id": s.id, "person_name": s.person_name, "location": s.location,
              "task": s.task_description, "activity_type": s.activity_type or "other",

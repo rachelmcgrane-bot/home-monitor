@@ -375,15 +375,15 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     <!-- ── Charts row ─────────────────────────────────────────────────── -->
     <div class="charts-row">
       <div class="chart-card">
-        <div class="chart-title">📊 Job Completion — Today</div>
+        <div class="chart-title">📊 Job Completion — Today <span style="font-size:.6rem;color:var(--faint);font-weight:400">tap bar for camera events</span></div>
         <div class="chart-inner"><canvas id="chartJobs"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">❤️ Family Time — Today</div>
+        <div class="chart-title">❤️ Family Time — Today <span style="font-size:.6rem;color:var(--faint);font-weight:400">tap bar for camera events</span></div>
         <div class="chart-inner" id="chartFamilyWrap"><canvas id="chartFamily"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">📈 Job Completion — This Month</div>
+        <div class="chart-title">📈 Job Completion — This Month <span style="font-size:.6rem;color:var(--faint);font-weight:400">tap point for day detail</span></div>
         <div class="chart-inner" id="chartMonthWrap"><canvas id="chartMonth"></canvas></div>
       </div>
     </div>
@@ -911,6 +911,129 @@ const CHART_DEFAULTS={
 const DARK_GRID={color:'rgba(255,255,255,.06)'};
 const DARK_TICK={font:{size:8},color:'#4a5578'};
 
+// ── Chart drill-down helpers ───────────────────────────────────────────────────
+
+// Render a single camera sighting row for drill-down modals
+function _sightingRow(s){
+  const t=new Date(s.timestamp+'Z').toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const col=s.person_name==='Liam'?'var(--blue)':s.person_name==='Rachel'?'var(--pink)':'var(--sub)';
+  return `<div style="display:flex;gap:.5rem;align-items:flex-start;padding:.4rem 0;border-bottom:1px solid var(--border)">
+    ${s.thumbnail_url?`<img src="${esc(s.thumbnail_url)}" onclick="openLB('${esc(s.thumbnail_url)}')" style="width:54px;height:40px;object-fit:cover;border-radius:5px;cursor:pointer;flex-shrink:0">`
+      :'<div style="width:54px;height:40px;background:var(--border);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.1rem">📷</div>'}
+    <div style="flex:1;min-width:0">
+      <div style="font-size:.72rem;font-weight:600;color:var(--text)">${esc(s.task||'—')}</div>
+      <div style="font-size:.65rem;color:var(--sub);margin-top:.1rem">📍 ${esc(s.location||'')} · ${t} · ${Math.round((s.confidence||0)*100)}% match</div>
+    </div>
+  </div>`;
+}
+
+// Render a single chore assessment row for drill-down modals
+function _assessRow(a){
+  const t=new Date(a.timestamp+'Z').toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const sc=a.score>=7?'sc-hi':a.score>=4?'sc-mi':'sc-lo';
+  return `<div style="display:flex;gap:.5rem;align-items:flex-start;padding:.4rem 0;border-bottom:1px solid var(--border)">
+    ${a.thumbnail_url?`<img src="${esc(a.thumbnail_url)}" onclick="openLB('${esc(a.thumbnail_url)}')" style="width:54px;height:40px;object-fit:cover;border-radius:5px;cursor:pointer;flex-shrink:0">`
+      :'<div style="width:54px;height:40px;background:var(--border);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1rem">🧹</div>'}
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap">
+        <span style="font-size:.73rem;font-weight:700;color:var(--text)">${esc(a.chore_name)}</span>
+        <span class="sc-badge ${sc}" style="font-size:.6rem">${a.score}/10</span>
+        <span style="font-size:.62rem;color:var(--green)">+${a.points_earned}pts</span>
+        <span style="font-size:.6rem;color:var(--faint)">${t}</span>
+      </div>
+      ${a.assessment?`<div style="font-size:.65rem;color:var(--sub);margin-top:.1rem">${esc((a.assessment||'').slice(0,120))}</div>`:''}
+    </div>
+  </div>`;
+}
+
+async function drillJobCompletion(person, plan){
+  const dname=dn(person);
+  showDetail(`📊 ${dname} — Job Completion (Today)`, '<div style="color:var(--sub);font-size:.8rem">Loading…</div>');
+  const today=todayStr();
+  const [assessments, sightings] = await Promise.all([
+    fetch(`${API}/api/chores/assessments?date=${today}&person_name=${encodeURIComponent(person)}`).then(r=>r.json()).catch(()=>[]),
+    fetch(`${API}/api/sightings?limit=60&person_name=${encodeURIComponent(person)}&activity_type=cleaning&date=${today}`).then(r=>r.json()).catch(()=>[]),
+  ]);
+  const chores=(plan.plan?.[person]?.chores||[]).filter(c=>!c.carried_forward);
+  const earned=plan.plan?.[person]?.earned_points||0;
+  const total=plan.plan?.[person]?.total_points||0;
+  const pct=plan.plan?.[person]?.pct||0;
+  let html=`<div style="margin-bottom:.6rem;padding:.45rem .6rem;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
+    <span style="font-weight:700;font-size:.85rem;color:var(--blue)">${pct}% complete</span>
+    <span style="font-size:.72rem;color:var(--sub);margin-left:.5rem">${earned} / ${total} pts today</span>
+  </div>`;
+  if(assessments.length){
+    html+=`<div style="font-size:.68rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin:.5rem 0 .2rem">📋 Camera-verified completions</div>`;
+    html+=assessments.map(_assessRow).join('');
+  }
+  if(sightings.length){
+    html+=`<div style="font-size:.68rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin:.6rem 0 .2rem">📷 Cleaning activity captured on camera</div>`;
+    html+=sightings.map(_sightingRow).join('');
+  }
+  if(!assessments.length&&!sightings.length){
+    html+=`<div style="color:var(--faint);font-size:.8rem;padding:1rem 0;text-align:center">No camera activity recorded yet today.</div>`;
+  }
+  html+=`<div style="margin-top:.8rem"><button class="btn-del" style="width:100%;background:rgba(96,165,250,.12);color:var(--blue);border-color:var(--blue)" onclick="closeDetail();goToActivity('cleaning','${person}')">View full activity feed →</button></div>`;
+  showDetail(`📊 ${dname} — Job Completion (Today)`, html);
+}
+
+async function drillFamilyTime(person, actType){
+  const dname=dn(person);
+  const label=actType==='family'?'Family Time':'Relaxing';
+  const icon=actType==='family'?'❤️':'🛋️';
+  showDetail(`${icon} ${dname} — ${label} (Today)`, '<div style="color:var(--sub);font-size:.8rem">Loading…</div>');
+  const today=todayStr();
+  const sightings = await fetch(`${API}/api/sightings?limit=60&person_name=${encodeURIComponent(person)}&activity_type=${actType}&date=${today}`).then(r=>r.json()).catch(()=>[]);
+  let html='';
+  if(sightings.length){
+    html+=`<div style="font-size:.68rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem">📷 ${sightings.length} camera event${sightings.length!==1?'s':''} captured today</div>`;
+    html+=sightings.map(_sightingRow).join('');
+  }else{
+    html=`<div style="color:var(--faint);font-size:.8rem;padding:1rem 0;text-align:center">No ${label.toLowerCase()} events captured by camera today.</div>`;
+  }
+  html+=`<div style="margin-top:.8rem"><button class="btn-del" style="width:100%;background:rgba(34,211,238,.1);color:var(--cyan);border-color:var(--cyan)" onclick="closeDetail();goToActivity('${actType}','${person}')">View full activity feed →</button></div>`;
+  showDetail(`${icon} ${dname} — ${label} (Today)`, html);
+}
+
+async function drillMonthDay(date, dayNums, calDays){
+  const day=parseInt(date.split('-')[2]);
+  showDetail(`📅 Day ${day} — Job Completion`, '<div style="color:var(--sub);font-size:.8rem">Loading…</div>');
+  const [liamAss, rachelAss, liamSeen, rachelSeen] = await Promise.all([
+    fetch(`${API}/api/chores/assessments?date=${date}&person_name=Liam`).then(r=>r.json()).catch(()=>[]),
+    fetch(`${API}/api/chores/assessments?date=${date}&person_name=Rachel`).then(r=>r.json()).catch(()=>[]),
+    fetch(`${API}/api/sightings?limit=40&person_name=Liam&activity_type=cleaning&date=${date}`).then(r=>r.json()).catch(()=>[]),
+    fetch(`${API}/api/sightings?limit=40&person_name=Rachel&activity_type=cleaning&date=${date}`).then(r=>r.json()).catch(()=>[]),
+  ]);
+  const dayInfo=calDays[date]||{};
+  const liamPct=dayInfo.Liam?.pct||0, rachelPct=dayInfo.Rachel?.pct||0;
+  let html=`<div style="display:flex;gap:.5rem;margin-bottom:.6rem">
+    <div style="flex:1;background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);border-radius:8px;padding:.4rem .6rem;text-align:center">
+      <div style="font-size:.7rem;color:var(--sub)">Dad</div>
+      <div style="font-size:1rem;font-weight:700;color:var(--blue)">${liamPct}%</div>
+    </div>
+    <div style="flex:1;background:rgba(244,114,182,.1);border:1px solid rgba(244,114,182,.3);border-radius:8px;padding:.4rem .6rem;text-align:center">
+      <div style="font-size:.7rem;color:var(--sub)">Mom</div>
+      <div style="font-size:1rem;font-weight:700;color:var(--pink)">${rachelPct}%</div>
+    </div>
+  </div>`;
+  if(liamAss.length){
+    html+=`<div style="font-size:.68rem;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;margin:.4rem 0 .15rem">📋 Dad — verified by camera</div>`;
+    html+=liamAss.map(_assessRow).join('');
+  }
+  if(rachelAss.length){
+    html+=`<div style="font-size:.68rem;font-weight:700;color:var(--pink);text-transform:uppercase;letter-spacing:.05em;margin:.6rem 0 .15rem">📋 Mom — verified by camera</div>`;
+    html+=rachelAss.map(_assessRow).join('');
+  }
+  if(liamSeen.length||rachelSeen.length){
+    html+=`<div style="font-size:.68rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin:.6rem 0 .15rem">📷 Camera sightings that day</div>`;
+    html+=[...liamSeen,...rachelSeen].sort((a,b)=>a.timestamp.localeCompare(b.timestamp)).map(_sightingRow).join('');
+  }
+  if(!liamAss.length&&!rachelAss.length&&!liamSeen.length&&!rachelSeen.length){
+    html+=`<div style="color:var(--faint);font-size:.8rem;padding:1rem 0;text-align:center">No camera activity recorded for this day.</div>`;
+  }
+  showDetail(`📅 ${date} — Job Completion Breakdown`, html);
+}
+
 function renderCharts(plan, viols, daily, calendar){
   const calDays=calendar.days||{};
   const dayNums=Object.keys(calDays).sort();
@@ -919,6 +1042,7 @@ function renderCharts(plan, viols, daily, calendar){
   if(_chartJobs){_chartJobs.destroy();_chartJobs=null;}
   const ctxJ=document.getElementById('chartJobs');
   if(ctxJ){
+    ctxJ.style.cursor='pointer';
     const dadPct=plan.plan?.Liam?.pct||0;
     const momPct=plan.plan?.Rachel?.pct||0;
     _chartJobs=new Chart(ctxJ,{
@@ -931,7 +1055,13 @@ function renderCharts(plan, viols, daily, calendar){
         ]
       },
       options:{...CHART_DEFAULTS,
-        plugins:{...CHART_DEFAULTS.plugins,tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}%`}}},
+        onClick(evt,els){
+          if(!els.length)return;
+          const person=['Liam','Rachel'][els[0].index];
+          if(person) drillJobCompletion(person, plan);
+        },
+        plugins:{...CHART_DEFAULTS.plugins,
+          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}% · tap to see camera events`}}},
         scales:{
           x:{ticks:{...DARK_TICK},grid:{display:false}},
           y:{min:0,max:100,ticks:{...DARK_TICK,callback:v=>v+'%'},grid:DARK_GRID},
@@ -944,6 +1074,7 @@ function renderCharts(plan, viols, daily, calendar){
   if(_chartFamily){_chartFamily.destroy();_chartFamily=null;}
   const ctxF=document.getElementById('chartFamily');
   if(ctxF){
+    ctxF.style.cursor='pointer';
     const dadFam=Math.round(daily?.Liam?.family_mins||0);
     const momFam=Math.round(daily?.Rachel?.family_mins||0);
     const dadRel=Math.round(daily?.Liam?.personal_mins||0);
@@ -958,8 +1089,14 @@ function renderCharts(plan, viols, daily, calendar){
         ]
       },
       options:{...CHART_DEFAULTS,
+        onClick(evt,els){
+          if(!els.length)return;
+          const person=['Liam','Rachel'][els[0].index];
+          const actType=['family','personal'][els[0].datasetIndex];
+          if(person&&actType) drillFamilyTime(person, actType);
+        },
         plugins:{...CHART_DEFAULTS.plugins,
-          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}m`}}},
+          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}m · tap to see camera events`}}},
         scales:{
           x:{ticks:{...DARK_TICK},grid:{display:false}},
           y:{min:0,ticks:{...DARK_TICK,callback:v=>v+'m'},grid:DARK_GRID},
@@ -973,6 +1110,7 @@ function renderCharts(plan, viols, daily, calendar){
   const ctxM=document.getElementById('chartMonth');
   if(ctxM){
     if(dayNums.length){
+      ctxM.style.cursor='pointer';
       const labels=dayNums.map(d=>parseInt(d.split('-')[2]));
       const dadLine=dayNums.map(d=>calDays[d]?.Liam?.pct||0);
       const momLine=dayNums.map(d=>calDays[d]?.Rachel?.pct||0);
@@ -980,12 +1118,18 @@ function renderCharts(plan, viols, daily, calendar){
       _chartMonth=new Chart(ctxM,{
         type:'line',
         data:{labels,datasets:[
-          {label:'Dad',  data:dadLine,borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.18)',tension:.4,fill:true,pointRadius:2,borderWidth:2.5,pointHoverRadius:4},
-          {label:'Mom',  data:momLine,borderColor:'#f472b6',backgroundColor:'rgba(244,114,182,.18)',tension:.4,fill:true,pointRadius:2,borderWidth:2.5,pointHoverRadius:4},
-          {label:'Avg',  data:avgLine,borderColor:'#4ade80',backgroundColor:'rgba(74,222,128,.06)',tension:.4,fill:true,pointRadius:0,borderWidth:1.5,borderDash:[4,3],pointHoverRadius:3},
+          {label:'Dad',  data:dadLine,borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.18)',tension:.4,fill:true,pointRadius:3,borderWidth:2.5,pointHoverRadius:6},
+          {label:'Mom',  data:momLine,borderColor:'#f472b6',backgroundColor:'rgba(244,114,182,.18)',tension:.4,fill:true,pointRadius:3,borderWidth:2.5,pointHoverRadius:6},
+          {label:'Avg',  data:avgLine,borderColor:'#4ade80',backgroundColor:'rgba(74,222,128,.06)',tension:.4,fill:true,pointRadius:0,borderWidth:1.5,borderDash:[4,3],pointHoverRadius:4},
         ]},
         options:{...CHART_DEFAULTS,
-          plugins:{...CHART_DEFAULTS.plugins,tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}%`}}},
+          onClick(evt,els){
+            if(!els.length)return;
+            const idx=els[0].index;
+            const date=dayNums[idx];
+            if(date) drillMonthDay(date, dayNums, calDays);
+          },
+          plugins:{...CHART_DEFAULTS.plugins,tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}% · tap for detail`}}},
           scales:{
             x:{ticks:{...DARK_TICK,maxRotation:0},grid:{display:false}},
             y:{min:0,max:100,ticks:{...DARK_TICK,callback:v=>v+'%'},grid:DARK_GRID},
