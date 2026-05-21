@@ -173,8 +173,37 @@ _ROTATING_MAP = [
 ]
 
 
+def _generate_pwa_icons():
+    """Generate 192×192 and 512×512 PWA app icons using PIL."""
+    try:
+        from PIL import Image, ImageDraw
+        for size in [192, 512]:
+            path = static_dir / f"icon-{size}.png"
+            if path.exists():
+                continue
+            img = Image.new("RGB", (size, size), "#0d0f1a")
+            draw = ImageDraw.Draw(img)
+            s = size
+            # Rounded card background
+            draw.rounded_rectangle([s*.06,s*.06,s*.94,s*.94], radius=s*.18, fill="#141726")
+            # House body
+            draw.rectangle([s*.28,s*.52,s*.72,s*.78], fill="#3b82f6")
+            # Roof triangle
+            draw.polygon([(s*.5,s*.2),(s*.18,s*.54),(s*.82,s*.54)], fill="#818cf8")
+            # Door
+            draw.rounded_rectangle([s*.42,s*.62,s*.58,s*.78], radius=s*.03, fill="#0d0f1a")
+            # Window
+            draw.rounded_rectangle([s*.32,s*.58,s*.44,s*.7], radius=s*.02, fill="#22d3ee")
+            # Chimney
+            draw.rectangle([s*.62,s*.26,s*.72,s*.4], fill="#c084fc")
+            img.save(path, "PNG", optimize=True)
+    except Exception:
+        pass  # icons are optional — app still works without them
+
+
 @app.on_event("startup")
 async def startup():
+    _generate_pwa_icons()
     await init_db()
     async with SessionLocal() as db:
         existing_res = await db.execute(select(Chore.person_name, Chore.chore_name))
