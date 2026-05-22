@@ -711,7 +711,7 @@ function switchTab(name){
   document.getElementById('tab-'+name).classList.add('active');
   if(feedTimer){clearInterval(feedTimer);feedTimer=null;}
   if(name==='dashboard') loadDashboard();
-  if(name==='activity'){loadPersons();loadFeed();renderKids();feedTimer=setInterval(loadFeed,15000);}
+  if(name==='activity'){loadPersons();_feedLoading=false;loadFeed();renderKids();feedTimer=setInterval(loadFeed,15000);}
   if(name==='chores'){loadChoreTable();loadChoreDL();}
 }
 
@@ -1310,7 +1310,10 @@ async function loadDashboard(){
 
   // (carry-forward badges removed from header)
 
-  ['Liam','Rachel'].forEach(p=>renderPanel(p,plan.plan?.[p]||{chores:[],total_points:100,earned_points:0,pct:0},viols,daily[p]||{},(monthly.persons||{})[p]||{}));
+  ['Liam','Rachel'].forEach(p=>{
+    try{renderPanel(p,plan.plan?.[p]||{chores:[],total_points:100,earned_points:0,pct:0},viols,daily[p]||{},(monthly.persons||{})[p]||{});}
+    catch(e){console.error('renderPanel error',p,e);}
+  });
   renderUnassigned(plan.unassigned||[]);
   renderMiniCal();
   checkPushNotif();
@@ -1424,7 +1427,11 @@ function renderPanel(person,data,viols,ds,ms){
 
     let rowClick='';
     if(hasDetail){
-      rowClick=` data-chore='${JSON.stringify(c).replace(/'/g,"&#39;")}' onclick="choreClick(this)"`;
+      // Fully escape for HTML attribute: replace &, <, >, ", ' so browsers don't misparse
+      const choreJson=JSON.stringify(c)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+      rowClick=` data-chore='${choreJson}' onclick="choreClick(this)"`;
     } else if(!done){
       const safe=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       rowClick=` onclick="quickMarkDone('${person}','${safe}')" style="cursor:pointer" title="Tap to mark done"`;
@@ -1514,7 +1521,9 @@ function _setupDropZone(zone,dropPerson){
 
 function choreClick(el){
   try{
-    const c=JSON.parse(el.dataset.chore.replace(/&#39;/g,"'"));
+    const c=JSON.parse(el.dataset.chore
+      .replace(/&#39;/g,"'").replace(/&quot;/g,'"')
+      .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&'));
     // 🎵 Play sound based on completion status
     if(c.done && c.score>=8) playMarioFanfare();
     else if(c.done || c.status==='partial') playMarioCoin();
@@ -2060,6 +2069,7 @@ function setViolFilter(el){
 }
 async function manualRefresh(){
   const btn=document.getElementById('refreshBtn');btn.classList.add('spinning');
+  _feedLoading=false; // force-reset mutex in case it got stuck
   await loadFeed();setTimeout(()=>btn.classList.remove('spinning'),500);
 }
 async function loadFeed(){
@@ -2102,9 +2112,20 @@ async function loadFeed(){
     if(loc)url+=`&location=${encodeURIComponent(loc)}`;
     if(pid)url+=`&person_id=${pid}`;
 
+    // Show loading indicator while fetching (server may need to wake from sleep)
+    status.style.display='block';
+    status.textContent='⏳ Loading activity feed…';
+
+    // Fetch with timeout — Render free tier can take 30-60s to cold-start
+    function fetchWithTimeout(url,opts={},ms=20000){
+      const ctrl=new AbortController();
+      const t=setTimeout(()=>ctrl.abort(),ms);
+      return fetch(url,{...opts,signal:ctrl.signal}).finally(()=>clearTimeout(t));
+    }
+
     // Fetch sightings + today's assessments for enrichment
     const [items,todayAss,todayViols]=await Promise.all([
-      fetch(url).then(r=>{if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();}),
+      fetchWithTimeout(url,{},20000).then(r=>{if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();}),
       fetch(`${API}/api/chores/assessments`).then(r=>r.json()).catch(()=>[]),
       fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({violations:[]})),
     ]);
@@ -2169,8 +2190,16 @@ async function loadFeed(){
       </div></div>`;
     }).join('');
   }catch(e){
-    status.style.display='block';status.textContent='⚠️ '+e.message;
-    feed.innerHTML='<div class="empty">Unable to load feed.</div>';
+    const msg=e.name==='AbortError'?'Server is waking up — tap ↻ Refresh in a moment':'⚠️ '+e.message;
+    status.style.display='block';status.textContent=msg;
+    if(feed)feed.innerHTML=`<div class="empty" style="padding:1.5rem">
+      <div style="font-size:1.5rem;margin-bottom:.5rem">😴</div>
+      <div style="font-weight:600;color:var(--sub);margin-bottom:.4rem">${e.name==='AbortError'?'Server is starting up…':'Unable to load feed'}</div>
+      <div style="font-size:.72rem;color:var(--faint);margin-bottom:.8rem">${e.name==='AbortError'?'Render.com free tier takes 30–60s to wake':''+e.message}</div>
+      <button class="btn-sm-act" onclick="manualRefresh()" style="margin:0 auto;display:block">↻ Retry</button>
+    </div>`;
+    // Auto-retry once after 8 seconds if server was sleeping
+    if(e.name==='AbortError'){setTimeout(()=>{if(!_feedLoading)loadFeed();},8000);}
   }finally{_feedLoading=false;}
 }
 
