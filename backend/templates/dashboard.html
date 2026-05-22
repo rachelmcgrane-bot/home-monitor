@@ -78,7 +78,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .hd-wrap{display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:10px;padding:5px 3px 2px;transition:background .15s}
 .hd-wrap:hover{background:rgba(255,255,255,.04)}
 .hd-svg{width:100%}
-.hd-label{font-size:.72rem;font-weight:600;text-align:center;margin-bottom:2px;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.hd-label{font-weight:700;text-align:center;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
 /* ── Chore chips (horizontal list) ── */
 .chore-chips{display:flex;flex-wrap:wrap;gap:.3rem;padding:.35rem .55rem .5rem;overflow-y:auto;flex:1;align-content:flex-start}
 .cc-item{display:inline-flex;align-items:center;gap:.28rem;padding:.26rem .55rem;border-radius:20px;font-size:.7rem;font-weight:500;cursor:default;border:1px solid;transition:opacity .15s;line-height:1.2}
@@ -632,9 +632,9 @@ function halfDonut(pct,label,value,onclickFn,gradId,stops){
   const labelGrad=`linear-gradient(90deg,${stops[0].color},${stops[stops.length-1].color})`;
   const oc=onclickFn?`onclick="${onclickFn}"` :'';
   const gradDef=`<linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">${stops.map(s=>`<stop offset="${s.pct}" stop-color="${s.color}"/>`).join('')}</linearGradient>`;
-  const valText=value?`<text x="50" y="54" text-anchor="middle" font-size="8.5" font-weight="500" fill="#94a3b8" font-family="Inter,system-ui">${esc(String(value))}</text>`:'';
+  const valText=value?`<text x="50" y="54" text-anchor="middle" font-size="7" font-weight="600" letter-spacing="0.4" fill="${midCol}" opacity="0.85" font-family="'SF Mono','Fira Mono','Courier New',monospace">${esc(String(value))}</text>`:'';
   return `<div class="hd-wrap" ${oc} title="${p}%">
-    <div class="hd-label" style="background:${labelGrad};-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${esc(label)}</div>
+    <div class="hd-label" style="font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;background:${labelGrad};-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${esc(label)}</div>
     <svg viewBox="0 0 100 58" class="hd-svg">
       <defs>${gradDef}</defs>
       <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="${trackCol}" stroke-width="8" fill="none" stroke-linecap="butt"/>
