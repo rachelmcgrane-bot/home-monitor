@@ -73,12 +73,21 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .pp-name{font-size:1rem;font-weight:700;color:var(--text)}
 .pp-arrival{font-size:.68rem;color:var(--sub);font-weight:400}
 .pp-arrival strong{color:var(--blue);font-weight:600}
-/* ── Gauge row ── */
-.hd-row{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:.5rem .5rem .2rem;flex-shrink:0}
-.hd-wrap{display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:10px;padding:5px 3px 2px;transition:background .15s}
-.hd-wrap:hover{background:rgba(255,255,255,.04)}
-.hd-svg{width:100%}
-.hd-label{font-weight:700;text-align:center;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+/* ── Full donut gauges ── */
+.hd-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:.4rem .5rem .15rem;flex-shrink:0}
+.fd-col{display:flex;flex-direction:column;align-items:center}
+.fd-wrap{cursor:pointer;border-radius:10px;transition:background .15s;width:100%}
+.fd-wrap:hover{background:rgba(255,255,255,.04)}
+.fd-svg{width:100%;display:block}
+.fd-legend{display:flex;flex-wrap:wrap;gap:2px 8px;padding:1px 4px 3px;justify-content:center}
+.fd-leg-item{display:flex;align-items:center;gap:3px;font-size:.52rem;color:var(--sub);font-family:'SF Mono','Courier New',monospace;letter-spacing:.03em}
+.fd-leg-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+/* ── Drag-and-drop ── */
+.cc-item[draggable=true]{cursor:grab}
+.cc-item[draggable=true]:active{cursor:grabbing}
+.cc-extra{background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.45);color:var(--amber)}
+.panel-drop-zone{border:2px dashed transparent;border-radius:8px;transition:border-color .2s,background .2s;min-height:32px}
+.panel-drop-zone.drag-over{border-color:var(--blue)!important;background:rgba(96,165,250,.07)!important}
 /* ── Chore chips (horizontal list) ── */
 .chore-chips{display:flex;flex-wrap:wrap;gap:.3rem;padding:.35rem .55rem .5rem;overflow-y:auto;flex:1;align-content:flex-start}
 .cc-item{display:inline-flex;align-items:center;gap:.28rem;padding:.26rem .55rem;border-radius:20px;font-size:.7rem;font-weight:500;cursor:default;border:1px solid;transition:opacity .15s;line-height:1.2}
@@ -604,46 +613,44 @@ function todayStr(){return new Date().toISOString().slice(0,10)}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function fmtM(m){m=Math.round(m||0);if(m<60)return m+'m';return Math.floor(m/60)+'h'+(m%60?' '+m%60+'m':'')}
 
-// ── Gauge colour: yellow → orange → blue → purple → green ────────────────────
-function gaugeColor(pct){
-  if(pct>=80)return '#22c55e';   // green
-  if(pct>=60)return '#a855f7';   // purple
-  if(pct>=40)return '#3b82f6';   // blue
-  if(pct>=20)return '#f97316';   // orange
-  return '#f59e0b';               // yellow
+// ── Extra-job pickup (localStorage per day) ───────────────────────────────────
+function _xjKey(){return `extraJobs_${todayStr()}`;}
+function getExtraJobs(){try{return JSON.parse(localStorage.getItem(_xjKey())||'[]');}catch{return [];}}
+function saveExtraJobs(arr){localStorage.setItem(_xjKey(),JSON.stringify(arr));}
+function addExtraJob(from,to,choreName){
+  const jobs=getExtraJobs();
+  if(!jobs.find(j=>j.choreName===choreName&&j.to===to)){
+    jobs.push({from,to,choreName,ts:Date.now()});
+    saveExtraJobs(jobs);
+    loadDashboard();
+  }
 }
-// ── Inverted gauge colour for Rework: 0%=green (clean), 100%=red (bad) ───────
-function gaugeColorInv(pct){
-  if(pct<=0)return '#22c55e';    // green  — no violations
-  if(pct<=33)return '#f59e0b';   // amber  — 1 violation
-  if(pct<=66)return '#f97316';   // orange — 2 violations
-  return '#ef4444';               // red    — 3+ violations
+function removeExtraJob(to,choreName){
+  saveExtraJobs(getExtraJobs().filter(j=>!(j.to===to&&j.choreName===choreName)));
+  loadDashboard();
 }
 
-// ── Half-donut gauge — gradient arc, label on top, value below ───────────────
-// stops: [{pct:'0%',color:'#hex'}, ...]   gradId: unique per gauge
-// value: string shown beneath the arc (e.g. "45m", "0/156 pts", "clean ✓")
-function halfDonut(pct,label,value,onclickFn,gradId,stops){
-  const R=34,CX=50,CY=42,circ=Math.PI*R;
-  const p=Math.min(Math.max(pct||0,0),100);
-  const offset=circ*(1-p/100);
-  const trackCol=stops[0].color+'15';
-  const midCol=stops[Math.floor(stops.length/2)].color;
-  const labelGrad=`linear-gradient(90deg,${stops[0].color},${stops[stops.length-1].color})`;
-  const oc=onclickFn?`onclick="${onclickFn}"` :'';
-  const gradDef=`<linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">${stops.map(s=>`<stop offset="${s.pct}" stop-color="${s.color}"/>`).join('')}</linearGradient>`;
-  const valText=value?`<text x="50" y="54" text-anchor="middle" font-size="7" font-weight="600" letter-spacing="0.4" fill="${midCol}" opacity="0.85" font-family="'SF Mono','Fira Mono','Courier New',monospace">${esc(String(value))}</text>`:'';
-  return `<div class="hd-wrap" ${oc} title="${p}%">
-    <div class="hd-label" style="font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;background:${labelGrad};-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${esc(label)}</div>
-    <svg viewBox="0 0 100 58" class="hd-svg">
-      <defs>${gradDef}</defs>
-      <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="${trackCol}" stroke-width="8" fill="none" stroke-linecap="butt"/>
-      <path d="M${CX-R} ${CY} A${R} ${R} 0 0 1 ${CX+R} ${CY}" stroke="url(#${gradId})" stroke-width="8" fill="none" stroke-linecap="butt"
-        stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"
-        style="transition:stroke-dashoffset .6s;filter:drop-shadow(0 0 4px ${midCol})"/>
-      ${valText}
-    </svg>
-  </div>`;
+// ── Full donut gauge ──────────────────────────────────────────────────────────
+// segs: [{pct, color, glow?}, ...]  centerVal: big text  centerSub: small text below
+function fullDonut(segs,centerVal,centerSub,onclickStr,baseId){
+  const R=36,CX=50,CY=50,circ=2*Math.PI*R;
+  const oc=onclickStr?`onclick="${onclickStr}"`:'';
+  let paths=`<circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="9"/>`;
+  let deg=-90;
+  segs.forEach((seg,i)=>{
+    const p=Math.min(Math.max(seg.pct||0,0),100);
+    if(p<=0)return;
+    const arc=circ*p/100;
+    const shadow=seg.glow?`filter:drop-shadow(0 0 3px ${seg.color}90)`:'';
+    paths+=`<circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="${seg.color}" stroke-width="9" stroke-linecap="butt"
+      stroke-dasharray="${arc.toFixed(2)} ${(circ-arc).toFixed(2)}"
+      transform="rotate(${deg} ${CX} ${CY})" style="${shadow}"/>`;
+    deg+=p*3.6;
+  });
+  const cv=String(centerVal||'0');
+  const cs=centerSub?`<text x="50" y="62" text-anchor="middle" font-size="6" font-weight="500" fill="#4a5578" font-family="'SF Mono','Courier New',monospace" letter-spacing="0.3">${esc(centerSub)}</text>`:'';
+  paths+=`<text x="50" y="55" text-anchor="middle" font-size="16" font-weight="900" fill="#e2e8f0" font-family="Inter,system-ui" letter-spacing="-0.5">${esc(cv)}</text>${cs}`;
+  return `<div class="fd-wrap" ${oc}><svg viewBox="0 0 100 100" class="fd-svg">${paths}</svg></div>`;
 }
 
 function pie(segs,size=66){
@@ -1261,12 +1268,13 @@ async function loadDashboard(){
   if(liamPts===0&&rachelPts===0){kv('kv-jobsL','—');kv('ks-jobsL','tap a job chip to log it');}
   else if(liamPts>=rachelPts){kv('kv-jobsL','Dad 🏆');kv('ks-jobsL',liamPts+'pts vs Mom '+rachelPts);}
   else{kv('kv-jobsL','Mom 🏆');kv('ks-jobsL',rachelPts+'pts vs Dad '+liamPts);}
-  // Family time leader (active time with kids)
-  const liamFam=monthly.persons?.Liam?.family_mins||0, rachelFam=monthly.persons?.Rachel?.family_mins||0;
-  if(liamFam===0&&rachelFam===0){kv('kv-famL','—');kv('ks-famL','no family time logged');}
-  else if(liamFam>rachelFam){kv('kv-famL','Dad 🏆');kv('ks-famL',fmtM(liamFam)+' vs Mom '+fmtM(rachelFam));}
-  else if(rachelFam>liamFam){kv('kv-famL','Mom 🏆');kv('ks-famL',fmtM(rachelFam)+' vs Dad '+fmtM(liamFam));}
-  else{kv('kv-famL','Tied');kv('ks-famL',fmtM(liamFam)+' each');}
+  // Family time leader — only show if meaningful data (>5 min total this month)
+  const liamFam=daily?.Liam?.family_mins||0, rachelFam=daily?.Rachel?.family_mins||0;
+  const mthLiamFam=monthly.persons?.Liam?.family_mins||0, mthRachelFam=monthly.persons?.Rachel?.family_mins||0;
+  if(mthLiamFam+mthRachelFam<5){kv('kv-famL','—');kv('ks-famL','no family time logged yet');}
+  else if(mthLiamFam>mthRachelFam){kv('kv-famL','Dad 🏆');kv('ks-famL',fmtM(mthLiamFam)+' vs Mom '+fmtM(mthRachelFam));}
+  else if(mthRachelFam>mthLiamFam){kv('kv-famL','Mom 🏆');kv('ks-famL',fmtM(mthRachelFam)+' vs Dad '+fmtM(mthLiamFam));}
+  else{kv('kv-famL','Tied');kv('ks-famL',fmtM(mthLiamFam)+' each');}
   // Most present — use days_present (distinct sighting dates) not days_seen (PersonDailyStat rows)
   const liamDays=monthly.persons?.Liam?.days_present||0, rachelDays=monthly.persons?.Rachel?.days_present||0;
   if(liamDays===0&&rachelDays===0){kv('kv-presL','—');kv('ks-presL','no camera sightings this month');}
@@ -1342,44 +1350,51 @@ function renderPanel(person,data,viols,ds,ms){
     ?`<img src="${po.photo_url}" class="pp-photo" onclick="openLB('${po.photo_url}')">`
     :`<div class="pp-photo-ph">👤</div>`;
 
+  const partner=person==='Liam'?'Rachel':'Liam';
   const pct=data.pct||0;
-  const dayFamPct=Math.min(Math.round((ds.family_mins||0)/120*100),100);
-  const dayPersonPct=Math.min(Math.round((ds.personal_mins||0)/120*100),100);
+  const dayFamMins=ds.family_mins||0;
+  const dayPersonMins=ds.personal_mins||0;
+  // Scale to 100% based on 2h max family / 4h max present
+  const dayFamPct=Math.min(Math.round(dayFamMins/120*100),100);
+  const dayPersonPct=Math.min(Math.round(dayPersonMins/240*100),100);
   const arrTxt=ds.morning_arrival?`<strong>${esc(ds.morning_arrival)} GMT</strong>`:'<span style="color:var(--faint)">not yet seen</span>';
 
-  // Job count label: done jobs / total assigned
+  // Extra jobs this person has picked up from partner (localStorage)
+  const extraJobsForMe=getExtraJobs().filter(j=>j.to===person);
+  const extraCount=extraJobsForMe.length;
+  // Extra as % of donut (each extra job counts as 1 unit vs total own jobs)
+  const ownJobCount=(data.chores||[]).filter(c=>!c.carried_forward).length||1;
+  const extraPct=Math.min(Math.round(extraCount/ownJobCount*100),40); // cap visual at 40%
+
+  // Job count labels
   const totalJobs=(data.chores||[]).filter(c=>!c.carried_forward).length;
   const doneJobs=(data.chores||[]).filter(c=>!c.carried_forward&&c.done).length;
-  const choreSublabel=`${doneJobs}/${totalJobs} jobs`;
-  const famSublabel=fmtM(ds.family_mins||0);
-  const persSublabel=fmtM(ds.personal_mins||0);
+  const jobsCenterVal=pct+'%';
+  const jobsCenterSub=`${doneJobs}/${totalJobs}${extraCount?'+'+extraCount:''}`;
 
-  // Gauge onclick: go to activity tab with appropriate filter
+  // Time donut
+  const timeTotalMins=dayFamMins+dayPersonMins;
+  const timeCenterVal=fmtM(timeTotalMins)||'0m';
+
+  // Onclick links
   const choreOnclick=`goToActivity('cleaning','${person}')`;
   const famOnclick=`goToActivity('family','${person}')`;
-  const persOnclick=`goToActivity('present','${person}')`;
 
-  // Pie segments
-  const choreMins=(data.chores||[]).reduce((s,c)=>s+(c.time_spent_mins||0),0);
-  const pieSegs=[
-    {v:choreMins,c:C.chores,label:'Jobs'},
-    {v:ds.family_mins||0,c:C.family,label:'Family Time'},
-    {v:ds.personal_mins||0,c:C.personal,label:'Present'},
-  ];
-  const pieDetailHtml=pieSegs.filter(s=>s.v>0).map(s=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><div style="width:12px;height:12px;border-radius:50%;background:${s.c}"></div><span style="flex:1">${esc(s.label)}</span><strong>${fmtM(s.v)}</strong></div>`).join('');
+  // Donut 1: Jobs — own completion (blue) + extra picked up (amber)
+  const donut1=fullDonut(
+    [{pct,color:'#60a5fa',glow:true},{pct:extraPct,color:'#fbbf24',glow:false}],
+    jobsCenterVal, jobsCenterSub, choreOnclick, `fd-${person.toLowerCase()}-jobs`
+  );
+  // Donut 2: Time — family (cyan) + present (purple)
+  const donut2=fullDonut(
+    [{pct:dayFamPct,color:'#22d3ee',glow:true},{pct:dayPersonPct,color:'#c084fc',glow:false}],
+    timeCenterVal, 'today', famOnclick, `fd-${person.toLowerCase()}-time`
+  );
 
-  // Exclude carried-forward items from chip list
-  const shown=(data.chores||[]).filter(c=>!c.carried_forward&&(c.chore_type==='core'||c.chore_type==='rotating'||(c.when_suits)));
+  // Chips: show core + rotating + flex; include ALL non-carried chores so more appear
+  const shown=(data.chores||[]).filter(c=>!c.carried_forward);
 
-  // Gradient stops for each metric
-  const px=person.toLowerCase();
-  const GRADS={
-    jobs:  [{pct:'0%',color:'#818cf8'},{pct:'50%',color:'#60a5fa'},{pct:'100%',color:'#22d3ee'}],
-    fam:   [{pct:'0%',color:'#22d3ee'},{pct:'50%',color:'#4ade80'},{pct:'100%',color:'#86efac'}],
-    rel:   [{pct:'0%',color:'#c084fc'},{pct:'50%',color:'#f472b6'},{pct:'100%',color:'#fb7185'}],
-  };
-
-  function choreChip(c, _person){
+  function choreChip(c){
     let cls='cc-pending',icon='○';
     if(c.done){cls='cc-done';icon='✓';}
     else if(c.status==='partial'){cls='cc-partial';icon='◑';}
@@ -1388,20 +1403,25 @@ function renderPanel(person,data,viols,ds,ms){
               c.chore_type==='rotating'?`<span class="cc-tag cc-rot">↻</span>`:
               c.when_suits?`<span class="cc-tag cc-ws">flex</span>`:'';
     const hasDetail=!!(c.assessment||c.thumbnail_url);
+    const dragAttrs=`draggable="true" data-person="${person}" data-chore-name="${esc(c.chore_name)}"`;
     if(hasDetail){
       const ocAttr=` data-chore='${JSON.stringify(c).replace(/'/g,"&#39;")}'`;
-      return `<div class="cc-item ${cls}"${ocAttr} onclick="choreClick(this)">
-        ${icon} ${esc(c.chore_name)}${tag}
-      </div>`;
+      return `<div class="cc-item ${cls}" ${dragAttrs}${ocAttr} onclick="choreClick(this)">${icon} ${esc(c.chore_name)}${tag}</div>`;
     }
-    // Pending with no camera evidence — tap to mark as done
-    if(!c.done && _person){
-      const safeChore=esc(c.chore_name).replace(/'/g,"\\'");
-      return `<div class="cc-item ${cls}" onclick="quickMarkDone('${_person}','${safeChore}')" title="Tap to mark as done ✓" style="cursor:pointer">
-        ${icon} ${esc(c.chore_name)}${tag}
-      </div>`;
+    if(!c.done){
+      const safeChore=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return `<div class="cc-item ${cls}" ${dragAttrs} onclick="quickMarkDone('${person}','${safeChore}')" title="Tap to mark done · drag to give to ${dn(partner)}" style="cursor:pointer">${icon} ${esc(c.chore_name)}${tag}</div>`;
     }
-    return `<div class="cc-item ${cls}">${icon} ${esc(c.chore_name)}${tag}</div>`;
+    return `<div class="cc-item ${cls}" ${dragAttrs}>${icon} ${esc(c.chore_name)}${tag}</div>`;
+  }
+
+  function extraChip(j){
+    const fromDisplay=j.from==='Liam'?'Dad':'Mom';
+    const safeChore=j.choreName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<div class="cc-item cc-extra" title="Extra job from ${fromDisplay} — tap to mark done" onclick="quickMarkDone('${person}','${safeChore}');removeExtraJob('${person}','${safeChore}')">
+      ⭐ ${esc(j.choreName)}<span class="cc-tag" style="background:rgba(251,191,36,.2);color:var(--amber);margin-left:3px">+${fromDisplay}</span>
+      <span style="font-size:.58rem;color:var(--faint);margin-left:3px;cursor:pointer" onclick="event.stopPropagation();removeExtraJob('${person}','${safeChore}')">✕</span>
+    </div>`;
   }
 
   el.innerHTML=`
@@ -1413,16 +1433,57 @@ function renderPanel(person,data,viols,ds,ms){
     </div>
 
     <div class="hd-row">
-      ${halfDonut(pct,          'Jobs',        choreSublabel,   choreOnclick, `g-${px}-jobs`, GRADS.jobs)}
-      ${halfDonut(dayFamPct,   'Family Time', famSublabel,     famOnclick,   `g-${px}-fam`,  GRADS.fam)}
-      ${halfDonut(dayPersonPct,'Present',     persSublabel,    persOnclick,  `g-${px}-rel`,  GRADS.rel)}
+      <div class="fd-col">
+        ${donut1}
+        <div class="fd-legend">
+          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#60a5fa"></div>Jobs</div>
+          ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>Extra(${extraCount})</div>`:''}
+        </div>
+      </div>
+      <div class="fd-col">
+        ${donut2}
+        <div class="fd-legend">
+          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#22d3ee"></div>Family</div>
+          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#c084fc"></div>Present</div>
+        </div>
+      </div>
     </div>
 
     <div class="chore-list-hdr">
       <span style="font-weight:600">Today's Jobs</span>
-      <span style="color:var(--blue);font-weight:600">${choreSublabel}</span>
+      <span style="color:var(--sub);font-size:.58rem;font-weight:500">drag → ${dn(partner)} to share</span>
+      <span style="color:var(--blue);font-weight:600">${doneJobs}/${totalJobs}</span>
     </div>
-    <div class="chore-chips">${shown.length?shown.map(c=>choreChip(c,person)).join(''):'<div class="empty" style="padding:.6rem;font-size:.75rem">No chores assigned</div>'}</div>`;
+    <div class="chore-chips panel-drop-zone" id="chips-${person}" data-person="${person}">
+      ${shown.map(choreChip).join('')}
+      ${extraJobsForMe.map(extraChip).join('')}
+      ${!shown.length&&!extraCount?'<div class="empty" style="padding:.6rem;font-size:.75rem">No chores assigned</div>':''}
+    </div>`;
+
+  // Wire up drag-and-drop
+  _setupDropZone(document.getElementById(`chips-${person}`), person);
+  el.querySelectorAll('.cc-item[draggable=true]').forEach(chip=>{
+    chip.addEventListener('dragstart',e=>{
+      e.dataTransfer.setData('text/plain',JSON.stringify({from:chip.dataset.person,choreName:chip.dataset.choreName}));
+      e.dataTransfer.effectAllowed='copy';
+      setTimeout(()=>chip.style.opacity='.45',0);
+    });
+    chip.addEventListener('dragend',()=>{chip.style.opacity='';});
+  });
+}
+
+function _setupDropZone(zone,dropPerson){
+  if(!zone)return;
+  zone.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';zone.classList.add('drag-over');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+  zone.addEventListener('drop',e=>{
+    e.preventDefault();zone.classList.remove('drag-over');
+    try{
+      const d=JSON.parse(e.dataTransfer.getData('text/plain'));
+      if(d.from===dropPerson)return; // same panel — no-op
+      addExtraJob(d.from,dropPerson,d.choreName);
+    }catch(_){}
+  });
 }
 
 function choreClick(el){
