@@ -946,14 +946,15 @@ function _assessRow(a){
   </div>`;
 }
 
-async function drillJobCompletion(person, plan){
+async function drillJobCompletion(person, plan, cachedAss){
   const dname=dn(person);
   showDetail(`📊 ${dname} — Job Completion (Today)`, '<div style="color:var(--sub);font-size:.8rem">Loading…</div>');
   const today=todayStr();
-  const [assessments, sightings] = await Promise.all([
-    fetch(`${API}/api/chores/assessments?date=${today}&person_name=${encodeURIComponent(person)}`).then(r=>r.json()).catch(()=>[]),
-    fetch(`${API}/api/sightings?limit=60&person_name=${encodeURIComponent(person)}&activity_type=cleaning&date=${today}`).then(r=>r.json()).catch(()=>[]),
-  ]);
+  // Use pre-fetched assessments if available, otherwise re-fetch
+  const assessments = cachedAss
+    ? cachedAss.filter(a=>a.person_name===person)
+    : await fetch(`${API}/api/chores/assessments?date=${today}&person_name=${encodeURIComponent(person)}`).then(r=>r.json()).catch(()=>[]);
+  const sightings = await fetch(`${API}/api/sightings?limit=60&person_name=${encodeURIComponent(person)}&activity_type=cleaning&date=${today}`).then(r=>r.json()).catch(()=>[]);
   const chores=(plan.plan?.[person]?.chores||[]).filter(c=>!c.carried_forward);
   const earned=plan.plan?.[person]?.earned_points||0;
   const total=plan.plan?.[person]?.total_points||0;
@@ -1043,36 +1044,68 @@ async function drillMonthDay(date, dayNums, calDays){
   showDetail(`📅 ${date} — Job Completion Breakdown`, html);
 }
 
-function renderCharts(plan, viols, daily, calendar){
+function renderCharts(plan, viols, daily, calendar, todayAss){
   const calDays=calendar.days||{};
   const dayNums=Object.keys(calDays).sort();
+  const _todayAss=Array.isArray(todayAss)?todayAss:[];
 
-  // ── 1. Job Completion — Today (grouped bar: Dad blue, Mom pink)
+  // ── 1. Job Completion — Today (cumulative step-line through the day)
   if(_chartJobs){_chartJobs.destroy();_chartJobs=null;}
   const ctxJ=document.getElementById('chartJobs');
   if(ctxJ){
     ctxJ.style.cursor='pointer';
-    const dadPct=plan.plan?.Liam?.pct||0;
-    const momPct=plan.plan?.Rachel?.pct||0;
+    const liamTotal=plan.plan?.Liam?.total_points||100;
+    const rachelTotal=plan.plan?.Rachel?.total_points||100;
+
+    // Build sorted assessment series per person
+    const liamAss=_todayAss.filter(a=>a.person_name==='Liam').sort((a,b)=>a.timestamp.localeCompare(b.timestamp));
+    const rachelAss=_todayAss.filter(a=>a.person_name==='Rachel').sort((a,b)=>a.timestamp.localeCompare(b.timestamp));
+
+    // Collect all unique time labels (HH:MM local) from both series, add midnight anchor
+    function toLocal(ts){const d=new Date(ts+'Z');return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});}
+    const allTimes=['00:00',...new Set([...liamAss,...rachelAss].map(a=>toLocal(a.timestamp)))].sort();
+
+    // Cumulative % at or before each time label (step-wise, no double-counting)
+    function cumSeries(assessments, total){
+      return allTimes.map(t=>{
+        const earned=assessments
+          .filter(a=>toLocal(a.timestamp)<=t)
+          .reduce((s,a)=>s+(a.points_earned||0),0);
+        return total>0 ? Math.min(Math.round(earned/total*100),100) : 0;
+      });
+    }
+    const dadLine=cumSeries(liamAss,liamTotal);
+    const momLine=cumSeries(rachelAss,rachelTotal);
+    const hasData=liamAss.length||rachelAss.length;
+
     _chartJobs=new Chart(ctxJ,{
-      type:'bar',
+      type:'line',
       data:{
-        labels:['Dad','Mom'],
+        labels: hasData ? allTimes : ['Start','Now'],
         datasets:[
-          {label:'Completed',data:[dadPct,momPct],backgroundColor:['rgba(96,165,250,.85)','rgba(244,114,182,.85)'],borderRadius:6,borderSkipped:false},
-          {label:'Goal',data:[100,100],type:'line',borderColor:'#4ade80',backgroundColor:'transparent',borderDash:[5,3],pointRadius:4,pointStyle:'crossRot',borderWidth:2,pointBorderColor:'#4ade80',pointBorderWidth:2,fill:false,order:0},
+          {label:'Dad',  data: hasData ? dadLine  : [0, plan.plan?.Liam?.pct||0],
+            borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.15)',
+            tension:0,stepped:'after',fill:true,pointRadius:hasData?3:4,borderWidth:2.5,pointHoverRadius:6},
+          {label:'Mom',  data: hasData ? momLine  : [0, plan.plan?.Rachel?.pct||0],
+            borderColor:'#f472b6',backgroundColor:'rgba(244,114,182,.12)',
+            tension:0,stepped:'after',fill:true,pointRadius:hasData?3:4,borderWidth:2.5,pointHoverRadius:6},
+          {label:'Goal', data: hasData ? allTimes.map(()=>100) : [100,100],
+            borderColor:'#4ade80',backgroundColor:'transparent',borderDash:[5,3],
+            pointRadius:0,borderWidth:1.5,stepped:false,fill:false,tension:0},
         ]
       },
       options:{...CHART_DEFAULTS,
         onClick(evt,els){
           if(!els.length)return;
-          const person=['Liam','Rachel'][els[0].index];
-          if(person) drillJobCompletion(person, plan);
+          const dsIdx=els[0].datasetIndex;
+          const person=dsIdx===0?'Liam':dsIdx===1?'Rachel':null;
+          if(person) drillJobCompletion(person, plan, _todayAss);
         },
         plugins:{...CHART_DEFAULTS.plugins,
-          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}% · tap to see camera events`}}},
+          tooltip:{mode:'index',intersect:false,
+            callbacks:{label:ctx=>ctx.dataset.label==='Goal'?null:`${ctx.dataset.label}: ${ctx.raw}%`}}},
         scales:{
-          x:{ticks:{...DARK_TICK},grid:{display:false}},
+          x:{ticks:{...DARK_TICK,maxRotation:0,maxTicksLimit:6},grid:{display:false}},
           y:{min:0,max:100,ticks:{...DARK_TICK,callback:v=>v+'%'},grid:DARK_GRID},
         }
       }
@@ -1153,12 +1186,13 @@ function renderCharts(plan, viols, daily, calendar){
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 async function loadDashboard(){
-  const [plan,viols,daily,monthly,calendar]=await Promise.all([
+  const [plan,viols,daily,monthly,calendar,todayAss]=await Promise.all([
     fetch(`${API}/api/chores/daily-plan`).then(r=>r.json()).catch(()=>({plan:{},unassigned:[]})),
     fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({by_person:{},violations:[]})),
     fetch(`${API}/api/stats/daily`).then(r=>r.json()).catch(()=>({})),
     fetch(`${API}/api/stats/monthly`).then(r=>r.json()).catch(()=>({persons:{}})),
     fetch(`${API}/api/chores/calendar`).then(r=>r.json()).catch(()=>({days:{}})),
+    fetch(`${API}/api/chores/assessments`).then(r=>r.json()).catch(()=>[]),
   ]);
   if(!_persons.length) _persons=await fetch(`${API}/api/persons`).then(r=>r.json()).catch(()=>[]);
   // ── KPI stat boxes ────────────────────────────────────────────────────────
@@ -1211,7 +1245,7 @@ async function loadDashboard(){
   kv('ks-carry', totalCarry?`Dad ${liamCarryItems.length} · Mom ${rachelCarryItems.length}`:'All clear today ✓');
 
   // ── Charts ────────────────────────────────────────────────────────────────
-  renderCharts(plan, viols, daily, calendar);
+  renderCharts(plan, viols, daily, calendar, todayAss);
 
   // ── Carry-forward badges ──────────────────────────────────────────────────
   ['Liam','Rachel'].forEach(person=>{
@@ -1285,8 +1319,9 @@ function renderPanel(person,data,viols,ds,ms){
 
   const pct=data.pct||0;
   const violCount=(viols.by_person||{})[person]||0;
-  // Rework % = how many of the 3-violation cap has been hit today (0 = clean, 100 = 3+ violations)
-  const reworkPct=Math.min(Math.round(violCount/3*100),100);
+  // Rework % — each violation costs ~8% of the gauge, max 24% (3 violations)
+  // Kept small so it doesn't dominate the overall picture
+  const reworkPct=Math.min(violCount*8,24);
   const dayFamPct=Math.min(Math.round((ds.family_mins||0)/120*100),100);
   const dayPersonPct=Math.min(Math.round((ds.personal_mins||0)/120*100),100);
   const mthFamPct=Math.min(Math.round((ms.family_mins||0)/3600*100),100);
