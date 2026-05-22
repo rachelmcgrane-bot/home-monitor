@@ -1659,6 +1659,8 @@ async def get_daily_stats(db: AsyncSession = Depends(get_db)):
 async def get_monthly_stats(month: Optional[str] = None, db: AsyncSession = Depends(get_db)):
     if not month:
         month = datetime.utcnow().strftime("%Y-%m")
+
+    # ── PersonDailyStat rows (kitchen/personal/family mins + arrivals) ─────────
     res = await db.execute(
         select(PersonDailyStat).where(PersonDailyStat.stat_date.like(f"{month}%")))
     rows = res.scalars().all()
@@ -1681,6 +1683,31 @@ async def get_monthly_stats(month: Optional[str] = None, db: AsyncSession = Depe
             "kitchen_mins": 0, "personal_mins": 0, "family_mins": 0,
             "days_seen": 0, "arrivals": [],
         })
+
+    # ── Days present: count distinct calendar days each person was sighted ─────
+    # Use Sighting table with confidence >= 0.5 — more reliable than PersonDailyStat
+    # which only gets written when time-tracking runs. Cast timestamp to date in SQL.
+    month_start = f"{month}-01"
+    month_end_dt = datetime.strptime(month_start, "%Y-%m-%d")
+    # last day of month = first day of next month
+    if month_end_dt.month == 12:
+        next_month = month_end_dt.replace(year=month_end_dt.year + 1, month=1, day=1)
+    else:
+        next_month = month_end_dt.replace(month=month_end_dt.month + 1, day=1)
+
+    for person in ["Liam", "Rachel"]:
+        sighting_days_res = await db.execute(
+            select(func.count(func.distinct(func.date(Sighting.timestamp))))
+            .where(
+                Sighting.person_name == person,
+                Sighting.confidence >= 0.5,
+                Sighting.timestamp >= datetime.strptime(month_start, "%Y-%m-%d"),
+                Sighting.timestamp < next_month,
+            )
+        )
+        days_present = int(sighting_days_res.scalar() or 0)
+        output[person]["days_present"] = days_present
+
     return {"month": month, "persons": output}
 
 

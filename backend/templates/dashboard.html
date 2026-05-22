@@ -1230,9 +1230,9 @@ async function loadDashboard(){
   else if(liamFam>rachelFam){kv('kv-famL','Dad 🏆');kv('ks-famL',fmtM(liamFam)+' vs Mom '+fmtM(rachelFam));}
   else if(rachelFam>liamFam){kv('kv-famL','Mom 🏆');kv('ks-famL',fmtM(rachelFam)+' vs Dad '+fmtM(liamFam));}
   else{kv('kv-famL','Tied');kv('ks-famL',fmtM(liamFam)+' each');}
-  // Most present
-  const liamDays=monthly.persons?.Liam?.days_seen||0, rachelDays=monthly.persons?.Rachel?.days_seen||0;
-  if(liamDays===0&&rachelDays===0){kv('kv-presL','—');kv('ks-presL','no data this month');}
+  // Most present — use days_present (distinct sighting dates) not days_seen (PersonDailyStat rows)
+  const liamDays=monthly.persons?.Liam?.days_present||0, rachelDays=monthly.persons?.Rachel?.days_present||0;
+  if(liamDays===0&&rachelDays===0){kv('kv-presL','—');kv('ks-presL','no camera sightings this month');}
   else if(liamDays>rachelDays){kv('kv-presL','Dad 🏆');kv('ks-presL',liamDays+' days vs Mom '+rachelDays);}
   else if(rachelDays>liamDays){kv('kv-presL','Mom 🏆');kv('ks-presL',rachelDays+' days vs Dad '+liamDays);}
   else{kv('kv-presL','Tied');kv('ks-presL',liamDays+' days each');}
