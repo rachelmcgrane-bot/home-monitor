@@ -63,7 +63,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .chart-title{font-size:.6rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;margin-bottom:.3rem}
 .chart-inner{position:relative;flex:1;min-height:0}
 /* ── Person panels side by side ── */
-.panels-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px 8px 8px;flex:1;min-height:320px}
+.panels-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px 8px 8px;flex:1;min-height:380px}
 /* Person panel */
 .person-panel{background:#191d30;border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .pp-head{padding:.55rem .8rem .3rem;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -74,22 +74,38 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .pp-arrival{font-size:.68rem;color:var(--sub);font-weight:400}
 .pp-arrival strong{color:var(--blue);font-weight:600}
 /* ── Full donut gauges ── */
-.hd-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:.4rem .5rem .15rem;flex-shrink:0}
-.fd-col{display:flex;flex-direction:column;align-items:center}
-.fd-wrap{cursor:pointer;border-radius:10px;transition:background .15s;width:100%}
+.hd-row{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:.4rem .4rem .1rem;flex-shrink:0}
+.fd-col{display:flex;flex-direction:column;align-items:center;gap:2px}
+.fd-wrap{cursor:pointer;border-radius:10px;transition:background .15s;display:flex;justify-content:center}
 .fd-wrap:hover{background:rgba(255,255,255,.04)}
-.fd-svg{width:100%;display:block}
-.fd-legend{display:flex;flex-wrap:wrap;gap:2px 8px;padding:1px 4px 3px;justify-content:center}
+.fd-svg{width:88px;height:88px;display:block;flex-shrink:0}
+.fd-legend{display:flex;flex-wrap:wrap;gap:2px 8px;padding:0 2px 2px;justify-content:center}
 .fd-leg-item{display:flex;align-items:center;gap:3px;font-size:.52rem;color:var(--sub);font-family:'SF Mono','Courier New',monospace;letter-spacing:.03em}
 .fd-leg-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-/* ── Drag-and-drop ── */
-.cc-item[draggable=true]{cursor:grab}
-.cc-item[draggable=true]:active{cursor:grabbing}
-.cc-extra{background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.45);color:var(--amber)}
-.panel-drop-zone{border:2px dashed transparent;border-radius:8px;transition:border-color .2s,background .2s;min-height:32px}
-.panel-drop-zone.drag-over{border-color:var(--blue)!important;background:rgba(96,165,250,.07)!important}
-/* ── Chore chips (horizontal list) ── */
+/* ── Drag-and-drop job list ── */
+.panel-drop-zone{border:2px dashed transparent;border-radius:8px;transition:border-color .2s,background .2s}
+.panel-drop-zone.drag-over{border-color:var(--blue)!important;background:rgba(96,165,250,.06)!important}
+/* ── Vertical chore job list ── */
 .chore-chips{display:flex;flex-wrap:wrap;gap:.3rem;padding:.35rem .55rem .5rem;overflow-y:auto;flex:1;align-content:flex-start}
+.job-list{flex:1;overflow-y:auto;padding:0 .4rem .3rem;min-height:0;display:flex;flex-direction:column;gap:0}
+.job-list::-webkit-scrollbar{width:3px}
+.job-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.jl-item{display:flex;align-items:center;gap:.4rem;padding:.32rem .4rem;border-radius:7px;border-left:3px solid transparent;transition:background .12s;cursor:default}
+.jl-item:hover{background:rgba(255,255,255,.04)}
+.jl-item.jl-done{border-left-color:var(--green)}
+.jl-item.jl-partial{border-left-color:var(--orange)}
+.jl-item.jl-pending{border-left-color:var(--border)}
+.jl-item.jl-extra{border-left-color:var(--amber);background:rgba(251,191,36,.05)}
+.jl-drag{color:var(--faint);font-size:.75rem;cursor:grab;flex-shrink:0;padding:0 2px;user-select:none}
+.jl-drag:active{cursor:grabbing}
+.jl-icon{font-size:.78rem;flex-shrink:0;width:14px;text-align:center}
+.jl-name{flex:1;font-size:.73rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jl-name.done{color:var(--green);text-decoration:line-through;opacity:.7}
+.jl-name.extra-name{color:var(--amber)}
+.jl-badge{font-size:.5rem;padding:.05rem .22rem;border-radius:3px;font-weight:700;text-transform:uppercase;flex-shrink:0}
+.jlb-core{background:rgba(96,165,250,.18);color:var(--blue)}
+.jlb-rot{background:rgba(192,132,252,.18);color:var(--purple)}
+.jlb-extra{background:rgba(251,191,36,.2);color:var(--amber)}
 .cc-item{display:inline-flex;align-items:center;gap:.28rem;padding:.26rem .55rem;border-radius:20px;font-size:.7rem;font-weight:500;cursor:default;border:1px solid;transition:opacity .15s;line-height:1.2}
 .cc-item[onclick]{cursor:pointer}.cc-item[onclick]:hover{opacity:.8}
 .cc-done{background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.4);color:var(--green)}
@@ -1391,36 +1407,46 @@ function renderPanel(person,data,viols,ds,ms){
     timeCenterVal, 'today', famOnclick, `fd-${person.toLowerCase()}-time`
   );
 
-  // Chips: show core + rotating + flex; include ALL non-carried chores so more appear
+  // All non-carried chores for this person
   const shown=(data.chores||[]).filter(c=>!c.carried_forward);
 
-  function choreChip(c){
-    let cls='cc-pending',icon='○';
-    if(c.done){cls='cc-done';icon='✓';}
-    else if(c.status==='partial'){cls='cc-partial';icon='◑';}
-    else if(c.when_suits){icon='◇';}
-    const tag=c.chore_type==='core'?`<span class="cc-tag">core</span>`:
-              c.chore_type==='rotating'?`<span class="cc-tag cc-rot">↻</span>`:
-              c.when_suits?`<span class="cc-tag cc-ws">flex</span>`:'';
+  // ── Job row builder ───────────────────────────────────────────────────────
+  function jobRow(c){
+    const done=c.done, partial=c.status==='partial';
+    const cls=done?'jl-done':partial?'jl-partial':'jl-pending';
+    const icon=done?'✓':partial?'◑':'○';
+    const nameCls=done?'done':'';
+    const badge=c.chore_type==='core'?`<span class="jl-badge jlb-core">core</span>`:
+                c.chore_type==='rotating'?`<span class="jl-badge jlb-rot">↻ rot</span>`:'';
     const hasDetail=!!(c.assessment||c.thumbnail_url);
+    const dragData=JSON.stringify({from:person,choreName:c.chore_name}).replace(/'/g,'&#39;');
     const dragAttrs=`draggable="true" data-person="${person}" data-chore-name="${esc(c.chore_name)}"`;
+
+    let rowClick='';
     if(hasDetail){
-      const ocAttr=` data-chore='${JSON.stringify(c).replace(/'/g,"&#39;")}'`;
-      return `<div class="cc-item ${cls}" ${dragAttrs}${ocAttr} onclick="choreClick(this)">${icon} ${esc(c.chore_name)}${tag}</div>`;
+      rowClick=` data-chore='${JSON.stringify(c).replace(/'/g,"&#39;")}' onclick="choreClick(this)"`;
+    } else if(!done){
+      const safe=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      rowClick=` onclick="quickMarkDone('${person}','${safe}')" style="cursor:pointer" title="Tap to mark done"`;
     }
-    if(!c.done){
-      const safeChore=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      return `<div class="cc-item ${cls}" ${dragAttrs} onclick="quickMarkDone('${person}','${safeChore}')" title="Tap to mark done · drag to give to ${dn(partner)}" style="cursor:pointer">${icon} ${esc(c.chore_name)}${tag}</div>`;
-    }
-    return `<div class="cc-item ${cls}" ${dragAttrs}>${icon} ${esc(c.chore_name)}${tag}</div>`;
+
+    return `<div class="jl-item ${cls}" ${dragAttrs}${rowClick}>
+      <span class="jl-drag" data-person="${person}" data-chore-name="${esc(c.chore_name)}" title="Drag to give to ${dn(partner)}">⠿</span>
+      <span class="jl-icon">${icon}</span>
+      <span class="jl-name ${nameCls}">${esc(c.chore_name)}</span>
+      ${badge}
+    </div>`;
   }
 
-  function extraChip(j){
+  // ── Extra (picked-up) job row ─────────────────────────────────────────────
+  function extraRow(j){
     const fromDisplay=j.from==='Liam'?'Dad':'Mom';
-    const safeChore=j.choreName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    return `<div class="cc-item cc-extra" title="Extra job from ${fromDisplay} — tap to mark done" onclick="quickMarkDone('${person}','${safeChore}');removeExtraJob('${person}','${safeChore}')">
-      ⭐ ${esc(j.choreName)}<span class="cc-tag" style="background:rgba(251,191,36,.2);color:var(--amber);margin-left:3px">+${fromDisplay}</span>
-      <span style="font-size:.58rem;color:var(--faint);margin-left:3px;cursor:pointer" onclick="event.stopPropagation();removeExtraJob('${person}','${safeChore}')">✕</span>
+    const safe=j.choreName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<div class="jl-item jl-extra" onclick="quickMarkDone('${person}','${safe}');removeExtraJob('${person}','${safe}')" style="cursor:pointer" title="Tap to mark done">
+      <span class="jl-icon">⭐</span>
+      <span class="jl-name extra-name">${esc(j.choreName)}</span>
+      <span class="jl-badge jlb-extra">+${fromDisplay}</span>
+      <span style="font-size:.62rem;color:var(--faint);cursor:pointer;padding:0 2px;margin-left:2px" onclick="event.stopPropagation();removeExtraJob('${person}','${safe}')">✕</span>
     </div>`;
   }
 
@@ -1437,7 +1463,7 @@ function renderPanel(person,data,viols,ds,ms){
         ${donut1}
         <div class="fd-legend">
           <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#60a5fa"></div>Jobs</div>
-          ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>Extra(${extraCount})</div>`:''}
+          ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>+${extraCount} extra</div>`:''}
         </div>
       </div>
       <div class="fd-col">
@@ -1451,24 +1477,24 @@ function renderPanel(person,data,viols,ds,ms){
 
     <div class="chore-list-hdr">
       <span style="font-weight:600">Today's Jobs</span>
-      <span style="color:var(--sub);font-size:.58rem;font-weight:500">drag → ${dn(partner)} to share</span>
-      <span style="color:var(--blue);font-weight:600">${doneJobs}/${totalJobs}</span>
+      <span style="color:var(--faint);font-size:.55rem">⠿ drag to ${dn(partner)}</span>
+      <span style="color:var(--blue);font-weight:600">${doneJobs}/${totalJobs+extraCount}</span>
     </div>
-    <div class="chore-chips panel-drop-zone" id="chips-${person}" data-person="${person}">
-      ${shown.map(choreChip).join('')}
-      ${extraJobsForMe.map(extraChip).join('')}
-      ${!shown.length&&!extraCount?'<div class="empty" style="padding:.6rem;font-size:.75rem">No chores assigned</div>':''}
+    <div class="job-list panel-drop-zone" id="chips-${person}" data-person="${person}">
+      ${shown.map(jobRow).join('')}
+      ${extraJobsForMe.map(extraRow).join('')}
+      ${!shown.length&&!extraCount?'<div class="empty" style="padding:.8rem;font-size:.75rem">No chores assigned</div>':''}
     </div>`;
 
-  // Wire up drag-and-drop
+  // Wire up drag-and-drop on job rows
   _setupDropZone(document.getElementById(`chips-${person}`), person);
-  el.querySelectorAll('.cc-item[draggable=true]').forEach(chip=>{
-    chip.addEventListener('dragstart',e=>{
-      e.dataTransfer.setData('text/plain',JSON.stringify({from:chip.dataset.person,choreName:chip.dataset.choreName}));
+  el.querySelectorAll('.jl-item[draggable=true]').forEach(row=>{
+    row.addEventListener('dragstart',e=>{
+      e.dataTransfer.setData('text/plain',JSON.stringify({from:row.dataset.person,choreName:row.dataset.choreName}));
       e.dataTransfer.effectAllowed='copy';
-      setTimeout(()=>chip.style.opacity='.45',0);
+      setTimeout(()=>row.style.opacity='.4',0);
     });
-    chip.addEventListener('dragend',()=>{chip.style.opacity='';});
+    row.addEventListener('dragend',()=>{row.style.opacity='';});
   });
 }
 
