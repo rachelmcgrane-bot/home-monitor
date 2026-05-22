@@ -734,10 +734,11 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
             prev_act = tracking["last_activity_type"]
             if tracking["last_in_kitchen"]:
                 tracking["kitchen_mins"] += elapsed_mins
-            # personal_mins: passive/leisure time (tv, resting, personal, eating)
-            if prev_act in ("tv", "resting", "personal", "eating"):
+            # personal_mins: all time that is not jobs or family time
+            # (tv, resting, personal, eating, cooking, other all count as "other" category)
+            if prev_act in ("tv", "resting", "personal", "eating", "cooking", "other"):
                 tracking["personal_mins"] += elapsed_mins
-            # family_mins: time with children
+            # family_mins: active time spent with the children
             elif prev_act == "family":
                 tracking["family_mins"] += elapsed_mins
             # cleaning time is tracked implicitly via ChoreAssessments — no separate bucket needed

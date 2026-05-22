@@ -356,7 +356,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
         <div class="sk-sub" id="ks-jobsL">today's points</div>
       </div>
       <div class="stat-kpi sk-cyan" data-icon="❤️">
-        <div class="sk-label">Family Time Leader</div>
+        <div class="sk-label">Present Leader</div>
         <div class="sk-value" id="kv-famL">—</div>
         <div class="sk-sub" id="ks-famL">this month</div>
       </div>
@@ -379,7 +379,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
         <div class="chart-inner"><canvas id="chartJobs"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">❤️ Family Time — Today <span style="font-size:.6rem;color:var(--faint);font-weight:400">tap bar for camera events</span></div>
+        <div class="chart-title">❤️ Present — Today <span style="font-size:.6rem;color:var(--faint);font-weight:400">tap line for camera events</span></div>
         <div class="chart-inner" id="chartFamilyWrap"><canvas id="chartFamily"></canvas></div>
       </div>
       <div class="chart-card">
@@ -453,7 +453,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
           <span class="pill" onclick="setFilter(this,'tv')">📺 TV</span>
           <span class="pill" onclick="setFilter(this,'resting')">🛋️ Resting</span>
           <span class="pill" onclick="setFilter(this,'personal')">📱 Relaxing</span>
-          <span class="pill" onclick="setFilter(this,'family')">👨‍👩‍👧‍👦 Family Time</span>
+          <span class="pill" onclick="setFilter(this,'family')">👨‍👩‍👧‍👦 Present</span>
           <span class="pill p-viol" onclick="setViolFilter(this)">⚠️ Rework</span>
         </div>
         <div class="filter-row">
@@ -1044,7 +1044,7 @@ async function drillMonthDay(date, dayNums, calDays){
   showDetail(`📅 ${date} — Job Completion Breakdown`, html);
 }
 
-function renderCharts(plan, viols, daily, calendar, todayAss){
+function renderCharts(plan, viols, daily, calendar, todayAss, familySightings){
   const calDays=calendar.days||{};
   const dayNums=Object.keys(calDays).sort();
   const _todayAss=Array.isArray(todayAss)?todayAss:[];
@@ -1112,35 +1112,58 @@ function renderCharts(plan, viols, daily, calendar, todayAss){
     });
   }
 
-  // ── 2. Family Time — Today (grouped bar: Family cyan, Relaxing purple) in minutes
+  // ── 2. Present (family time with kids) — Today (cumulative step-line through the day)
   if(_chartFamily){_chartFamily.destroy();_chartFamily=null;}
   const ctxF=document.getElementById('chartFamily');
   if(ctxF){
     ctxF.style.cursor='pointer';
-    const dadFam=Math.round(daily?.Liam?.family_mins||0);
-    const momFam=Math.round(daily?.Rachel?.family_mins||0);
-    const dadRel=Math.round(daily?.Liam?.personal_mins||0);
-    const momRel=Math.round(daily?.Rachel?.personal_mins||0);
+    const _famSights=Array.isArray(familySightings)?familySightings:[];
+    const liamFamSights=_famSights.filter(s=>s.person_name==='Liam').sort((a,b)=>a.timestamp.localeCompare(b.timestamp));
+    const rachelFamSights=_famSights.filter(s=>s.person_name==='Rachel').sort((a,b)=>a.timestamp.localeCompare(b.timestamp));
+    const dadFamTotal=Math.round(daily?.Liam?.family_mins||0);
+    const momFamTotal=Math.round(daily?.Rachel?.family_mins||0);
+
+    function toLocalF(ts){const d=new Date(ts+'Z');return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});}
+    const allTimesF=['00:00',...new Set([...liamFamSights,...rachelFamSights].map(s=>toLocalF(s.timestamp)))].sort();
+
+    // Distribute the backend-calculated total evenly across sighting timestamps for a smooth cumulative line
+    function famCumSeries(sights,total){
+      if(!sights.length)return allTimesF.map(()=>0);
+      const perSight=total/sights.length;
+      return allTimesF.map(t=>{
+        const n=sights.filter(s=>toLocalF(s.timestamp)<=t).length;
+        return Math.round(n*perSight*10)/10;
+      });
+    }
+    const hasDataF=liamFamSights.length||rachelFamSights.length;
+    const dadFamLine=famCumSeries(liamFamSights,dadFamTotal);
+    const momFamLine=famCumSeries(rachelFamSights,momFamTotal);
+
     _chartFamily=new Chart(ctxF,{
-      type:'bar',
+      type:'line',
       data:{
-        labels:['Dad','Mom'],
+        labels:hasDataF?allTimesF:['Start','Now'],
         datasets:[
-          {label:'Family',   data:[dadFam,momFam], backgroundColor:'rgba(34,211,238,.85)', borderRadius:5, borderSkipped:false},
-          {label:'Relaxing', data:[dadRel,momRel],  backgroundColor:'rgba(192,132,252,.85)',borderRadius:5, borderSkipped:false},
+          {label:'Dad',  data:hasDataF?dadFamLine:[0,dadFamTotal],
+            borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.15)',
+            tension:0,stepped:'after',fill:true,pointRadius:hasDataF?3:4,borderWidth:2.5,pointHoverRadius:6},
+          {label:'Mom',  data:hasDataF?momFamLine:[0,momFamTotal],
+            borderColor:'#f472b6',backgroundColor:'rgba(244,114,182,.12)',
+            tension:0,stepped:'after',fill:true,pointRadius:hasDataF?3:4,borderWidth:2.5,pointHoverRadius:6},
         ]
       },
       options:{...CHART_DEFAULTS,
         onClick(evt,els){
           if(!els.length)return;
-          const person=['Liam','Rachel'][els[0].index];
-          const actType=['family','personal'][els[0].datasetIndex];
-          if(person&&actType) drillFamilyTime(person, actType);
+          const dsIdx=els[0].datasetIndex;
+          const person=dsIdx===0?'Liam':dsIdx===1?'Rachel':null;
+          if(person) drillFamilyTime(person,'family');
         },
         plugins:{...CHART_DEFAULTS.plugins,
-          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}m · tap to see camera events`}}},
+          tooltip:{mode:'index',intersect:false,
+            callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}m · tap for camera events`}}},
         scales:{
-          x:{ticks:{...DARK_TICK},grid:{display:false}},
+          x:{ticks:{...DARK_TICK,maxRotation:0,maxTicksLimit:6},grid:{display:false}},
           y:{min:0,ticks:{...DARK_TICK,callback:v=>v+'m'},grid:DARK_GRID},
         }
       }
@@ -1186,13 +1209,15 @@ function renderCharts(plan, viols, daily, calendar, todayAss){
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 async function loadDashboard(){
-  const [plan,viols,daily,monthly,calendar,todayAss]=await Promise.all([
+  const _td=todayStr();
+  const [plan,viols,daily,monthly,calendar,todayAss,todayFamSightings]=await Promise.all([
     fetch(`${API}/api/chores/daily-plan`).then(r=>r.json()).catch(()=>({plan:{},unassigned:[]})),
     fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({by_person:{},violations:[]})),
     fetch(`${API}/api/stats/daily`).then(r=>r.json()).catch(()=>({})),
     fetch(`${API}/api/stats/monthly`).then(r=>r.json()).catch(()=>({persons:{}})),
     fetch(`${API}/api/chores/calendar`).then(r=>r.json()).catch(()=>({days:{}})),
     fetch(`${API}/api/chores/assessments`).then(r=>r.json()).catch(()=>[]),
+    fetch(`${API}/api/sightings?limit=200&activity_type=family&date=${_td}`).then(r=>r.json()).catch(()=>[]),
   ]);
   if(!_persons.length) _persons=await fetch(`${API}/api/persons`).then(r=>r.json()).catch(()=>[]);
   // ── KPI stat boxes ────────────────────────────────────────────────────────
@@ -1202,7 +1227,7 @@ async function loadDashboard(){
     if(!valid.length)return null;
     const mins=valid.map(t=>{const[h,m]=t.split(':').map(Number);return h*60+m;});
     const avg=Math.round(mins.reduce((a,b)=>a+b,0)/mins.length);
-    return `${String(Math.floor(avg/60)).padStart(2,'0')}:${String(avg%60).padStart(2,'0')} UTC`;
+    return `${String(Math.floor(avg/60)).padStart(2,'0')}:${String(avg%60).padStart(2,'0')} GMT`;
   }
   // Today's actual wake time — persist last seen via localStorage
   const todayL=daily?.Liam?.morning_arrival, todayR=daily?.Rachel?.morning_arrival;
@@ -1224,9 +1249,9 @@ async function loadDashboard(){
   if(liamPts===0&&rachelPts===0){kv('kv-jobsL','—');kv('ks-jobsL','no points yet today');}
   else if(liamPts>=rachelPts){kv('kv-jobsL','Dad 🏆');kv('ks-jobsL',liamPts+'pts vs Mom '+rachelPts);}
   else{kv('kv-jobsL','Mom 🏆');kv('ks-jobsL',rachelPts+'pts vs Dad '+liamPts);}
-  // Family time leader
+  // Present leader (family time with kids)
   const liamFam=monthly.persons?.Liam?.family_mins||0, rachelFam=monthly.persons?.Rachel?.family_mins||0;
-  if(liamFam===0&&rachelFam===0){kv('kv-famL','—');kv('ks-famL','no data yet');}
+  if(liamFam===0&&rachelFam===0){kv('kv-famL','—');kv('ks-famL','no present time logged');}
   else if(liamFam>rachelFam){kv('kv-famL','Dad 🏆');kv('ks-famL',fmtM(liamFam)+' vs Mom '+fmtM(rachelFam));}
   else if(rachelFam>liamFam){kv('kv-famL','Mom 🏆');kv('ks-famL',fmtM(rachelFam)+' vs Dad '+fmtM(liamFam));}
   else{kv('kv-famL','Tied');kv('ks-famL',fmtM(liamFam)+' each');}
@@ -1245,7 +1270,7 @@ async function loadDashboard(){
   kv('ks-carry', totalCarry?`Dad ${liamCarryItems.length} · Mom ${rachelCarryItems.length}`:'All clear today ✓');
 
   // ── Charts ────────────────────────────────────────────────────────────────
-  renderCharts(plan, viols, daily, calendar, todayAss);
+  renderCharts(plan, viols, daily, calendar, todayAss, todayFamSightings);
 
   // ── Carry-forward badges ──────────────────────────────────────────────────
   ['Liam','Rachel'].forEach(person=>{
@@ -1319,20 +1344,20 @@ function renderPanel(person,data,viols,ds,ms){
 
   const pct=data.pct||0;
   const violCount=(viols.by_person||{})[person]||0;
-  // Rework % — each violation costs ~8% of the gauge, max 24% (3 violations)
-  // Kept small so it doesn't dominate the overall picture
-  const reworkPct=Math.min(violCount*8,24);
+  // Rework % — only meaningful when jobs have been logged today; hide if no jobs yet
+  const hasJobsToday=(data.earned_points||0)>0;
+  const reworkPct=hasJobsToday?Math.min(violCount*8,24):0;
   const dayFamPct=Math.min(Math.round((ds.family_mins||0)/120*100),100);
   const dayPersonPct=Math.min(Math.round((ds.personal_mins||0)/120*100),100);
   const mthFamPct=Math.min(Math.round((ms.family_mins||0)/3600*100),100);
   const mthPersonPct=Math.min(Math.round((ms.personal_mins||0)/3600*100),100);
   const mthChoresPct=Math.min(Math.round((data.pct||0)),100);
-  const arrTxt=ds.morning_arrival?`<strong>${esc(ds.morning_arrival)} UTC</strong>`:'<span style="color:var(--faint)">not yet seen</span>';
+  const arrTxt=ds.morning_arrival?`<strong>${esc(ds.morning_arrival)} GMT</strong>`:'<span style="color:var(--faint)">not yet seen</span>';
 
   const choreSublabel=`${data.earned_points||0}/${data.total_points||0}`;
   const famSublabel=fmtM(ds.family_mins||0);
   const persSublabel=fmtM(ds.personal_mins||0);
-  const rewSublabel=violCount?`${violCount} ⚠️`:'clean ✓';
+  const rewSublabel=!hasJobsToday?'no jobs yet':(violCount?`${violCount} ⚠️`:'clean ✓');
 
   // Gauge onclick: go to activity tab with appropriate filter
   const pEnc=encodeURIComponent(person);
@@ -1345,8 +1370,8 @@ function renderPanel(person,data,viols,ds,ms){
   const choreMins=(data.chores||[]).reduce((s,c)=>s+(c.time_spent_mins||0),0);
   const pieSegs=[
     {v:choreMins,c:C.chores,label:'Jobs'},
-    {v:ds.family_mins||0,c:C.family,label:'Family Time'},
-    {v:ds.personal_mins||0,c:C.personal,label:'Relaxing'},
+    {v:ds.family_mins||0,c:C.family,label:'Present'},
+    {v:ds.personal_mins||0,c:C.personal,label:'Other'},
     {v:Math.max((ds.kitchen_mins||0)-choreMins,0),c:C.kitchen,label:'Kitchen'},
   ];
   const pieDetailHtml=pieSegs.filter(s=>s.v>0).map(s=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><div style="width:12px;height:12px;border-radius:50%;background:${s.c}"></div><span style="flex:1">${esc(s.label)}</span><strong>${fmtM(s.v)}</strong></div>`).join('');
@@ -1390,9 +1415,9 @@ function renderPanel(person,data,viols,ds,ms){
 
     <div class="hd-row">
       ${halfDonut(pct,         'Jobs',        pct+'%',         choreOnclick, `g-${px}-jobs`, GRADS.jobs)}
-      ${halfDonut(dayFamPct,   'Family Time', dayFamPct+'%',   famOnclick,   `g-${px}-fam`,  GRADS.fam)}
-      ${halfDonut(reworkPct,   'Rework',      reworkPct+'%',   rewOnclick,   `g-${px}-rew`,  GRADS.rew)}
-      ${halfDonut(dayPersonPct,'Relaxing',    dayPersonPct+'%',persOnclick,  `g-${px}-rel`,  GRADS.rel)}
+      ${halfDonut(dayFamPct,   'Present',     dayFamPct+'%',   famOnclick,   `g-${px}-fam`,  GRADS.fam)}
+      ${halfDonut(reworkPct,   'Rework',      rewSublabel,     rewOnclick,   `g-${px}-rew`,  GRADS.rew)}
+      ${halfDonut(dayPersonPct,'Other',       dayPersonPct+'%',persOnclick,  `g-${px}-rel`,  GRADS.rel)}
     </div>
 
     <div class="chore-list-hdr">
