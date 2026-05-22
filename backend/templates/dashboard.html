@@ -194,12 +194,8 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .feed::-webkit-scrollbar-thumb{background:var(--border)}
 .feed-item{display:flex;gap:.55rem;background:var(--bg);border-radius:8px;padding:.5rem;border-left:3px solid var(--border)}
 .feed-item.type-cleaning{border-left-color:var(--green)}
-.feed-item.type-cooking{border-left-color:var(--orange)}
-.feed-item.type-eating{border-left-color:var(--amber)}
-.feed-item.type-tv{border-left-color:var(--purple)}
-.feed-item.type-resting{border-left-color:var(--cyan)}
-.feed-item.type-personal{border-left-color:var(--orange)}
-.feed-item.type-family{border-left-color:var(--green)}
+.feed-item.type-family{border-left-color:var(--cyan)}
+.feed-item.type-present{border-left-color:var(--indigo)}
 .feed-item.type-violation{border-left-color:var(--orange);background:#fff7ed}
 .feed-item img{width:54px;height:40px;object-fit:cover;border-radius:5px;flex-shrink:0;cursor:pointer}
 .feed-item img:hover{opacity:.8}
@@ -317,10 +313,6 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     <button class="tab-btn" onclick="switchTab('activity')">📡 Activity</button>
     <button class="tab-btn" onclick="switchTab('chores')">🧹 Jobs</button>
   </nav>
-  <div class="carry-badges">
-    <button class="carry-badge" id="carryBadge-Liam" onclick="carryOverClick()" title="Dad's carried-over jobs from yesterday">🔄 Dad <span id="carryCount-Liam">—</span></button>
-    <button class="carry-badge" id="carryBadge-Rachel" onclick="carryOverClick()" title="Mom's carried-over jobs from yesterday">🔄 Mom <span id="carryCount-Rachel">—</span></button>
-  </div>
   <a class="cam-link" href="/camera" target="_blank">📷 Camera</a>
 </header>
 
@@ -356,7 +348,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
         <div class="sk-sub" id="ks-jobsL">today's points</div>
       </div>
       <div class="stat-kpi sk-cyan" data-icon="❤️">
-        <div class="sk-label">Present Leader</div>
+        <div class="sk-label">Family Time Leader</div>
         <div class="sk-value" id="kv-famL">—</div>
         <div class="sk-sub" id="ks-famL">this month</div>
       </div>
@@ -379,7 +371,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
         <div class="chart-inner"><canvas id="chartJobs"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">❤️ Present — Today <span style="font-size:.6rem;color:var(--faint);font-weight:400">tap line for camera events</span></div>
+        <div class="chart-title">❤️ Family Time — Today <span style="font-size:.6rem;color:var(--faint);font-weight:400">tap line for camera events</span></div>
         <div class="chart-inner" id="chartFamilyWrap"><canvas id="chartFamily"></canvas></div>
       </div>
       <div class="chart-card">
@@ -447,14 +439,10 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
         <div class="card-title">Activity Stream</div>
         <div class="type-pills" id="typePills">
           <span class="pill active" onclick="setFilter(this,'')">All</span>
-          <span class="pill" onclick="setFilter(this,'cleaning')">🧹 Cleaning</span>
-          <span class="pill" onclick="setFilter(this,'cooking')">🍳 Cooking</span>
-          <span class="pill" onclick="setFilter(this,'eating')">🍽️ Eating</span>
-          <span class="pill" onclick="setFilter(this,'tv')">📺 TV</span>
-          <span class="pill" onclick="setFilter(this,'resting')">🛋️ Resting</span>
-          <span class="pill" onclick="setFilter(this,'personal')">📱 Relaxing</span>
-          <span class="pill" onclick="setFilter(this,'family')">👨‍👩‍👧‍👦 Present</span>
-          <span class="pill p-viol" onclick="setViolFilter(this)">⚠️ Rework</span>
+          <span class="pill" onclick="setFilter(this,'cleaning')">🧹 Jobs</span>
+          <span class="pill" onclick="setFilter(this,'family')">❤️ Family Time</span>
+          <span class="pill" onclick="setFilter(this,'present')">👁 Present</span>
+          <span class="pill p-viol" onclick="setViolFilter(this)">⚠️ Quality Issues</span>
         </div>
         <div class="filter-row">
           <select id="filterLoc"><option value="">All locations</option></select>
@@ -606,7 +594,7 @@ const API='';
 const DISPLAY={'Liam':'Dad','Rachel':'Mom'};
 function dn(n){return DISPLAY[n]||n;}
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
-const ACT_ICONS={cleaning:'🧹',cooking:'🍳',eating:'🍽️',tv:'📺',resting:'🛋️',personal:'📱',family:'👨‍👩‍👧‍👦',other:'💼'};
+const ACT_ICONS={cleaning:'🧹',family:'❤️',present:'👁'};
 const C={chores:'#3b82f6',family:'#22c55e',personal:'#a855f7',kitchen:'#06b6d4',amber:'#f59e0b'};
 let calY=new Date().getUTCFullYear(),calM=new Date().getUTCMonth()+1;
 let mcY=new Date().getUTCFullYear(),mcM=new Date().getUTCMonth()+1;
@@ -878,23 +866,43 @@ function carryOverClick(){
     showDetail('🎉 No Carry-overs!','<div style="text-align:center;padding:1.5rem 0"><div style="font-size:2rem;margin-bottom:.5rem">✅</div><div style="font-weight:700;color:var(--green)">All clean — nothing carried over today!</div></div>');
     return;
   }
-  function itemList(arr,color){
+  function itemList(arr, color, personKey){
     if(!arr.length) return '<div style="color:var(--faint);font-size:.75rem">None</div>';
-    return arr.map(c=>`<div style="display:flex;align-items:center;gap:.5rem;padding:.32rem 0;border-bottom:1px solid var(--border);font-size:.78rem">
-      <span>🔄</span><span style="flex:1">${esc(c.chore_name)}</span>
-      <span style="color:${color};font-weight:700">${c.points}pts <span style="font-size:.65rem;opacity:.7">(50% penalty)</span></span>
-    </div>`).join('');
+    return arr.map(c=>{
+      const safe=esc(c.chore_name).replace(/'/g,"\\'");
+      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.32rem 0;border-bottom:1px solid var(--border);font-size:.78rem">
+        <span>🔄</span><span style="flex:1">${esc(c.chore_name)}</span>
+        <span style="color:${color};font-weight:700;font-size:.7rem">${c.points}pts</span>
+        <button onclick="closeDetail();quickMarkDone('${personKey}','${safe}')"
+          style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:.18rem .45rem;font-size:.65rem;cursor:pointer;font-weight:700">✓ Done</button>
+      </div>`;
+    }).join('');
   }
   showDetail(`🔄 Carry-overs Today (${total} jobs)`,`
     <div style="font-size:.72rem;color:var(--orange);background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);border-radius:8px;padding:.55rem .75rem;margin-bottom:.8rem">
-      ⚠️ These jobs weren't done yesterday and carry forward at 50% points.
+      ⚠️ These jobs weren't done yesterday. Tap ✓ Done to log them now.
     </div>
     <div style="font-weight:700;font-size:.8rem;color:var(--blue);margin-bottom:.3rem">Dad (${liamItems.length})</div>
-    ${itemList(liamItems,'var(--blue)')}
+    ${itemList(liamItems,'var(--blue)','Liam')}
     <div style="font-weight:700;font-size:.8rem;color:var(--purple);margin:.7rem 0 .3rem">Mom (${rachelItems.length})</div>
-    ${itemList(rachelItems,'var(--purple)')}
-    <button class="btn" style="margin-top:1rem" onclick="closeDetail();openAddToday()">📅 Record a job now →</button>
+    ${itemList(rachelItems,'var(--purple)','Rachel')}
   `);
+}
+
+// ── Quick mark-as-done from dashboard chip tap ─────────────────────────────────
+async function quickMarkDone(person, choreName){
+  const fd=new FormData();
+  fd.append('person_name',person);
+  fd.append('chore_name',choreName);
+  fd.append('score','10');
+  fd.append('notes','Marked done from dashboard');
+  try{
+    const res=await fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd});
+    if(res.ok){
+      playMarioCoin();
+      loadDashboard();
+    }
+  }catch(e){console.error('quickMarkDone error',e);}
 }
 
 // ── Chart instances (kept to allow destroy/recreate) ──────────────────────────
@@ -1244,14 +1252,15 @@ async function loadDashboard(){
   kv('kv-riseR', avgTimeStr(monthly.persons?.Rachel?.arrivals)||'—');
   kv('ks-riseL', `${(monthly.persons?.Liam?.arrivals||[]).length} days tracked`);
   kv('ks-riseR', `${(monthly.persons?.Rachel?.arrivals||[]).length} days tracked`);
-  // Jobs leader
-  const liamPts=plan.plan?.Liam?.earned_points||0, rachelPts=plan.plan?.Rachel?.earned_points||0;
-  if(liamPts===0&&rachelPts===0){kv('kv-jobsL','—');kv('ks-jobsL','no points yet today');}
+  // Jobs leader — use total_earned_today which counts ALL assessments, not just plan matches
+  const liamPts=plan.plan?.Liam?.total_earned_today||plan.plan?.Liam?.earned_points||0;
+  const rachelPts=plan.plan?.Rachel?.total_earned_today||plan.plan?.Rachel?.earned_points||0;
+  if(liamPts===0&&rachelPts===0){kv('kv-jobsL','—');kv('ks-jobsL','tap a job chip to log it');}
   else if(liamPts>=rachelPts){kv('kv-jobsL','Dad 🏆');kv('ks-jobsL',liamPts+'pts vs Mom '+rachelPts);}
   else{kv('kv-jobsL','Mom 🏆');kv('ks-jobsL',rachelPts+'pts vs Dad '+liamPts);}
-  // Present leader (family time with kids)
+  // Family time leader (active time with kids)
   const liamFam=monthly.persons?.Liam?.family_mins||0, rachelFam=monthly.persons?.Rachel?.family_mins||0;
-  if(liamFam===0&&rachelFam===0){kv('kv-famL','—');kv('ks-famL','no present time logged');}
+  if(liamFam===0&&rachelFam===0){kv('kv-famL','—');kv('ks-famL','no family time logged');}
   else if(liamFam>rachelFam){kv('kv-famL','Dad 🏆');kv('ks-famL',fmtM(liamFam)+' vs Mom '+fmtM(rachelFam));}
   else if(rachelFam>liamFam){kv('kv-famL','Mom 🏆');kv('ks-famL',fmtM(rachelFam)+' vs Dad '+fmtM(liamFam));}
   else{kv('kv-famL','Tied');kv('ks-famL',fmtM(liamFam)+' each');}
@@ -1272,19 +1281,7 @@ async function loadDashboard(){
   // ── Charts ────────────────────────────────────────────────────────────────
   renderCharts(plan, viols, daily, calendar, todayAss, todayFamSightings);
 
-  // ── Carry-forward badges ──────────────────────────────────────────────────
-  ['Liam','Rachel'].forEach(person=>{
-    const chores=(plan.plan?.[person]?.chores)||[];
-    const n=chores.filter(c=>c.carried_forward).length;
-    const countEl=document.getElementById(`carryCount-${person}`);
-    const badgeEl=document.getElementById(`carryBadge-${person}`);
-    if(countEl) countEl.textContent=n>0?n:'✓';
-    if(badgeEl){
-      badgeEl.className='carry-badge '+(n>0?'has-carry':'no-carry');
-      const dname=dn(person);
-      badgeEl.title=n>0?`${dname} has ${n} job${n>1?'s':''} carried over from yesterday — click to view Jobs tab`:`${dname} has no carry-overs today`;
-    }
-  });
+  // (carry-forward badges removed from header)
 
   ['Liam','Rachel'].forEach(p=>renderPanel(p,plan.plan?.[p]||{chores:[],total_points:100,earned_points:0,pct:0},viols,daily[p]||{},(monthly.persons||{})[p]||{}));
   renderUnassigned(plan.unassigned||[]);
@@ -1344,9 +1341,9 @@ function renderPanel(person,data,viols,ds,ms){
 
   const pct=data.pct||0;
   const violCount=(viols.by_person||{})[person]||0;
-  // Rework % — only meaningful when jobs have been logged today; hide if no jobs yet
-  const hasJobsToday=(data.earned_points||0)>0;
-  const reworkPct=hasJobsToday?Math.min(violCount*8,24):0;
+  // Quality % — monthly average assessment score (from monthly stats passed as ms)
+  const qualityPct = ms.avg_quality_pct != null ? ms.avg_quality_pct : null;
+  const qualityDisplay = qualityPct != null ? qualityPct+'%' : '—';
   const dayFamPct=Math.min(Math.round((ds.family_mins||0)/120*100),100);
   const dayPersonPct=Math.min(Math.round((ds.personal_mins||0)/120*100),100);
   const mthFamPct=Math.min(Math.round((ms.family_mins||0)/3600*100),100);
@@ -1357,22 +1354,21 @@ function renderPanel(person,data,viols,ds,ms){
   const choreSublabel=`${data.earned_points||0}/${data.total_points||0}`;
   const famSublabel=fmtM(ds.family_mins||0);
   const persSublabel=fmtM(ds.personal_mins||0);
-  const rewSublabel=!hasJobsToday?'no jobs yet':(violCount?`${violCount} ⚠️`:'clean ✓');
+  const rewSublabel=qualityDisplay;
 
   // Gauge onclick: go to activity tab with appropriate filter
   const pEnc=encodeURIComponent(person);
   const choreOnclick=`goToActivity('cleaning','${person}')`;
   const famOnclick=`goToActivity('family','${person}')`;
   const persOnclick=`goToActivity('personal','${person}')`;
-  const rewOnclick="reworkClick_p('"+person+"')";
+  const rewOnclick="qualityClick_p('"+person+"')";
 
   // Pie segments
   const choreMins=(data.chores||[]).reduce((s,c)=>s+(c.time_spent_mins||0),0);
   const pieSegs=[
     {v:choreMins,c:C.chores,label:'Jobs'},
-    {v:ds.family_mins||0,c:C.family,label:'Present'},
-    {v:ds.personal_mins||0,c:C.personal,label:'Other'},
-    {v:Math.max((ds.kitchen_mins||0)-choreMins,0),c:C.kitchen,label:'Kitchen'},
+    {v:ds.family_mins||0,c:C.family,label:'Family Time'},
+    {v:ds.personal_mins||0,c:C.personal,label:'Present'},
   ];
   const pieDetailHtml=pieSegs.filter(s=>s.v>0).map(s=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><div style="width:12px;height:12px;border-radius:50%;background:${s.c}"></div><span style="flex:1">${esc(s.label)}</span><strong>${fmtM(s.v)}</strong></div>`).join('');
 
@@ -1384,13 +1380,17 @@ function renderPanel(person,data,viols,ds,ms){
   const GRADS={
     jobs:  [{pct:'0%',color:'#818cf8'},{pct:'50%',color:'#60a5fa'},{pct:'100%',color:'#22d3ee'}],
     fam:   [{pct:'0%',color:'#22d3ee'},{pct:'50%',color:'#4ade80'},{pct:'100%',color:'#86efac'}],
-    rew:   reworkPct===0
-      ? [{pct:'0%',color:'#4ade80'},{pct:'50%',color:'#34d399'},{pct:'100%',color:'#86efac'}]
-      : [{pct:'0%',color:'#fbbf24'},{pct:'50%',color:'#fb923c'},{pct:'100%',color:'#f472b6'}],
+    rew:   qualityPct==null
+      ? [{pct:'0%',color:'#4a5578'},{pct:'50%',color:'#64748b'},{pct:'100%',color:'#94a3b8'}]
+      : qualityPct>=70
+        ? [{pct:'0%',color:'#4ade80'},{pct:'50%',color:'#34d399'},{pct:'100%',color:'#86efac'}]
+        : qualityPct>=40
+          ? [{pct:'0%',color:'#fbbf24'},{pct:'50%',color:'#fb923c'},{pct:'100%',color:'#f97316'}]
+          : [{pct:'0%',color:'#ef4444'},{pct:'50%',color:'#f87171'},{pct:'100%',color:'#fca5a5'}],
     rel:   [{pct:'0%',color:'#c084fc'},{pct:'50%',color:'#f472b6'},{pct:'100%',color:'#fb7185'}],
   };
 
-  function choreChip(c){
+  function choreChip(c, _person){
     let cls='cc-pending',icon='○';
     if(c.done){cls='cc-done';icon='✓';}
     else if(c.status==='partial'){cls='cc-partial';icon='◑';}
@@ -1399,10 +1399,20 @@ function renderPanel(person,data,viols,ds,ms){
               c.chore_type==='rotating'?`<span class="cc-tag cc-rot">↻</span>`:
               c.when_suits?`<span class="cc-tag cc-ws">flex</span>`:'';
     const hasDetail=!!(c.assessment||c.thumbnail_url);
-    const ocAttr=hasDetail?` data-chore='${JSON.stringify(c).replace(/'/g,"&#39;")}'`:'';
-    return `<div class="cc-item ${cls}"${ocAttr}${hasDetail?' onclick="choreClick(this)"':''}>
-      ${icon} ${esc(c.chore_name)}${tag}
-    </div>`;
+    if(hasDetail){
+      const ocAttr=` data-chore='${JSON.stringify(c).replace(/'/g,"&#39;")}'`;
+      return `<div class="cc-item ${cls}"${ocAttr} onclick="choreClick(this)">
+        ${icon} ${esc(c.chore_name)}${tag}
+      </div>`;
+    }
+    // Pending with no camera evidence — tap to mark as done
+    if(!c.done && _person){
+      const safeChore=esc(c.chore_name).replace(/'/g,"\\'");
+      return `<div class="cc-item ${cls}" onclick="quickMarkDone('${_person}','${safeChore}')" title="Tap to mark as done ✓" style="cursor:pointer">
+        ${icon} ${esc(c.chore_name)}${tag}
+      </div>`;
+    }
+    return `<div class="cc-item ${cls}">${icon} ${esc(c.chore_name)}${tag}</div>`;
   }
 
   el.innerHTML=`
@@ -1414,17 +1424,17 @@ function renderPanel(person,data,viols,ds,ms){
     </div>
 
     <div class="hd-row">
-      ${halfDonut(pct,         'Jobs',        pct+'%',         choreOnclick, `g-${px}-jobs`, GRADS.jobs)}
-      ${halfDonut(dayFamPct,   'Present',     dayFamPct+'%',   famOnclick,   `g-${px}-fam`,  GRADS.fam)}
-      ${halfDonut(reworkPct,   'Rework',      rewSublabel,     rewOnclick,   `g-${px}-rew`,  GRADS.rew)}
-      ${halfDonut(dayPersonPct,'Other',       dayPersonPct+'%',persOnclick,  `g-${px}-rel`,  GRADS.rel)}
+      ${halfDonut(pct,                  'Jobs',        pct+'%',         choreOnclick, `g-${px}-jobs`, GRADS.jobs)}
+      ${halfDonut(dayFamPct,            'Family Time', dayFamPct+'%',   famOnclick,   `g-${px}-fam`,  GRADS.fam)}
+      ${halfDonut(qualityPct||0,        'Quality',     rewSublabel,     rewOnclick,   `g-${px}-rew`,  GRADS.rew)}
+      ${halfDonut(dayPersonPct,         'Present',     dayPersonPct+'%',persOnclick,  `g-${px}-rel`,  GRADS.rel)}
     </div>
 
     <div class="chore-list-hdr">
       <span style="font-weight:600">Today's Jobs</span>
       <span style="color:var(--blue);font-weight:600">${data.earned_points||0}/${data.total_points||0} pts</span>
     </div>
-    <div class="chore-chips">${shown.length?shown.map(choreChip).join(''):'<div class="empty" style="padding:.6rem;font-size:.75rem">No chores assigned</div>'}</div>`;
+    <div class="chore-chips">${shown.length?shown.map(c=>choreChip(c,person)).join(''):'<div class="empty" style="padding:.6rem;font-size:.75rem">No chores assigned</div>'}</div>`;
 }
 
 function choreClick(el){
@@ -1474,16 +1484,32 @@ function violationCardHtml(v){
   </div>`;
 }
 
-async function reworkClick_p(person){
-  const viols=await fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({violations:[]}));
+async function qualityClick_p(person){
+  const dname=dn(person);
+  // Fetch both today's assessments for quality score and violations for quality issues
+  const [assResp, viols]=await Promise.all([
+    fetch(`${API}/api/chores/assessments?date=${todayStr()}&person_name=${encodeURIComponent(person)}`).then(r=>r.json()).catch(()=>[]),
+    fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({violations:[]})),
+  ]);
   const mine=(viols.violations||[]).filter(v=>v.person_name===person);
+  const myAss=Array.isArray(assResp)?assResp:[];
+
+  // Calculate today's quality %
+  const todayQuality = myAss.length>0
+    ? Math.round(myAss.reduce((s,a)=>s+(a.score||0),0)/myAss.length/10*100)
+    : null;
+
+  const qualHeaderHtml=todayQuality!=null
+    ?`<div style="text-align:center;padding:.6rem 0 .8rem">
+        <div style="font-size:2rem;font-weight:900;color:${todayQuality>=70?'var(--green)':todayQuality>=40?'var(--amber)':'var(--orange)'}">${todayQuality}%</div>
+        <div style="font-size:.72rem;color:var(--sub)">quality today · ${myAss.length} job${myAss.length!==1?'s':''} assessed</div>
+      </div>`
+    :'<div style="font-size:.78rem;color:var(--sub);padding:.5rem 0">No camera-verified jobs today. Tap a job chip on the dashboard to log manually.</div>';
 
   if(!mine.length){
-    showDetail(`${person} — Rework`,`
-      <div style="text-align:center;padding:2rem 1rem">
-        <div style="font-size:2.5rem;margin-bottom:.6rem">✅</div>
-        <div style="font-weight:700;font-size:1rem;color:var(--green);margin-bottom:.3rem">All clean today!</div>
-        <div style="font-size:.78rem;color:var(--sub)">No rework violations recorded for ${esc(person)}.</div>
+    showDetail(`${dname} — Quality`,qualHeaderHtml+`
+      <div style="text-align:center;padding:.5rem 0">
+        <div style="font-size:.78rem;color:var(--green);font-weight:600">✅ No quality issues flagged today</div>
       </div>`);
     return;
   }
@@ -1500,10 +1526,10 @@ async function reworkClick_p(person){
       <span style="color:var(--orange);font-weight:700">${n}×</span>
     </div>`).join('');
 
-  let html=`
+  let html=qualHeaderHtml+`
     <div style="background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.35);border-radius:10px;padding:.8rem 1rem;margin-bottom:1rem">
       <div style="font-size:.88rem;font-weight:700;color:var(--orange);margin-bottom:.4rem">
-        ⚠️ ${mine.length} Rework Violation${mine.length!==1?'s':''} Today
+        ⚠️ ${mine.length} Quality Issue${mine.length!==1?'s':''} Today
       </div>
       <div style="font-size:.73rem;color:var(--sub);margin-bottom:.6rem">
         Each violation means something was spotted by the camera that needs attention or correction. Tap <strong>AI second opinion</strong> or <strong>Remove</strong> if any seem unfair.
@@ -1514,7 +1540,7 @@ async function reworkClick_p(person){
     ${mine.map(violationCardHtml).join('')}
     <button class="btn" style="margin-top:.6rem;background:var(--sub);font-size:.78rem" onclick="closeDetail();goToActivity('','${person}')">→ View in Activity Stream</button>`;
 
-  showDetail(`${person} — Rework Breakdown`,html);
+  showDetail(`${dname} — Quality Breakdown`,html);
 }
 
 async function disputeViol(vid, method, personName){
@@ -2011,15 +2037,20 @@ async function loadFeed(){
     const violSet=new Set((todayViols.violations||[]).map(v=>v.person_name+'|'+v.timestamp.slice(0,16)));
 
     status.style.display='none';
-    if(!items.length){feed.innerHTML='<div class="empty">No activity recorded yet.</div>';return;}
 
     // Update location dropdown
     const ls=document.getElementById('filterLoc');
     const known=new Set([...ls.querySelectorAll('option')].map(o=>o.value).filter(Boolean));
     items.forEach(s=>{if(s.location&&!known.has(s.location)){const o=document.createElement('option');o.value=s.location;o.textContent=s.location;ls.appendChild(o);known.add(s.location);}});
 
-    feed.innerHTML=items.map(s=>{
-      const t=s.activity_type||'other';
+    // Only show the 3 valid activity types in the stream
+    const VALID_TYPES=new Set(['cleaning','family','present']);
+    const filtered=activeType?items:items.filter(s=>VALID_TYPES.has(s.activity_type));
+
+    if(!filtered.length){feed.innerHTML='<div class="empty">No activity recorded yet.</div>';return;}
+
+    feed.innerHTML=filtered.map(s=>{
+      const t=s.activity_type||'present';
       const conf=s.confidence;
       const bc=conf>=.75?'cd-hi':conf>=.45?'cd-mi':'cd-lo';
       const ts=new Date(s.timestamp+'Z').toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -2029,17 +2060,16 @@ async function loadFeed(){
       const sTime=new Date(s.timestamp+'Z').getTime();
       const linkedAss=todayAss.find(a=>a.person_name===s.person_name&&Math.abs(new Date(a.timestamp+'Z').getTime()-sTime)<5*60*1000);
 
-      // Traceability badge
+      // Traceability badge (3-type system)
       let traceBadge='';
       if(t==='cleaning'||linkedAss) traceBadge=`<span class="trace-badge tb-chores" onclick="goToActivity('cleaning','${esc(s.person_name)}')">→ Jobs</span>`;
       else if(t==='family') traceBadge=`<span class="trace-badge tb-family" onclick="goToActivity('family','${esc(s.person_name)}')">→ Family Time</span>`;
-      else if(t==='personal') traceBadge=`<span class="trace-badge tb-personal" onclick="goToActivity('personal','${esc(s.person_name)}')">→ Relaxing</span>`;
-      else if(t==='cooking'||t==='eating') traceBadge=`<span class="trace-badge tb-kitchen" onclick="goToActivity('cooking','${esc(s.person_name)}')">→ Kitchen</span>`;
+      else if(t==='present') traceBadge=`<span class="trace-badge tb-personal" onclick="goToActivity('present','${esc(s.person_name)}')">→ Present</span>`;
 
-      // Violation tag: check if this sighting has a linked violation
+      // Violation tag
       const sMin=s.timestamp.slice(0,16);
       const hasViol=violSet.has(s.person_name+'|'+sMin);
-      const violTag=hasViol?`<span class="trace-badge tb-viol">⚠️ Violation</span>`:'';
+      const violTag=hasViol?`<span class="trace-badge tb-viol">⚠️ Quality Issue</span>`:'';
 
       // Chore type tag + points if linked assessment
       let choreTag='';
@@ -2050,7 +2080,7 @@ async function loadFeed(){
       }
 
       return `<div class="feed-item type-${t}${hasViol?' type-violation':''}">${img}<div style="flex:1;min-width:0">
-        <div class="fi-who">${ACT_ICONS[t]||'💼'} ${esc(s.person_name)}<span class="conf-dot ${bc}">${Math.round(conf*100)}%</span>${choreTag}${violTag}</div>
+        <div class="fi-who">${ACT_ICONS[t]||'👁'} ${esc(s.person_name)}<span class="conf-dot ${bc}">${Math.round(conf*100)}%</span>${choreTag}${violTag}</div>
         <div class="fi-task">${esc(s.task||'')}</div>
         <div class="fi-meta">📍 ${esc(s.location||'')} · ${ts}${traceBadge?` · ${traceBadge}`:''}</div>
         ${linkedAss?`<div style="font-size:.68rem;color:var(--sub);margin-top:.1rem">📋 ${esc(linkedAss.chore_name)}: <strong>${linkedAss.score}/10</strong>${linkedAss.commentary?` — ${esc(linkedAss.commentary.slice(0,60))}`:''}</div>`:''}

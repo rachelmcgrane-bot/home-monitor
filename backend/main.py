@@ -502,7 +502,7 @@ async def recalculate_stats(db: AsyncSession = Depends(get_db)):
                 "morning_arrival": stat_row.morning_arrival,
                 "first_activity": stat_row.first_activity,
                 "last_seen": None,
-                "last_activity_type": "other",
+                "last_activity_type": "present",
                 "last_in_kitchen": False,
                 "kitchen_mins": float(stat_row.kitchen_mins or 0),
                 "personal_mins": float(stat_row.personal_mins or 0),
@@ -637,7 +637,7 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
     _last_ai_call[location] = datetime.utcnow()
     _last_ai_result[location] = {
         "id": None, "person_name": analysis.get("person_name", "Unknown"),
-        "task": analysis.get("task", ""), "activity_type": analysis.get("activity_type", "other"),
+        "task": analysis.get("task", ""), "activity_type": analysis.get("activity_type", "present"),
         "confidence": float(analysis.get("confidence", 0.0)),
         "etiquette_violation": analysis.get("etiquette_violation"),
         "etiquette_nudge": analysis.get("etiquette_nudge"),
@@ -645,24 +645,30 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
         "morning_announcement": None, "chore_assessment": None,
     }
 
-    # Always save sightings so the activity stream stays populated
+    person_name = analysis.get("person_name", "Unknown")
+
+    # ── Skip unknown persons entirely — no storage, no tracking ─────────────
+    if person_name in ("Unknown", None) or float(analysis.get("confidence", 0.0)) < 0.35:
+        return {"id": None, "person_name": "Unknown", "task": "Person not recognised",
+                "activity_type": "present", "confidence": 0.0,
+                "timestamp": datetime.utcnow().isoformat(),
+                "etiquette_violation": None, "etiquette_nudge": None,
+                "violations": [], "morning_announcement": None, "chore_assessment": None,
+                "skipped": "unknown_person"}
 
     thumb = _thumb(data)
 
     sighting = Sighting(
         person_id=analysis.get("person_id"),
-        person_name=analysis.get("person_name", "Unknown"),
+        person_name=person_name,
         location=location,
         task_description=analysis.get("task", ""),
-        activity_type=analysis.get("activity_type", "other"),
+        activity_type=analysis.get("activity_type", "present"),
         confidence=float(analysis.get("confidence", 0.0)),
         thumbnail_data=thumb,
     )
     db.add(sighting); await db.commit(); await db.refresh(sighting)
-
-    person_name = analysis.get("person_name", "Unknown")
     task_text = analysis.get("task", "")
-    confidence = float(analysis.get("confidence", 0.0))
     etiquette_violation = analysis.get("etiquette_violation")
     etiquette_nudge = analysis.get("etiquette_nudge")
     frame_violations = analysis.get("violations", [])
@@ -674,8 +680,8 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
     today_day = int(today.split("-")[2])
 
     # ── Save frame-level violations ───────────────────────────────────────────
-    # Never flag violations for Unknown persons; cap at 3 per identified person per day
-    if frame_violations and person_name and person_name != "Unknown":
+    # Cap at 3 per person per day
+    if frame_violations and person_name:
         viol_count_res = await db.execute(
             select(func.count(ChoreViolation.id)).where(
                 ChoreViolation.person_name == person_name,
@@ -701,8 +707,8 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
             await db.commit()
 
     # ── Person daily time-tracking ────────────────────────────────────────────
-    if person_name not in ("Unknown", None):
-        act_type = analysis.get("activity_type", "other")
+    if True:  # person is always known here (unknown returns early above)
+        act_type = analysis.get("activity_type", "present")
         in_kitchen = "kitchen" in location.lower()
 
         tracking = _person_day_tracking.get(person_name)
@@ -734,13 +740,13 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
             prev_act = tracking["last_activity_type"]
             if tracking["last_in_kitchen"]:
                 tracking["kitchen_mins"] += elapsed_mins
-            # personal_mins: all time that is not jobs or family time
-            # (tv, resting, personal, eating, cooking, other all count as "other" category)
-            if prev_act in ("tv", "resting", "personal", "eating", "cooking", "other"):
+            # personal_mins: "present" time (detected but not cleaning or family)
+            if prev_act == "present":
                 tracking["personal_mins"] += elapsed_mins
             # family_mins: active time spent with the children
             elif prev_act == "family":
                 tracking["family_mins"] += elapsed_mins
+            # cleaning time: tracked via ChoreAssessments, not bucketed here
             # cleaning time is tracked implicitly via ChoreAssessments — no separate bucket needed
 
         tracking["last_seen"] = now
@@ -748,7 +754,8 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
         tracking["last_in_kitchen"] = in_kitchen
         await _upsert_person_stats(person_name, tracking, db)
 
-    if person_name != "Unknown" and confidence >= 0.5:
+    confidence = float(analysis.get("confidence", 0.0))
+    if confidence >= 0.45:
         # ── Morning announcement ──────────────────────────────────────────────
         if _morning_announced.get(person_name, {}).get("date") != today:
             chores_res2 = await db.execute(select(Chore).where(Chore.active == True))
@@ -777,7 +784,7 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
         person_chores = [c for c in all_active
                          if c.person_name in (person_name, "both", "unassigned")]
         matched = None
-        if act_type_for_chore in ("cleaning", "cooking"):
+        if act_type_for_chore == "cleaning":
             matched = next((c for c in person_chores
                             if _chore_matches(c.chore_name, task_text)), None)
         if matched:
@@ -1278,10 +1285,13 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
                     weekly_pts += c.points
                     weekly_earned += pts_earned
 
+        # Sum ALL assessments for this person today (for KPI total, not just plan items)
+        total_earned_today = sum(a.points_earned or 0 for a in today_ass if a.person_name == person)
         plan[person] = {
             "chores": chore_list,
             "total_points": total_pts,
             "earned_points": earned_pts,
+            "total_earned_today": total_earned_today,
             "pct": int(earned_pts / total_pts * 100) if total_pts else 0,
             "weekly_points": weekly_pts,
             "weekly_earned": weekly_earned,
@@ -1701,13 +1711,31 @@ async def get_monthly_stats(month: Optional[str] = None, db: AsyncSession = Depe
             select(func.count(func.distinct(func.date(Sighting.timestamp))))
             .where(
                 Sighting.person_name == person,
-                Sighting.confidence >= 0.5,
+                Sighting.confidence >= 0.45,
                 Sighting.timestamp >= datetime.strptime(month_start, "%Y-%m-%d"),
                 Sighting.timestamp < next_month,
             )
         )
         days_present = int(sighting_days_res.scalar() or 0)
         output[person]["days_present"] = days_present
+
+    # ── Quality: avg assessment score % this month ──────────────────────────
+    next_month_str = next_month.strftime("%Y-%m-%d")
+    for person in ["Liam", "Rachel"]:
+        quality_res = await db.execute(
+            select(func.avg(ChoreAssessment.score), func.count(ChoreAssessment.id))
+            .where(
+                ChoreAssessment.person_name == person,
+                ChoreAssessment.status.in_(["done", "partial"]),
+                ChoreAssessment.assessed_date >= month_start,
+                ChoreAssessment.assessed_date < next_month_str,
+            )
+        )
+        q_row = quality_res.one_or_none()
+        avg_score = float(q_row[0] or 0) if q_row and q_row[0] else 0.0
+        q_count = int(q_row[1] or 0) if q_row else 0
+        output[person]["avg_quality_pct"] = round(avg_score / 10 * 100) if q_count > 0 else None
+        output[person]["quality_count"] = q_count
 
     return {"month": month, "persons": output}
 

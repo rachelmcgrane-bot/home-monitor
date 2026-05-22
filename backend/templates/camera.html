@@ -29,6 +29,10 @@
   .btn-stop  { background: #ef4444; color: #fff; }
   .btn-stop:hover  { background: #dc2626; }
 
+  /* Motion mode info box */
+  .motion-info { background: rgba(124,133,255,.1); border: 1px solid rgba(124,133,255,.3); border-radius: 8px; padding: .65rem .9rem; font-size: .82rem; color: #a5b4fc; line-height: 1.5; }
+  .motion-info strong { color: #c4b5fd; }
+
   /* Rotation preview box */
   .rot-preview { display: flex; align-items: center; gap: 1rem; background: #1a1d2e; border: 1px solid #3b3f6e; border-radius: 8px; padding: .75rem 1rem; }
   .rot-diagram { width: 60px; height: 42px; border: 2px solid #3b3f6e; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; transition: transform .3s; flex-shrink: 0; background: #0f1117; }
@@ -45,12 +49,19 @@
   .rot-btn:hover { background: rgba(255,255,255,.3); }
   .rot-display { font-size: .75rem; color: rgba(255,255,255,.7); }
 
+  /* Motion status bar */
+  .motion-bar { position: absolute; top: 2.5rem; left: 0; right: 0; display: flex; align-items: center; justify-content: center; padding: .3rem .8rem; }
+  .motion-pill { font-size: .75rem; font-weight: 600; background: rgba(0,0,0,.65); border-radius: 999px; padding: .25rem .75rem; backdrop-filter: blur(4px); display: flex; align-items: center; gap: .4rem; border: 1px solid rgba(255,255,255,.1); }
+  .motion-dot { width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; }
+  .motion-dot.active { background: #22c55e; animation: pulse 1s infinite; }
+  .motion-dot.searching { background: #f59e0b; animation: pulse 1.2s infinite; }
+
   .overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.85)); padding: 1rem 1.2rem; }
   .last-result { font-size: 0.88rem; }
   .last-result .who { font-weight: 700; color: #a5b4fc; }
   .last-result .task { color: #cbd5e1; }
   .last-result .meta { font-size: 0.75rem; color: #64748b; margin-top: 0.2rem; }
-  .sending-indicator { position: absolute; top: 2.8rem; right: 0.9rem; font-size: 0.78rem; color: #fcd34d; background: rgba(0,0,0,.6); padding: 0.2rem 0.6rem; border-radius: 999px; opacity: 0; transition: opacity .3s; }
+  .sending-indicator { position: absolute; top: 5rem; right: 0.9rem; font-size: 0.78rem; color: #fcd34d; background: rgba(0,0,0,.6); padding: 0.2rem 0.6rem; border-radius: 999px; opacity: 0; transition: opacity .3s; }
   .sending-indicator.show { opacity: 1; }
   .hidden { display: none !important; }
 </style>
@@ -76,12 +87,16 @@
   </div>
   <div>
     <label>Capture interval</label>
-    <select id="intervalSelect">
+    <select id="intervalSelect" onchange="onIntervalChange()">
+      <option value="motion" selected>🔍 Motion — capture when movement detected</option>
       <option value="10">Every 10 s</option>
-      <option value="20" selected>Every 20 s</option>
+      <option value="20">Every 20 s</option>
       <option value="30">Every 30 s</option>
       <option value="60">Every 60 s</option>
     </select>
+  </div>
+  <div class="motion-info" id="motionInfoBox">
+    <strong>Motion mode:</strong> The camera watches for movement. When detected, a photo is sent to AI every 20 seconds. Stops automatically after 5 seconds of no movement.
   </div>
   <div>
     <label>Image rotation — use if the camera is mounted sideways</label>
@@ -111,6 +126,13 @@
     <span class="rot-display" id="liveRotDisplay">0°</span>
     <button class="rot-btn" onclick="stepRotation(90)">↻ Rotate right</button>
   </div>
+  <!-- Motion status indicator (only shown in motion mode) -->
+  <div class="motion-bar hidden" id="motionBar">
+    <div class="motion-pill">
+      <div class="motion-dot" id="motionDot"></div>
+      <span id="motionStatus">Watching for motion…</span>
+    </div>
+  </div>
   <span class="sending-indicator" id="sendingIndicator">Analysing…</span>
   <div class="overlay">
     <div class="last-result" id="lastResult">
@@ -126,7 +148,27 @@
 let stream = null;
 let timer = null;
 let captureRotation = 0; // degrees: 0, 90, 180, 270
+let _currentLocation = '';
 const API_BASE = window.location.origin;
+
+// ── Motion detection state ────────────────────────────────────────────────────
+let motionMode = false;
+let motionActive = false;      // true when movement is currently detected
+let lastMotionTime = 0;        // timestamp of last detected motion
+let lastCaptureTime = 0;       // timestamp of last frame sent to AI
+let motionPollTimer = null;    // 500ms interval for pixel-diff check
+let prevFrameData = null;      // previous frame's pixel data
+
+// Small off-screen canvas for motion comparison (low-res for perf)
+const motionCanvas = document.createElement('canvas');
+motionCanvas.width = 160; motionCanvas.height = 90;
+const motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
+
+const MOTION_CAPTURE_INTERVAL = 20000; // min ms between captures in motion mode
+const MOTION_STOP_AFTER_MS    = 5000;  // stop capturing after 5s no motion
+const MOTION_POLL_INTERVAL    = 500;   // how often to check for motion
+const MOTION_PIXEL_THRESHOLD  = 45;    // sum of |r|+|g|+|b| diff per pixel to count
+const MOTION_CHANGED_FRACTION = 0.02;  // 2% of pixels must change to trigger
 
 const ROT_INFO = {
   0:   { title: 'No rotation', desc: 'Image sent as captured — correct for a phone lying flat or mounted horizontally in landscape.' },
@@ -134,6 +176,11 @@ const ROT_INFO = {
   180: { title: '180° (upside-down)', desc: 'Camera is mounted upside-down. Image will be flipped.' },
   270: { title: '90° counter-clockwise', desc: 'Phone is tilted right (top pointing left). Image will be rotated so the scene appears upright.' },
 };
+
+function onIntervalChange() {
+  const val = document.getElementById('intervalSelect').value;
+  document.getElementById('motionInfoBox').style.display = val === 'motion' ? '' : 'none';
+}
 
 function updateRotPreview() {
   captureRotation = parseInt(document.getElementById('rotationSelect').value);
@@ -149,10 +196,74 @@ function stepRotation(delta) {
   document.getElementById('liveRotDisplay').textContent = captureRotation + '°';
 }
 
+// ── Motion detection helpers ──────────────────────────────────────────────────
+function setMotionUI(state) {
+  // state: 'idle' | 'watching' | 'active'
+  const dot    = document.getElementById('motionDot');
+  const status = document.getElementById('motionStatus');
+  const headDot = document.getElementById('statusDot');
+  dot.className = 'motion-dot';
+  if (state === 'active') {
+    dot.classList.add('active');
+    status.textContent = '🔴 Motion — capturing…';
+    headDot.classList.add('active');
+  } else if (state === 'watching') {
+    dot.classList.add('searching');
+    status.textContent = 'Watching for motion…';
+    headDot.classList.remove('active');
+  } else {
+    status.textContent = 'Paused — no motion';
+    headDot.classList.remove('active');
+  }
+}
+
+function pollMotion() {
+  const video = document.getElementById('video');
+  if (!video.videoWidth || !video.videoHeight) return;
+
+  // Draw current frame to small motion canvas
+  motionCtx.drawImage(video, 0, 0, 160, 90);
+  const frame = motionCtx.getImageData(0, 0, 160, 90);
+  const pixels = frame.data;
+
+  if (prevFrameData) {
+    const totalPixels = 160 * 90;
+    let changed = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      const dr = Math.abs(pixels[i]   - prevFrameData[i]);
+      const dg = Math.abs(pixels[i+1] - prevFrameData[i+1]);
+      const db = Math.abs(pixels[i+2] - prevFrameData[i+2]);
+      if (dr + dg + db > MOTION_PIXEL_THRESHOLD) changed++;
+    }
+    const fraction = changed / totalPixels;
+
+    if (fraction >= MOTION_CHANGED_FRACTION) {
+      lastMotionTime = Date.now();
+      if (!motionActive) {
+        motionActive = true;
+        setMotionUI('active');
+      }
+      // Capture if enough time has passed since last capture
+      if (Date.now() - lastCaptureTime >= MOTION_CAPTURE_INTERVAL) {
+        lastCaptureTime = Date.now();
+        captureAndSend(_currentLocation);
+      }
+    } else if (motionActive && (Date.now() - lastMotionTime) >= MOTION_STOP_AFTER_MS) {
+      motionActive = false;
+      setMotionUI('watching');
+    }
+  }
+
+  // Store a copy of this frame's pixels for next comparison
+  prevFrameData = new Uint8ClampedArray(pixels);
+}
+
+// ── Start / stop ─────────────────────────────────────────────────────────────
 document.getElementById('startBtn').addEventListener('click', async () => {
   const location = document.getElementById('locationInput').value.trim();
   if (!location) { alert('Please enter a location name.'); return; }
   captureRotation = parseInt(document.getElementById('rotationSelect').value);
+  _currentLocation = location;
 
   const btn = document.getElementById('startBtn');
   btn.disabled = true;
@@ -192,29 +303,61 @@ document.getElementById('startBtn').addEventListener('click', async () => {
 
   btn.disabled = false;
   btn.textContent = 'Start Monitoring';
+
+  const intervalVal = document.getElementById('intervalSelect').value;
+  motionMode = (intervalVal === 'motion');
+
   document.getElementById('video').srcObject = stream;
   document.getElementById('setupScreen').classList.add('hidden');
   document.getElementById('cameraScreen').classList.remove('hidden');
   document.getElementById('stopWrap').classList.remove('hidden');
-  document.getElementById('statusDot').classList.add('active');
   document.getElementById('liveRotDisplay').textContent = captureRotation + '°';
 
-  const interval = parseInt(document.getElementById('intervalSelect').value, 10) * 1000;
-  captureAndSend(location);
-  timer = setInterval(() => captureAndSend(location), interval);
+  if (motionMode) {
+    // Motion mode: show motion bar, start polling
+    document.getElementById('motionBar').classList.remove('hidden');
+    prevFrameData = null;
+    motionActive = false;
+    lastMotionTime = 0;
+    lastCaptureTime = 0;
+    setMotionUI('watching');
+    // Wait for video to have valid dimensions before polling
+    const video = document.getElementById('video');
+    video.addEventListener('loadeddata', () => {
+      motionPollTimer = setInterval(pollMotion, MOTION_POLL_INTERVAL);
+    }, { once: true });
+    // Fallback if loadeddata already fired
+    if (video.readyState >= 2) {
+      motionPollTimer = setInterval(pollMotion, MOTION_POLL_INTERVAL);
+    }
+  } else {
+    // Fixed interval mode: capture immediately then on interval
+    document.getElementById('motionBar').classList.add('hidden');
+    document.getElementById('statusDot').classList.add('active');
+    const intervalMs = parseInt(intervalVal, 10) * 1000;
+    captureAndSend(location);
+    timer = setInterval(() => captureAndSend(location), intervalMs);
+  }
 });
 
 document.getElementById('stopBtn').addEventListener('click', () => {
-  clearInterval(timer);
+  // Stop all timers
+  if (timer) { clearInterval(timer); timer = null; }
+  if (motionPollTimer) { clearInterval(motionPollTimer); motionPollTimer = null; }
   _networkErrors = 0;
+  motionActive = false;
+  prevFrameData = null;
+
   if (stream) stream.getTracks().forEach(t => t.stop());
+
   document.getElementById('cameraScreen').classList.add('hidden');
   document.getElementById('stopWrap').classList.add('hidden');
   document.getElementById('setupScreen').classList.remove('hidden');
   document.getElementById('statusDot').classList.remove('active');
+  document.getElementById('motionBar').classList.add('hidden');
 });
 
-// Apply rotation to canvas before converting to blob
+// ── Canvas rotation draw ──────────────────────────────────────────────────────
 function drawRotated(video, canvas) {
   const vw = video.videoWidth  || 640;
   const vh = video.videoHeight || 480;
@@ -222,13 +365,11 @@ function drawRotated(video, canvas) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
 
   if (captureRotation === 90) {
-    // Portrait→Landscape (phone tilted left): swap dims
     canvas.width  = vh;
     canvas.height = vw;
     ctx.translate(vh, 0);
     ctx.rotate(Math.PI / 2);
   } else if (captureRotation === 270) {
-    // Portrait→Landscape (phone tilted right): swap dims
     canvas.width  = vh;
     canvas.height = vw;
     ctx.translate(0, vw);
@@ -239,13 +380,12 @@ function drawRotated(video, canvas) {
     ctx.translate(vw, vh);
     ctx.rotate(Math.PI);
   } else {
-    // 0° — no rotation
     canvas.width  = vw;
     canvas.height = vh;
   }
 
   ctx.drawImage(video, 0, 0, vw, vh);
-  ctx.setTransform(1, 0, 0, 1, 0, 0); // reset after draw
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 let _networkErrors = 0;
@@ -266,16 +406,17 @@ async function captureAndSend(location) {
     try {
       const res = await fetch(`${API_BASE}/api/frame`, {
         method: 'POST', body: fd,
-        signal: AbortSignal.timeout(30000),   // 30s timeout per frame
+        signal: AbortSignal.timeout(30000),
       });
       if (res.ok) {
         _networkErrors = 0;
         const data = await res.json();
         showResult(data);
+        // In motion mode, update dot to show capture succeeded
+        if (motionMode && motionActive) setMotionUI('active');
       } else {
         let errText = `Server error ${res.status}`;
         try { const e = await res.json(); errText = e.detail || errText; } catch(_){}
-        // 503 = Render waking up, outside waking hours returns 200 with skipped
         if (res.status === 503 || res.status === 502) {
           showError('Server is starting up — will retry automatically…');
         } else if (res.status === 500 && errText.includes('AI error')) {
@@ -290,7 +431,7 @@ async function captureAndSend(location) {
         showError(`Connection lost — retrying (${_networkErrors}/3)…`);
       } else {
         showError('No connection to server. Check your internet and that the app URL is correct.');
-        document.getElementById('statusDot').classList.remove('active');
+        if (!motionMode) document.getElementById('statusDot').classList.remove('active');
       }
     } finally {
       indicator.classList.remove('show');
@@ -302,10 +443,11 @@ function showResult(data) {
   const conf = Math.round((data.confidence || 0) * 100);
   const skipped = data.skipped ? `<span style="color:#f59e0b"> ⚡ ${data.skipped}</span>` : '';
   const violCount = (data.violations || []).length;
-  const violStr = violCount ? `<span style="color:#f97316"> ⚠️ ${violCount} rework flag${violCount > 1 ? 's' : ''}</span>` : '';
+  const violStr = violCount ? `<span style="color:#f97316"> ⚠️ ${violCount} quality flag${violCount > 1 ? 's' : ''}</span>` : '';
   const rot = captureRotation ? ` <span style="color:#64748b;font-size:.7rem">↻${captureRotation}°</span>` : '';
+  const motionTag = motionMode ? ` <span style="color:#7c85ff;font-size:.7rem">motion</span>` : '';
   document.getElementById('lastResult').innerHTML = `
-    <div class="who">${data.person_name || '—'} &nbsp;<small style="color:#64748b">${conf}% match</small>${skipped}${rot}</div>
+    <div class="who">${data.person_name || '—'} &nbsp;<small style="color:#64748b">${conf}% match</small>${skipped}${rot}${motionTag}</div>
     <div class="task">${data.task || ''}${violStr}</div>
     <div class="meta">${data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}</div>
   `;
@@ -322,6 +464,9 @@ function showError(msg) {
     <div class="meta" style="color:#64748b">${hint}</div>
   `;
 }
+
+// Initialise interval info box visibility
+onIntervalChange();
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
