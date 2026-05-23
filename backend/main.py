@@ -1037,24 +1037,48 @@ async def verdict_proposal(pid: int, verdict: str = Form(...), approved_by: str 
 # ── Sightings ─────────────────────────────────────────────────────────────────
 
 @app.get("/api/sightings")
-async def get_sightings(limit: int = 80, location: Optional[str] = None,
+async def get_sightings(limit: int = 50, location: Optional[str] = None,
                         person_id: Optional[int] = None,
                         person_name: Optional[str] = None,
                         activity_type: Optional[str] = None,
                         date: Optional[str] = None,
+                        include_thumbnails: bool = False,
                         db: AsyncSession = Depends(get_db)):
-    q = select(Sighting).order_by(desc(Sighting.timestamp)).limit(limit)
+    # include_thumbnails=False by default — thumbnails are base64 images stored in the DB
+    # and each one is ~50-100KB. Fetching 200 at once was consuming Neon's transfer budget.
+    # Pass include_thumbnails=true only from the activity feed where images are needed.
+    if include_thumbnails:
+        q = select(Sighting).order_by(desc(Sighting.timestamp)).limit(limit)
+    else:
+        # Exclude the thumbnail_data column entirely to keep the query lightweight
+        q = select(
+            Sighting.id, Sighting.person_name, Sighting.location,
+            Sighting.task_description, Sighting.activity_type,
+            Sighting.confidence, Sighting.timestamp
+        ).order_by(desc(Sighting.timestamp)).limit(limit)
     if location: q = q.where(Sighting.location == location)
     if person_id: q = q.where(Sighting.person_id == person_id)
     if person_name: q = q.where(Sighting.person_name == person_name)
     if activity_type: q = q.where(Sighting.activity_type == activity_type)
     if date: q = q.where(func.date(Sighting.timestamp) == date)
     result = await db.execute(q)
-    return [{"id": s.id, "person_name": s.person_name, "location": s.location,
-             "task": s.task_description, "activity_type": s.activity_type or "other",
-             "confidence": s.confidence,
-             "thumbnail_url": _uri(s.thumbnail_data) if s.thumbnail_data else None,
-             "timestamp": s.timestamp.isoformat()} for s in result.scalars().all()]
+    rows = result.all() if not include_thumbnails else [(s,) for s in result.scalars().all()]
+    out = []
+    for row in rows:
+        if include_thumbnails:
+            s = row[0]
+            out.append({"id": s.id, "person_name": s.person_name, "location": s.location,
+                         "task": s.task_description, "activity_type": s.activity_type or "other",
+                         "confidence": s.confidence,
+                         "thumbnail_url": _uri(s.thumbnail_data) if s.thumbnail_data else None,
+                         "timestamp": s.timestamp.isoformat()})
+        else:
+            out.append({"id": row.id, "person_name": row.person_name, "location": row.location,
+                         "task": row.task_description, "activity_type": row.activity_type or "other",
+                         "confidence": row.confidence,
+                         "thumbnail_url": None,
+                         "timestamp": row.timestamp.isoformat()})
+    return out
 
 @app.get("/api/sightings/stats")
 async def get_stats(db: AsyncSession = Depends(get_db)):

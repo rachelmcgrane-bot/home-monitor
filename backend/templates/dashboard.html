@@ -13,7 +13,6 @@
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root{
   --bg:#0d0f1a;--card:#141726;--border:#1e2540;--text:#e2e8f0;--sub:#94a3b8;--faint:#4a5578;
@@ -57,13 +56,8 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .sk-label{font-size:.55rem;font-weight:700;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.18rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sk-value{font-size:1.2rem;font-weight:900;color:#fff;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px rgba(0,0,0,.3)}
 .sk-sub{font-size:.58rem;color:rgba(255,255,255,.6);margin-top:.12rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* ── Charts row ── */
-.charts-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:6px 8px 0;flex-shrink:0;height:240px}
-.chart-card{background:#191d30;border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);padding:.6rem .8rem;display:flex;flex-direction:column;min-width:0;overflow:hidden}
-.chart-title{font-size:.6rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;margin-bottom:.3rem}
-.chart-inner{position:relative;flex:1;min-height:0}
 /* ── Person panels side by side ── */
-.panels-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px 8px 8px;flex:1;min-height:380px}
+.panels-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px 8px 8px;flex:1;min-height:460px}
 /* Person panel */
 .person-panel{background:#191d30;border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .pp-head{padding:.55rem .8rem .3rem;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -78,7 +72,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .fd-col{display:flex;flex-direction:column;align-items:center;gap:2px}
 .fd-wrap{cursor:pointer;border-radius:10px;transition:background .15s;display:flex;justify-content:center}
 .fd-wrap:hover{background:rgba(255,255,255,.04)}
-.fd-svg{width:88px;height:88px;display:block;flex-shrink:0}
+.fd-svg{width:112px;height:112px;display:block;flex-shrink:0}
 .fd-legend{display:flex;flex-wrap:wrap;gap:2px 8px;padding:0 2px 2px;justify-content:center}
 .fd-leg-item{display:flex;align-items:center;gap:3px;font-size:.52rem;color:var(--sub);font-family:'SF Mono','Courier New',monospace;letter-spacing:.03em}
 .fd-leg-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
@@ -90,16 +84,29 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .job-list{flex:1;overflow-y:auto;padding:0 .4rem .3rem;min-height:0;display:flex;flex-direction:column;gap:0}
 .job-list::-webkit-scrollbar{width:3px}
 .job-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.jl-item{display:flex;align-items:center;gap:.4rem;padding:.32rem .4rem;border-radius:7px;border-left:3px solid transparent;transition:background .12s;cursor:default}
+.jl-item{display:flex;align-items:center;gap:.45rem;padding:.52rem .5rem;border-radius:8px;border-left:3px solid transparent;transition:background .12s;cursor:default;min-height:38px}
 .jl-item:hover{background:rgba(255,255,255,.04)}
 .jl-item.jl-done{border-left-color:var(--green)}
 .jl-item.jl-partial{border-left-color:var(--orange)}
 .jl-item.jl-pending{border-left-color:var(--border)}
 .jl-item.jl-extra{border-left-color:var(--amber);background:rgba(251,191,36,.05)}
+.jl-item.jl-given{border-left-color:var(--amber);background:rgba(251,191,36,.04);opacity:.75}
+.jl-item.jl-given .jl-name{color:var(--amber);text-decoration:line-through}
+.jl-item.jl-carry{border-left-color:var(--amber);background:rgba(251,191,36,.03)}
+.jl-name.carry{color:var(--amber);font-style:italic;opacity:.8}
+/* Inline done button — appears next to detail items */
+.jl-done-btn{background:var(--green);color:#fff;border:none;border-radius:5px;padding:.15rem .4rem;font-size:.7rem;font-weight:700;cursor:pointer;flex-shrink:0;margin-left:2px}
+/* Scroll indicator: fade-out at bottom of job list */
+.job-list-wrap{flex:1;display:flex;flex-direction:column;min-height:0;position:relative;overflow:hidden}
+.job-list-wrap::after{content:'';position:absolute;bottom:0;left:0;right:0;height:28px;background:linear-gradient(transparent,#191d30);pointer-events:none;border-radius:0 0 8px 8px}
+/* Context menu */
+.ctx-menu{position:fixed;background:#1e2540;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:9999;min-width:160px;padding:.3rem 0;font-size:.78rem}
+.ctx-item{padding:.45rem .85rem;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:.5rem}
+.ctx-item:hover{background:rgba(255,255,255,.07)}
 .jl-drag{color:var(--faint);font-size:.75rem;cursor:grab;flex-shrink:0;padding:0 2px;user-select:none}
 .jl-drag:active{cursor:grabbing}
 .jl-icon{font-size:.78rem;flex-shrink:0;width:14px;text-align:center}
-.jl-name{flex:1;font-size:.73rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jl-name{flex:1;font-size:.82rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .jl-name.done{color:var(--green);text-decoration:line-through;opacity:.7}
 .jl-name.extra-name{color:var(--amber)}
 .jl-badge{font-size:.5rem;padding:.05rem .22rem;border-radius:3px;font-weight:700;text-transform:uppercase;flex-shrink:0}
@@ -389,22 +396,6 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
       </div>
     </div>
 
-    <!-- ── Charts row ─────────────────────────────────────────────────── -->
-    <div class="charts-row">
-      <div class="chart-card">
-        <div class="chart-title">📊 Job Completion — Today <span style="font-size:.6rem;color:var(--faint);font-weight:400">tap bar for camera events</span></div>
-        <div class="chart-inner"><canvas id="chartJobs"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">❤️ Family Time — Today <span style="font-size:.6rem;color:var(--faint);font-weight:400">tap line for camera events</span></div>
-        <div class="chart-inner" id="chartFamilyWrap"><canvas id="chartFamily"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">📈 Job Completion — This Month <span style="font-size:.6rem;color:var(--faint);font-weight:400">tap point for day detail</span></div>
-        <div class="chart-inner" id="chartMonthWrap"><canvas id="chartMonth"></canvas></div>
-      </div>
-    </div>
-
     <!-- ── Person panels side by side ────────────────────────────────── -->
     <div class="panels-row">
 <div class="person-panel" id="panel-Liam"></div>
@@ -634,6 +625,12 @@ function _xjKey(){return `extraJobs_${todayStr()}`;}
 function getExtraJobs(){try{return JSON.parse(localStorage.getItem(_xjKey())||'[]');}catch{return [];}}
 function saveExtraJobs(arr){localStorage.setItem(_xjKey(),JSON.stringify(arr));}
 function addExtraJob(from,to,choreName){
+  // Prevent adding if partner already has this as their own regular job
+  const partnerPlan=window._lastPlan?.plan?.[to];
+  if(partnerPlan?.chores?.find(c=>c.chore_name===choreName&&!c.carried_forward)){
+    showToast(`${dn(to)} already has "${choreName}" assigned`,'var(--orange)');
+    return;
+  }
   const jobs=getExtraJobs();
   if(!jobs.find(j=>j.choreName===choreName&&j.to===to)){
     jobs.push({from,to,choreName,ts:Date.now()});
@@ -878,6 +875,65 @@ function playMarioFanfare(){
   });
 }
 
+// ── Toast notification ─────────────────────────────────────────────────────────
+function showToast(msg, color='var(--blue)'){
+  let t=document.getElementById('_toast');
+  if(!t){t=document.createElement('div');t.id='_toast';
+    Object.assign(t.style,{position:'fixed',bottom:'80px',left:'50%',transform:'translateX(-50%)',
+      background:'#1e2540',border:'1px solid',borderRadius:'10px',padding:'.55rem 1.1rem',
+      fontSize:'.82rem',fontWeight:'600',color:'#fff',zIndex:'99999',
+      transition:'opacity .3s',boxShadow:'0 4px 20px rgba(0,0,0,.5)',whiteSpace:'nowrap'});
+    document.body.appendChild(t);}
+  t.textContent=msg;t.style.borderColor=color;t.style.opacity='1';
+  clearTimeout(t._to);t._to=setTimeout(()=>t.style.opacity='0',2800);
+}
+
+// ── Context menu for job right-click ──────────────────────────────────────────
+let _ctxMenu=null;
+function _removeCtx(){if(_ctxMenu){_ctxMenu.remove();_ctxMenu=null;}}
+document.addEventListener('click',_removeCtx);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')_removeCtx();});
+
+function showJobCtxMenu(x, y, person, choreName, isDone){
+  _removeCtx();
+  const safe=choreName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const m=document.createElement('div');
+  m.className='ctx-menu';
+  m.style.left=Math.min(x, window.innerWidth-180)+'px';
+  m.style.top=Math.min(y, window.innerHeight-120)+'px';
+  m.innerHTML=`
+    <div class="ctx-item" onclick="_removeCtx();markJobCarryOver('${person}','${safe}')">
+      🔄 Mark as carry-over
+    </div>
+    ${!isDone?`<div class="ctx-item" onclick="_removeCtx();quickMarkDone('${person}','${safe}')">
+      ✓ Mark as done
+    </div>`:''}
+    <div class="ctx-item" onclick="_removeCtx();goToActivity('cleaning','${person}')">
+      📷 View camera activity
+    </div>`;
+  document.body.appendChild(m);
+  _ctxMenu=m;
+  setTimeout(()=>document.addEventListener('click',_removeCtx,{once:true}),50);
+}
+
+// Mark a job as carry-over (persist in localStorage, show as carried in panel)
+function _coKey(){return `carryOver_${todayStr()}`;}
+function getCarryOvers(){try{return JSON.parse(localStorage.getItem(_coKey())||'[]');}catch{return[];}}
+function saveCarryOvers(arr){localStorage.setItem(_coKey(),JSON.stringify(arr));}
+function markJobCarryOver(person, choreName){
+  const co=getCarryOvers();
+  if(!co.find(c=>c.person===person&&c.choreName===choreName)){
+    co.push({person,choreName,ts:Date.now()});
+    saveCarryOvers(co);
+  }
+  showToast(`🔄 "${choreName}" marked as carry-over`,'var(--amber)');
+  loadDashboard();
+}
+function clearCarryOver(person, choreName){
+  saveCarryOvers(getCarryOvers().filter(c=>!(c.person===person&&c.choreName===choreName)));
+  loadDashboard();
+}
+
 // ── Carry-over click handler ───────────────────────────────────────────────────
 function carryOverClick(){
   const plan=window._lastPlan||{};
@@ -913,6 +969,10 @@ function carryOverClick(){
 
 // ── Quick mark-as-done from dashboard chip tap ─────────────────────────────────
 async function quickMarkDone(person, choreName){
+  if(!person||!choreName){console.warn('quickMarkDone: missing args',person,choreName);return;}
+  // Show brief visual flash on the matching row
+  const row=document.querySelector(`[data-chore-name="${CSS.escape(choreName)}"][data-person="${person}"]`);
+  if(row){row.style.opacity='.4';row.style.pointerEvents='none';}
   const fd=new FormData();
   fd.append('person_name',person);
   fd.append('chore_name',choreName);
@@ -923,25 +983,21 @@ async function quickMarkDone(person, choreName){
     if(res.ok){
       playMarioCoin();
       loadDashboard();
+    }else{
+      const d=await res.json().catch(()=>({}));
+      const msg=d.detail||`Error ${res.status}`;
+      if(row){row.style.opacity='';row.style.pointerEvents='';}
+      // Show toast
+      showToast(`⚠️ ${msg}`, 'var(--orange)');
     }
-  }catch(e){console.error('quickMarkDone error',e);}
+  }catch(e){
+    if(row){row.style.opacity='';row.style.pointerEvents='';}
+    showToast('⚠️ Network error — try again', 'var(--orange)');
+    console.error('quickMarkDone error',e);
+  }
 }
 
-// ── Chart instances (kept to allow destroy/recreate) ──────────────────────────
-let _chartJobs=null,_chartFamily=null,_chartMonth=null;
-
-// Set Chart.js global defaults for dark theme
-Chart.defaults.color='#94a3b8';
-Chart.defaults.borderColor='rgba(255,255,255,.06)';
-
-const CHART_DEFAULTS={
-  responsive:true,maintainAspectRatio:false,
-  plugins:{legend:{labels:{font:{size:9},boxWidth:10,padding:6,color:'#94a3b8'}}},
-};
-const DARK_GRID={color:'rgba(255,255,255,.06)'};
-const DARK_TICK={font:{size:8},color:'#4a5578'};
-
-// ── Chart drill-down helpers ───────────────────────────────────────────────────
+// ── Chart drill-down helpers (kept for carry-over + assessments modals) ─────────
 
 // Render a single camera sighting row for drill-down modals
 function _sightingRow(s){
@@ -976,9 +1032,15 @@ function _assessRow(a){
   </div>`;
 }
 
-async function drillJobCompletion(person, plan, cachedAss){
+// (drillJobCompletion removed — charts removed)
+function drillJobCompletion(person){goToActivity('cleaning',person);}
+// (drillFamilyTime removed — charts removed)
+function drillFamilyTime(person){goToActivity('family',person);}
+
+/* drillJobCompletion / drillFamilyTime / drillMonthDay / renderCharts removed with charts
+async function _removed(person, plan, cachedAss){
   const dname=dn(person);
-  showDetail(`📊 ${dname} — Job Completion (Today)`, '<div style="color:var(--sub);font-size:.8rem">Loading…</div>');
+  showDetail(`removed`, '<div>removed</div>');
   const today=todayStr();
   // Use pre-fetched assessments if available, otherwise re-fetch
   const assessments = cachedAss
@@ -1235,23 +1297,17 @@ function renderCharts(plan, viols, daily, calendar, todayAss, familySightings){
           }
         }
       });
-    } else {
-      ctxM.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--faint);font-size:.72rem">No job data this month yet</div>';
-    }
-  }
-}
+*/
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 async function loadDashboard(){
   const _td=todayStr();
-  const [plan,viols,daily,monthly,calendar,todayAss,todayFamSightings]=await Promise.all([
+  const [plan,viols,daily,monthly,todayAss]=await Promise.all([
     fetch(`${API}/api/chores/daily-plan`).then(r=>r.json()).catch(()=>({plan:{},unassigned:[]})),
     fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({by_person:{},violations:[]})),
     fetch(`${API}/api/stats/daily`).then(r=>r.json()).catch(()=>({})),
     fetch(`${API}/api/stats/monthly`).then(r=>r.json()).catch(()=>({persons:{}})),
-    fetch(`${API}/api/chores/calendar`).then(r=>r.json()).catch(()=>({days:{}})),
     fetch(`${API}/api/chores/assessments`).then(r=>r.json()).catch(()=>[]),
-    fetch(`${API}/api/sightings?limit=200&activity_type=family&date=${_td}`).then(r=>r.json()).catch(()=>[]),
   ]);
   if(!_persons.length) _persons=await fetch(`${API}/api/persons`).then(r=>r.json()).catch(()=>[]);
   // ── KPI stat boxes ────────────────────────────────────────────────────────
@@ -1305,10 +1361,7 @@ async function loadDashboard(){
   kv('kv-carry', totalCarry||'0');
   kv('ks-carry', totalCarry?`Dad ${liamCarryItems.length} · Mom ${rachelCarryItems.length}`:'All clear today ✓');
 
-  // ── Charts ────────────────────────────────────────────────────────────────
-  renderCharts(plan, viols, daily, calendar, todayAss, todayFamSightings);
-
-  // (carry-forward badges removed from header)
+  // (charts removed — daily data shown in donuts and KPI tiles)
 
   ['Liam','Rachel'].forEach(p=>{
     try{renderPanel(p,plan.plan?.[p]||{chores:[],total_points:100,earned_points:0,pct:0},viols,daily[p]||{},(monthly.persons||{})[p]||{});}
@@ -1381,6 +1434,12 @@ function renderPanel(person,data,viols,ds,ms){
   // Extra jobs this person has picked up from partner (localStorage)
   const extraJobsForMe=getExtraJobs().filter(j=>j.to===person);
   const extraCount=extraJobsForMe.length;
+  // Jobs this person has given away to partner
+  const givenJobs=getExtraJobs().filter(j=>j.from===person);
+  const givenNames=new Set(givenJobs.map(j=>j.choreName));
+  // Jobs manually marked as carry-over today
+  const carryOvers=getCarryOvers().filter(c=>c.person===person);
+  const carryNames=new Set(carryOvers.map(c=>c.choreName));
   // Extra as % of donut (each extra job counts as 1 unit vs total own jobs)
   const ownJobCount=(data.chores||[]).filter(c=>!c.carried_forward).length||1;
   const extraPct=Math.min(Math.round(extraCount/ownJobCount*100),40); // cap visual at 40%
@@ -1415,33 +1474,51 @@ function renderPanel(person,data,viols,ds,ms){
 
   // ── Job row builder ───────────────────────────────────────────────────────
   function jobRow(c){
-    const done=c.done, partial=c.status==='partial';
-    const cls=done?'jl-done':partial?'jl-partial':'jl-pending';
-    const icon=done?'✓':partial?'◑':'○';
-    const nameCls=done?'done':'';
-    const badge=c.chore_type==='core'?`<span class="jl-badge jlb-core">core</span>`:
-                c.chore_type==='rotating'?`<span class="jl-badge jlb-rot">↻ rot</span>`:'';
+    const isGiven=givenNames.has(c.chore_name);
+    const isCarry=!isGiven&&carryNames.has(c.chore_name);
+    const done=c.done||isGiven, partial=!isGiven&&!isCarry&&c.status==='partial';
+    const cls=isGiven?'jl-given':isCarry?'jl-carry':done?'jl-done':partial?'jl-partial':'jl-pending';
+    const icon=isGiven?'':done?'✓':partial?'◑':isCarry?'🔄':'○';
+    const nameCls=done?'done':isCarry?'carry':'';
+    const toDisplay=dn(partner);
+    const badge=isGiven
+      ?`<span class="jl-badge jlb-extra" style="font-size:.48rem">→${toDisplay}</span>`
+      :isCarry
+      ?`<span class="jl-badge" style="background:rgba(251,191,36,.2);color:var(--amber)">tomorrow</span>`
+      :c.chore_type==='core'?`<span class="jl-badge jlb-core">core</span>`
+      :c.chore_type==='rotating'?`<span class="jl-badge jlb-rot">↻ rot</span>`:'';
     const hasDetail=!!(c.assessment||c.thumbnail_url);
-    const dragData=JSON.stringify({from:person,choreName:c.chore_name}).replace(/'/g,'&#39;');
-    const dragAttrs=`draggable="true" data-person="${person}" data-chore-name="${esc(c.chore_name)}"`;
+    const dragAttrs=!isGiven&&!isCarry?`draggable="true" data-person="${person}" data-chore-name="${esc(c.chore_name)}"`:
+                    `data-person="${person}" data-chore-name="${esc(c.chore_name)}"`;
+    const safe=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 
+    // Build onclick: given-away jobs have no action; others open detail or mark done
     let rowClick='';
-    if(hasDetail){
-      // Fully escape for HTML attribute: replace &, <, >, ", ' so browsers don't misparse
-      const choreJson=JSON.stringify(c)
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-      rowClick=` data-chore='${choreJson}' onclick="choreClick(this)"`;
-    } else if(!done){
-      const safe=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      rowClick=` onclick="quickMarkDone('${person}','${safe}')" style="cursor:pointer" title="Tap to mark done"`;
+    if(!isGiven){
+      if(hasDetail){
+        const choreJson=JSON.stringify({...c,person_name:person})
+          .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        rowClick=` data-chore='${choreJson}' onclick="choreClick(this)" style="cursor:pointer"`;
+      } else if(!done){
+        rowClick=` onclick="quickMarkDone('${person}','${safe}')" style="cursor:pointer" title="Tap to mark done"`;
+      }
     }
 
-    return `<div class="jl-item ${cls}" ${dragAttrs}${rowClick}>
-      <span class="jl-drag" data-person="${person}" data-chore-name="${esc(c.chore_name)}" title="Drag to give to ${dn(partner)}">⠿</span>
-      <span class="jl-icon">${icon}</span>
+    // Right-click context menu trigger (even for done / given items)
+    const ctxAttr=`data-ctx-person="${person}" data-ctx-chore="${esc(c.chore_name)}" data-ctx-done="${done?1:0}"`;
+
+    // Tap-to-done button shown alongside detail items (fixes "won't mark as done")
+    const markBtn=(!isGiven&&hasDetail&&!done)
+      ?`<button class="jl-done-btn" onclick="event.stopPropagation();quickMarkDone('${person}','${safe}')" title="Mark done">✓</button>`
+      :'';
+
+    return `<div class="jl-item ${cls}" ${dragAttrs}${rowClick} ${ctxAttr}>
+      ${!isGiven?`<span class="jl-drag" data-person="${person}" data-chore-name="${esc(c.chore_name)}" title="Drag to give to ${dn(partner)}">⠿</span>`
+               :`<span class="jl-icon" style="color:var(--amber)">→</span>`}
+      <span class="jl-icon">${isGiven?'':icon}</span>
       <span class="jl-name ${nameCls}">${esc(c.chore_name)}</span>
-      ${badge}
+      ${badge}${markBtn}
     </div>`;
   }
 
@@ -1449,11 +1526,13 @@ function renderPanel(person,data,viols,ds,ms){
   function extraRow(j){
     const fromDisplay=j.from==='Liam'?'Dad':'Mom';
     const safe=j.choreName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    return `<div class="jl-item jl-extra" onclick="quickMarkDone('${person}','${safe}');removeExtraJob('${person}','${safe}')" style="cursor:pointer" title="Tap to mark done">
+    return `<div class="jl-item jl-extra" style="cursor:pointer" title="Tap to mark done"
+      onclick="quickMarkDone('${person}','${safe}');removeExtraJob('${person}','${safe}')">
       <span class="jl-icon">⭐</span>
       <span class="jl-name extra-name">${esc(j.choreName)}</span>
       <span class="jl-badge jlb-extra">+${fromDisplay}</span>
-      <span style="font-size:.62rem;color:var(--faint);cursor:pointer;padding:0 2px;margin-left:2px" onclick="event.stopPropagation();removeExtraJob('${person}','${safe}')">✕</span>
+      <span style="font-size:.62rem;color:var(--faint);cursor:pointer;padding:0 2px;margin-left:4px"
+        onclick="event.stopPropagation();removeExtraJob('${person}','${safe}')">✕</span>
     </div>`;
   }
 
@@ -1471,6 +1550,7 @@ function renderPanel(person,data,viols,ds,ms){
         <div class="fd-legend">
           <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#60a5fa"></div>Jobs</div>
           ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>+${extraCount} extra</div>`:''}
+          ${givenJobs.length?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24;opacity:.5"></div>given away</div>`:''}
         </div>
       </div>
       <div class="fd-col">
@@ -1484,13 +1564,15 @@ function renderPanel(person,data,viols,ds,ms){
 
     <div class="chore-list-hdr">
       <span style="font-weight:600">Today's Jobs</span>
-      <span style="color:var(--faint);font-size:.55rem">⠿ drag to ${dn(partner)}</span>
-      <span style="color:var(--blue);font-weight:600">${doneJobs}/${totalJobs+extraCount}</span>
+      <span style="color:var(--faint);font-size:.55rem">⠿ drag · right-click for options</span>
+      <span style="color:var(--blue);font-weight:600">${doneJobs+givenJobs.length}/${totalJobs+extraCount}</span>
     </div>
-    <div class="job-list panel-drop-zone" id="chips-${person}" data-person="${person}">
-      ${shown.map(jobRow).join('')}
-      ${extraJobsForMe.map(extraRow).join('')}
-      ${!shown.length&&!extraCount?'<div class="empty" style="padding:.8rem;font-size:.75rem">No chores assigned</div>':''}
+    <div class="job-list-wrap">
+      <div class="job-list panel-drop-zone" id="chips-${person}" data-person="${person}">
+        ${shown.map(jobRow).join('')}
+        ${extraJobsForMe.map(extraRow).join('')}
+        ${!shown.length&&!extraCount?'<div class="empty" style="padding:.8rem;font-size:.75rem">No chores assigned</div>':''}
+      </div>
     </div>`;
 
   // Wire up drag-and-drop on job rows
@@ -1502,6 +1584,13 @@ function renderPanel(person,data,viols,ds,ms){
       setTimeout(()=>row.style.opacity='.4',0);
     });
     row.addEventListener('dragend',()=>{row.style.opacity='';});
+  });
+  // Right-click context menu on all job rows
+  el.querySelectorAll('.jl-item[data-ctx-person]').forEach(row=>{
+    row.addEventListener('contextmenu',e=>{
+      e.preventDefault();
+      showJobCtxMenu(e.clientX,e.clientY,row.dataset.ctxPerson,row.dataset.ctxChore,row.dataset.ctxDone==='1');
+    });
   });
 }
 
@@ -1531,6 +1620,14 @@ function choreClick(el){
     if(c.thumbnail_url)html+=`<img src="${esc(c.thumbnail_url)}" class="dm-photo" onclick="openLB('${esc(c.thumbnail_url)}')">`;
     const sc=c.score>=7?'sc-hi':c.score>=4?'sc-mi':'sc-lo';
     const typeLabel=c.chore_type==='core'?'Core':c.chore_type==='rotating'?'Rotating':'Standard';
+    // "Mark Done" button — always shown when job is not yet done (fixes Evening Clean Up issue)
+    if(!c.done){
+      const safeName=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      html+=`<button onclick="closeDetail();quickMarkDone('${c.person_name||''}','${safeName}')"
+        style="width:100%;background:var(--green);color:#fff;border:none;border-radius:9px;padding:.6rem;font-size:.88rem;font-weight:700;cursor:pointer;margin-bottom:.55rem;letter-spacing:.02em">
+        ✓ Mark as Done
+      </button>`;
+    }
     html+=`<div class="dm-score">
       <span class="sc-badge ${sc}">${c.score||0}/10</span>
       <strong>+${c.points_earned||0}/${c.points} pts</strong>
@@ -2108,7 +2205,8 @@ async function loadFeed(){
     const pid=document.getElementById('filterPerson').value;
     // Don't pass activity_type to API — fetch all and filter client-side so
     // legacy type names (cooking→cleaning, personal/other→present) are handled
-    let url=`${API}/api/sightings?limit=200`;
+    // include_thumbnails=true so images show in the feed (other callers omit it to save transfer)
+    let url=`${API}/api/sightings?limit=80&include_thumbnails=true`;
     if(loc)url+=`&location=${encodeURIComponent(loc)}`;
     if(pid)url+=`&person_id=${pid}`;
 
