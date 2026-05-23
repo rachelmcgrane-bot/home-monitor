@@ -53,6 +53,9 @@ WAKING_HOURS = (5, 23)          # UTC hour range — 5:00–23:59 UTC ≈ 6am–
 # ── Frame deduplication ───────────────────────────────────────────────────────
 _processed_hashes: dict = {}    # {sha256_hex: datetime} — skip already-analysed frames
 
+# ── Dashboard push-refresh ────────────────────────────────────────────────────
+_last_assessment_ts: Optional[str] = None   # ISO string updated on each new ChoreAssessment
+
 def _is_duplicate_frame(data: bytes) -> bool:
     """Return True if this exact frame was already analysed in the past 2 hours."""
     h = hashlib.sha256(data).hexdigest()
@@ -99,16 +102,22 @@ def _is_waking_hours() -> bool:
 # ── Default chore seed ────────────────────────────────────────────────────────
 # Format: (person, name, frequency, points, chore_type, rotating_with)
 DEFAULT_CHORES = [
-    # ── Rachel — Core 4 ──
-    ("Rachel", "Dishwasher unload",              "daily", 25, "core",     None),
-    ("Rachel", "Clear kitchen counters",          "daily", 25, "core",     None),
-    ("Rachel", "Wipe kitchen counters (morning)", "daily", 25, "core",     None),
-    ("Rachel", "Wipe kitchen counters (evening)", "daily", 25, "core",     None),
-    # ── Liam — Core 4 ──
-    ("Liam", "Dishwasher load",       "daily", 25, "core", None),
-    ("Liam", "Clear kitchen table",   "daily", 25, "core", None),
-    ("Liam", "Wipe kitchen table",    "daily", 25, "core", None),
-    ("Liam", "Kitchen surfaces wipe", "daily", 25, "core", None),
+    # ── Rachel — Core 7 (same every day, 1-day deadline) ──
+    ("Rachel", "Dishwasher unload",              "daily", 25, "core", None),
+    ("Rachel", "Clear kitchen counters",          "daily", 25, "core", None),
+    ("Rachel", "Wipe kitchen counters (morning)", "daily", 25, "core", None),
+    ("Rachel", "Wipe kitchen counters (evening)", "daily", 25, "core", None),
+    ("Rachel", "Clean kitchen sink",             "daily", 15, "core", None),
+    ("Rachel", "Wipe microwave",                 "daily", 10, "core", None),
+    ("Rachel", "Tidy kitchen before bed",        "daily", 20, "core", None),
+    # ── Liam — Core 7 (same every day, 1-day deadline) ──
+    ("Liam", "Dishwasher load",        "daily", 25, "core", None),
+    ("Liam", "Clear kitchen table",    "daily", 25, "core", None),
+    ("Liam", "Wipe kitchen table",     "daily", 25, "core", None),
+    ("Liam", "Kitchen surfaces wipe",  "daily", 25, "core", None),
+    ("Liam", "Wipe hob after cooking", "daily", 20, "core", None),
+    ("Liam", "Empty kitchen bin",      "daily", 10, "core", None),
+    ("Liam", "Set dishwasher to run",  "daily", 15, "core", None),
     # ── Rotating pool — bins ──
     ("Liam",   "General bin",      "daily",        10, "rotating", "Rachel"),
     ("Liam",   "Recycle bin",      "daily",        10, "rotating", "Rachel"),
@@ -164,11 +173,24 @@ DEFAULT_CHORES = [
 ]
 
 _CORE_MAP = {
-    "Rachel": ["Dishwasher unload", "Clear kitchen counters",
-               "Wipe kitchen counters (morning)", "Wipe kitchen counters (evening)"],
-    "Liam":   ["Dishwasher load", "Clear kitchen table",
-               "Wipe kitchen table", "Kitchen surfaces wipe"],
+    "Rachel": [
+        "Dishwasher unload", "Clear kitchen counters",
+        "Wipe kitchen counters (morning)", "Wipe kitchen counters (evening)",
+        "Clean kitchen sink", "Wipe microwave", "Tidy kitchen before bed",
+    ],
+    "Liam": [
+        "Dishwasher load", "Clear kitchen table",
+        "Wipe kitchen table", "Kitchen surfaces wipe",
+        "Wipe hob after cooking", "Empty kitchen bin", "Set dishwasher to run",
+    ],
 }
+
+# Pool of rotating chores per person — 2 selected per Mon/Fri assignment period
+_ROTATING_POOLS = {
+    "Liam":   ["General bin", "Recycle bin", "Food waste bin", "Toy pickup"],
+    "Rachel": ["Kitchen floor sweep", "Downstairs toilet quick wipe"],
+}
+
 _ROTATING_MAP = [
     ("Liam",   "General bin",                  "Rachel"),
     ("Liam",   "Recycle bin",                  "Rachel"),
@@ -276,6 +298,42 @@ def _day_qualifies_every2(chore_id: int, today: str) -> bool:
     """Return True if an every-2-days chore should appear today."""
     day_of_year = datetime.strptime(today, "%Y-%m-%d").timetuple().tm_yday
     return (day_of_year + chore_id) % 2 == 0
+
+
+def _assignment_date(today_str: str) -> str:
+    """Return the most recent Monday or Friday on or before today_str.
+    Rotating chores are assigned fresh on Monday morning and Friday morning,
+    each with a 3.5-day (84-hour) deadline."""
+    dt = datetime.strptime(today_str, "%Y-%m-%d")
+    wd = dt.weekday()          # 0=Mon … 4=Fri … 6=Sun
+    if wd in (0, 4):           # Monday or Friday → assigned today
+        return today_str
+    elif wd == 1:              # Tuesday → last Monday
+        return (dt - timedelta(days=1)).strftime("%Y-%m-%d")
+    elif wd == 2:              # Wednesday → last Monday
+        return (dt - timedelta(days=2)).strftime("%Y-%m-%d")
+    elif wd == 3:              # Thursday → last Monday
+        return (dt - timedelta(days=3)).strftime("%Y-%m-%d")
+    elif wd == 5:              # Saturday → last Friday
+        return (dt - timedelta(days=1)).strftime("%Y-%m-%d")
+    else:                      # Sunday → last Friday
+        return (dt - timedelta(days=2)).strftime("%Y-%m-%d")
+
+
+def _select_rotating_pair(person: str, assign_date_str: str) -> list:
+    """Pick 2 rotating chores for a person for the given assignment period.
+    Cycles through the pool so different chores are active each period."""
+    pool = _ROTATING_POOLS.get(person, [])
+    if len(pool) <= 2:
+        return pool[:]
+    dt = datetime.strptime(assign_date_str, "%Y-%m-%d")
+    iso_week = dt.isocalendar()[1]
+    # Alternate between even/odd ISO weeks; both Mon and Fri within a week
+    # share the same pair so there's continuity mid-week.
+    if iso_week % 2 == 0:
+        return [pool[0], pool[1]]
+    else:
+        return [pool[2 % len(pool)], pool[3 % len(pool)]]
 
 async def _upsert_person_stats(person_name: str, tracking: dict, db: AsyncSession):
     date_str = tracking["date"]
@@ -761,12 +819,13 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
             chores_res2 = await db.execute(select(Chore).where(Chore.active == True))
             all_c2 = chores_res2.scalars().all()
             todays_chores = []
+            _ann_rotating = _select_rotating_pair(person_name, _assignment_date(today))
             for c in all_c2:
                 if c.chore_type == "core" and c.person_name == person_name and c.frequency == "daily":
                     todays_chores.append({"chore_name": c.chore_name, "chore_type": "core", "points": c.points})
-                elif c.chore_type == "rotating" and c.rotating_with:
-                    if _rotating_assignee(c, [], today_day) == person_name:
-                        todays_chores.append({"chore_name": c.chore_name, "chore_type": "rotating", "points": c.points})
+                elif (c.chore_type == "rotating" and c.person_name == person_name
+                      and c.chore_name in _ann_rotating):
+                    todays_chores.append({"chore_name": c.chore_name, "chore_type": "rotating", "points": c.points})
             if todays_chores:
                 ann_text = await announce_morning_chores(person_name, todays_chores)
                 _morning_announced[person_name] = {"date": today, "text": ann_text, "person": person_name}
@@ -811,6 +870,10 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
                 time_spent_mins=duration_mins,
             )
             db.add(ca); await db.commit(); await db.refresh(ca)
+
+            # Notify dashboard to refresh (polled by frontend every ~8s)
+            global _last_assessment_ts
+            _last_assessment_ts = datetime.utcnow().isoformat()
 
             # Cap assessment violations too — never exceed 3/person/day total
             if assessment.get("violations") and person_name != "Unknown":
@@ -857,6 +920,16 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
             "violations": frame_violations,
             "morning_announcement": morning_announcement,
             "chore_assessment": chore_result}
+
+
+# ── Dashboard push-refresh polling ───────────────────────────────────────────
+
+@app.get("/api/events/latest-ts")
+async def latest_event_ts():
+    """Lightweight endpoint the dashboard polls every ~8 s to detect new assessments.
+    Returns the ISO timestamp of the most recent ChoreAssessment created via the camera.
+    No DB query — purely in-memory."""
+    return {"ts": _last_assessment_ts}
 
 
 # ── Announcements ─────────────────────────────────────────────────────────────
@@ -1201,18 +1274,16 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
                 total_pts += c.points
                 earned_pts += pts_earned
 
-        # ── Rotating chores (Saturdays only, up to 4 per person) ────────────
-        if is_saturday:
-            rotating_candidates = [
-                c for c in all_chores
-                if c.chore_type == "rotating" and c.rotating_with
-                and _rotating_assignee(c, yest_ass, today_day) == person
-            ]
-            # Sort by name for consistency, limit to 4
-            rotating_candidates.sort(key=lambda c: c.chore_name)
-            for c in rotating_candidates[:4]:
-                if c.frequency == "every-2-days" and not _day_qualifies_every2(c.id, today):
-                    continue
+        # ── Rotating chores (assigned Mon & Fri, 3.5-day / 84-hr deadline) ─────
+        _assign_str  = _assignment_date(today)
+        _assign_dt   = datetime.strptime(_assign_str, "%Y-%m-%d")
+        _deadline_dt = _assign_dt + timedelta(hours=84)
+        _hours_left  = max(0.0, (_deadline_dt - datetime.utcnow()).total_seconds() / 3600)
+        _is_overdue  = datetime.utcnow() > _deadline_dt
+        _sel_rotating = _select_rotating_pair(person, _assign_str)
+
+        for c in all_chores:
+            if c.chore_type == "rotating" and c.person_name == person and c.chore_name in _sel_rotating:
                 ta = best(today_ass, person, c.chore_name)
                 score = ta.score if ta else 0
                 pts_earned = ta.points_earned if ta else 0
@@ -1231,6 +1302,11 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
                     "thumbnail_url": _uri(ta.thumbnail_data) if ta and ta.thumbnail_data else None,
                     "assessment_id": ta.id if ta else None,
                     "dispute_status": ta.dispute_status if ta else None,
+                    # Deadline info for frontend badge
+                    "assign_date": _assign_str,
+                    "deadline": _deadline_dt.strftime("%Y-%m-%d"),
+                    "hours_left": round(_hours_left, 1),
+                    "is_overdue": _is_overdue,
                 })
                 total_pts += c.points
                 earned_pts += pts_earned

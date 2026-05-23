@@ -1481,12 +1481,20 @@ function renderPanel(person,data,viols,ds,ms){
     const icon=isGiven?'':done?'✓':partial?'◑':isCarry?'🔄':'○';
     const nameCls=done?'done':isCarry?'carry':'';
     const toDisplay=dn(partner);
+    // Rotating deadline badge: overdue → red, <24h → amber, else standard
+    let rotBadge=`<span class="jl-badge jlb-rot">↻ rot</span>`;
+    if(c.chore_type==='rotating'&&!done){
+      if(c.is_overdue)
+        rotBadge=`<span class="jl-badge" style="background:rgba(251,113,133,.18);color:var(--rose);font-weight:700">⚠ overdue</span>`;
+      else if(c.hours_left!=null&&c.hours_left<24)
+        rotBadge=`<span class="jl-badge" style="background:rgba(251,191,36,.2);color:var(--amber)">${Math.ceil(c.hours_left)}h left</span>`;
+    }
     const badge=isGiven
       ?`<span class="jl-badge jlb-extra" style="font-size:.48rem">→${toDisplay}</span>`
       :isCarry
       ?`<span class="jl-badge" style="background:rgba(251,191,36,.2);color:var(--amber)">tomorrow</span>`
       :c.chore_type==='core'?`<span class="jl-badge jlb-core">core</span>`
-      :c.chore_type==='rotating'?`<span class="jl-badge jlb-rot">↻ rot</span>`:'';
+      :c.chore_type==='rotating'?rotBadge:'';
     const hasDetail=!!(c.assessment||c.thumbnail_url);
     const dragAttrs=!isGiven&&!isCarry?`draggable="true" data-person="${person}" data-chore-name="${esc(c.chore_name)}"`:
                     `data-person="${person}" data-chore-name="${esc(c.chore_name)}"`;
@@ -2419,6 +2427,25 @@ async function loadCookingHistory(){
 // ── Boot ──────────────────────────────────────────────────────────────────────
 loadDashboard();
 setInterval(loadDashboard,60000);
+
+// ── Auto-refresh after camera assessment ─────────────────────────────────────
+// Polls a tiny in-memory endpoint every 8 s; refreshes dashboard when the
+// camera creates a new ChoreAssessment (e.g. Liam seen cleaning in kitchen).
+let _lastKnownTs=null;
+async function checkForUpdates(){
+  try{
+    const d=await fetch(`${API}/api/events/latest-ts`,{cache:'no-store'}).then(r=>r.json());
+    if(d.ts&&d.ts!==_lastKnownTs){
+      if(_lastKnownTs!==null){
+        // A new assessment arrived — refresh dashboard if it's the active tab
+        const dp=document.getElementById('tab-dashboard');
+        if(dp&&dp.classList.contains('active')) loadDashboard();
+      }
+      _lastKnownTs=d.ts;
+    }
+  }catch(e){}
+}
+setInterval(checkForUpdates,8000);
 
 // ── PWA Service Worker ────────────────────────────────────────────────────────
 if('serviceWorker' in navigator){
