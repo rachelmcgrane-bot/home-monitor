@@ -102,22 +102,16 @@ def _is_waking_hours() -> bool:
 # ── Default chore seed ────────────────────────────────────────────────────────
 # Format: (person, name, frequency, points, chore_type, rotating_with)
 DEFAULT_CHORES = [
-    # ── Rachel — Core 7 (same every day, 1-day deadline) ──
+    # ── Rachel — Core chores (same every day) ──
     ("Rachel", "Dishwasher unload",              "daily", 25, "core", None),
     ("Rachel", "Clear kitchen counters",          "daily", 25, "core", None),
     ("Rachel", "Wipe kitchen counters (morning)", "daily", 25, "core", None),
     ("Rachel", "Wipe kitchen counters (evening)", "daily", 25, "core", None),
-    ("Rachel", "Clean kitchen sink",             "daily", 15, "core", None),
-    ("Rachel", "Wipe microwave",                 "daily", 10, "core", None),
-    ("Rachel", "Tidy kitchen before bed",        "daily", 20, "core", None),
-    # ── Liam — Core 7 (same every day, 1-day deadline) ──
-    ("Liam", "Dishwasher load",        "daily", 25, "core", None),
-    ("Liam", "Clear kitchen table",    "daily", 25, "core", None),
-    ("Liam", "Wipe kitchen table",     "daily", 25, "core", None),
-    ("Liam", "Kitchen surfaces wipe",  "daily", 25, "core", None),
-    ("Liam", "Wipe hob after cooking", "daily", 20, "core", None),
-    ("Liam", "Empty kitchen bin",      "daily", 10, "core", None),
-    ("Liam", "Set dishwasher to run",  "daily", 15, "core", None),
+    # ── Liam — Core chores (same every day) ──
+    ("Liam", "Dishwasher load",       "daily", 25, "core", None),
+    ("Liam", "Clear kitchen table",   "daily", 25, "core", None),
+    ("Liam", "Wipe kitchen table",    "daily", 25, "core", None),
+    ("Liam", "Kitchen surfaces wipe", "daily", 25, "core", None),
     # ── Rotating pool — bins ──
     ("Liam",   "General bin",      "daily",        10, "rotating", "Rachel"),
     ("Liam",   "Recycle bin",      "daily",        10, "rotating", "Rachel"),
@@ -176,12 +170,10 @@ _CORE_MAP = {
     "Rachel": [
         "Dishwasher unload", "Clear kitchen counters",
         "Wipe kitchen counters (morning)", "Wipe kitchen counters (evening)",
-        "Clean kitchen sink", "Wipe microwave", "Tidy kitchen before bed",
     ],
     "Liam": [
         "Dishwasher load", "Clear kitchen table",
         "Wipe kitchen table", "Kitchen surfaces wipe",
-        "Wipe hob after cooking", "Empty kitchen bin", "Set dishwasher to run",
     ],
 }
 
@@ -234,16 +226,46 @@ async def startup():
     _generate_pwa_icons()
     await init_db()
     async with SessionLocal() as db:
-        existing_res = await db.execute(select(Chore.person_name, Chore.chore_name))
-        existing = {(row[0], row[1]) for row in existing_res.all()}
-        added = 0
-        for person, name, freq, pts, ctype, rwith in DEFAULT_CHORES:
-            if (person, name) not in existing:
+        # ── Seed only if the DB is completely empty (first install) ─────────
+        count_res = await db.execute(select(func.count(Chore.id)))
+        if int(count_res.scalar() or 0) == 0:
+            for person, name, freq, pts, ctype, rwith in DEFAULT_CHORES:
                 db.add(Chore(person_name=person, chore_name=name, frequency=freq,
                              points=pts, chore_type=ctype, rotating_with=rwith))
-                added += 1
-        if added:
             await db.commit()
+
+        # ── One-time cleanup: deactivate chores that were added by mistake ──
+        _erroneously_added = [
+            ("Rachel", "Clean kitchen sink"),
+            ("Rachel", "Wipe microwave"),
+            ("Rachel", "Tidy kitchen before bed"),
+            ("Liam",   "Wipe hob after cooking"),
+            ("Liam",   "Empty kitchen bin"),
+            ("Liam",   "Set dishwasher to run"),
+        ]
+        for person, name in _erroneously_added:
+            await db.execute(
+                sql_update(Chore)
+                .where(Chore.person_name == person, Chore.chore_name == name)
+                .values(active=False))
+
+        # ── Deduplicate: if the same (person, name) has multiple active rows,
+        #    keep the one with the lowest id and deactivate the rest ──────────
+        all_active_res = await db.execute(
+            select(Chore.id, Chore.person_name, Chore.chore_name)
+            .where(Chore.active == True)
+            .order_by(Chore.person_name, Chore.chore_name, Chore.id))
+        seen: dict = {}
+        for row in all_active_res.all():
+            key = (row.person_name, row.chore_name)
+            if key in seen:
+                # Duplicate — deactivate this later-id copy
+                await db.execute(
+                    sql_update(Chore).where(Chore.id == row.id).values(active=False))
+            else:
+                seen[key] = row.id
+
+        # ── Ensure correct chore_type on known chores ────────────────────────
         for person, names in _CORE_MAP.items():
             for name in names:
                 await db.execute(
