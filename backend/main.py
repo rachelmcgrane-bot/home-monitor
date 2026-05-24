@@ -820,14 +820,7 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
             prev_act = tracking["last_activity_type"]
             if tracking["last_in_kitchen"]:
                 tracking["kitchen_mins"] += elapsed_mins
-            # personal_mins: "present" time (detected but not cleaning or family)
-            if prev_act == "present":
-                tracking["personal_mins"] += elapsed_mins
-            # family_mins: active time spent with the children
-            elif prev_act == "family":
-                tracking["family_mins"] += elapsed_mins
-            # cleaning time: tracked via ChoreAssessments, not bucketed here
-            # cleaning time is tracked implicitly via ChoreAssessments — no separate bucket needed
+            # family_mins and personal_mins no longer tracked (removed from dashboard)
 
         tracking["last_seen"] = now
         tracking["last_activity_type"] = act_type
@@ -1858,6 +1851,17 @@ async def get_monthly_stats(month: Optional[str] = None, db: AsyncSession = Depe
         q_count = int(q_row[1] or 0) if q_row else 0
         output[person]["avg_quality_pct"] = round(avg_score / 10 * 100) if q_count > 0 else None
         output[person]["quality_count"] = q_count
+
+    # ── Total chore points earned this month (for Jobs Leader tile) ──────────
+    for person in ["Liam", "Rachel"]:
+        pts_res = await db.execute(
+            select(func.sum(ChoreAssessment.points_earned))
+            .where(
+                ChoreAssessment.person_name == person,
+                ChoreAssessment.assessed_date >= month_start,
+                ChoreAssessment.assessed_date < next_month_str,
+            ))
+        output[person]["total_earned"] = int(pts_res.scalar() or 0)
 
     return {"month": month, "persons": output}
 

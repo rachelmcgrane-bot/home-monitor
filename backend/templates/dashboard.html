@@ -41,7 +41,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 /* Dashboard scroll wrapper */
 .dash-scroll{flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:0}
 /* ── KPI stat strip ── */
-.stats-strip{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;padding:6px 8px 0;flex-shrink:0}
+.stats-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:6px 8px 0;flex-shrink:0}
 .stat-kpi{border-radius:8px;border:1px solid transparent;box-shadow:var(--sh);padding:.32rem .55rem;position:relative;overflow:hidden;cursor:default;min-width:0}
 .stat-kpi::before{display:none}
 .sk-blue{background:linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%)}
@@ -334,6 +334,23 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .cal-day-n{font-size:.72rem;font-weight:400;display:block}
 .cal-badge{font-size:.6rem;font-weight:700;display:block}
 @media(max-width:900px){.dash-layout{grid-template-columns:1fr};.tab-pane{overflow-y:auto}.person-panel{min-height:500px}}
+/* ── Full Calendar Tab ── */
+.tcal-wrap{display:flex;flex-direction:column;height:100%;padding:6px 8px 8px;gap:6px}
+.tcal-nav{display:flex;align-items:center;gap:.6rem;flex-shrink:0}
+.tcal-nav h3{flex:1;text-align:center;font-size:.95rem;font-weight:700}
+.tcal-nav-btn{background:var(--border);border:none;color:var(--text);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center}
+.tcal-nav-btn:hover{background:var(--blue);color:#fff}
+.tcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:1;min-height:0}
+.tcal-dow{font-size:.6rem;color:var(--faint);text-align:center;padding:2px 0;font-weight:700;letter-spacing:.04em}
+.tcal-day{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px 5px;cursor:pointer;transition:background .1s;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.tcal-day:hover{background:#1e2540}
+.tcal-day.is-today{border-color:var(--blue);background:rgba(96,165,250,.1)}
+.tcal-day.is-sel{border-color:var(--blue);background:rgba(96,165,250,.22)}
+.tcal-day.is-future{opacity:.3;pointer-events:none;cursor:default}
+.tcal-day.is-empty{background:transparent;border-color:transparent;pointer-events:none}
+.tcal-daynum{font-size:.72rem;font-weight:500;margin-bottom:2px}
+.tcal-detail{flex:0 0 220px;overflow-y:auto;background:var(--card);border-radius:10px;padding:.6rem;border:1px solid var(--border)}
+.tcal-bottom{display:flex;gap:6px;min-height:0}
 </style>
 </head>
 <body>
@@ -344,6 +361,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Dashboard</button>
     <button class="tab-btn" onclick="switchTab('activity')">📡 Activity</button>
     <button class="tab-btn" onclick="switchTab('chores')">🧹 Jobs</button>
+    <button class="tab-btn" onclick="switchTab('calendar')">📅 Calendar</button>
   </nav>
   <a class="cam-link" href="/camera" target="_blank">📷 Camera</a>
 </header>
@@ -379,20 +397,15 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
         <div class="sk-value" id="kv-jobsL">—</div>
         <div class="sk-sub" id="ks-jobsL">today's points</div>
       </div>
-      <div class="stat-kpi sk-cyan" data-icon="❤️">
-        <div class="sk-label">Family Time Leader</div>
-        <div class="sk-value" id="kv-famL">—</div>
-        <div class="sk-sub" id="ks-famL">this month</div>
-      </div>
-      <div class="stat-kpi sk-amber" data-icon="👁️">
-        <div class="sk-label">Most Present</div>
+      <div class="stat-kpi sk-amber" data-icon="⚠️">
+        <div class="sk-label">Most Not Done</div>
         <div class="sk-value" id="kv-presL">—</div>
-        <div class="sk-sub" id="ks-presL">days seen this month</div>
+        <div class="sk-sub" id="ks-presL">not completed today</div>
       </div>
-      <div class="stat-kpi sk-orange" data-icon="🔄" onclick="carryOverClick()" style="cursor:pointer" title="Click to see what's carried over">
-        <div class="sk-label">Carry-overs Today</div>
+      <div class="stat-kpi sk-orange" data-icon="📋">
+        <div class="sk-label">Not Done Yesterday</div>
         <div class="sk-value" id="kv-carry">—</div>
-        <div class="sk-sub" id="ks-carry">jobs not done yesterday</div>
+        <div class="sk-sub" id="ks-carry">by who</div>
       </div>
     </div>
 
@@ -573,6 +586,24 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
   </div>
 </div>
 
+<!-- ══ CALENDAR TAB ══ -->
+<div id="tab-calendar" class="tab-pane">
+  <div class="tcal-wrap">
+    <div class="tcal-nav">
+      <button class="tcal-nav-btn" onclick="tabCalNav(-1)">‹</button>
+      <h3 id="tabCalTitle"></h3>
+      <button class="tcal-nav-btn" onclick="tabCalNav(1)">›</button>
+    </div>
+    <div class="tcal-bottom" style="flex:1;min-height:0">
+      <div class="tcal-grid" id="tabCalGrid"></div>
+      <div class="tcal-detail" id="tabDayDetail" style="display:none">
+        <div style="font-size:.72rem;font-weight:700;margin-bottom:.5rem" id="tabDayDetailTitle"></div>
+        <div id="tabDayDetailBody"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Cooking History Modal -->
 <div id="cookModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9975;align-items:center;justify-content:center">
   <div style="background:var(--card);border-radius:14px;padding:1.2rem;max-width:620px;width:95vw;max-height:88vh;overflow-y:auto;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.15)">
@@ -613,6 +644,7 @@ const ACT_ICONS={cleaning:'🧹',family:'❤️',present:'👁'};
 const C={chores:'#3b82f6',family:'#22c55e',personal:'#a855f7',kitchen:'#06b6d4',amber:'#f59e0b'};
 let calY=new Date().getUTCFullYear(),calM=new Date().getUTCMonth()+1;
 let mcY=new Date().getUTCFullYear(),mcM=new Date().getUTCMonth()+1;
+let tabCalY=new Date().getUTCFullYear(),tabCalM=new Date().getUTCMonth()+1,tabSelDay=null;
 let calData={days:{}},selDay=null,_persons=[],activeType='',_showViolations=false,_feedLoading=false,feedTimer=null;
 
 function p2(n){return String(n).padStart(2,'0')}
@@ -703,13 +735,14 @@ function goToActivity(type,person){
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 function switchTab(name){
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['dashboard','activity','chores'][i]===name));
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['dashboard','activity','chores','calendar'][i]===name));
   document.querySelectorAll('.tab-pane').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if(feedTimer){clearInterval(feedTimer);feedTimer=null;}
   if(name==='dashboard') loadDashboard();
   if(name==='activity'){loadPersons();_feedLoading=false;loadFeed();renderKids();feedTimer=setInterval(loadFeed,15000);}
   if(name==='chores'){loadChoreTable();loadChoreDL();}
+  if(name==='calendar') renderTabCal();
 }
 
 // ── Lightbox ──────────────────────────────────────────────────────────────────
@@ -902,14 +935,17 @@ function showJobCtxMenu(x, y, person, choreName, isDone){
   m.style.left=Math.min(x, window.innerWidth-180)+'px';
   m.style.top=Math.min(y, window.innerHeight-120)+'px';
   m.innerHTML=`
-    <div class="ctx-item" onclick="_removeCtx();markJobCarryOver('${person}','${safe}')">
-      🔄 Mark as carry-over
-    </div>
     ${!isDone?`<div class="ctx-item" onclick="_removeCtx();quickMarkDone('${person}','${safe}')">
       ✓ Mark as done
     </div>`:''}
+    ${!isDone?`<div class="ctx-item" style="color:var(--rose)" onclick="_removeCtx();quickMarkNotDone('${person}','${safe}')">
+      ✗ Mark as not completed
+    </div>`:''}
+    <div class="ctx-item" onclick="_removeCtx();markJobCarryOver('${person}','${safe}')">
+      🔄 Mark as carry-over
+    </div>
     <div class="ctx-item" onclick="_removeCtx();goToActivity('cleaning','${person}')">
-      📷 View camera activity
+      📷 View activity
     </div>`;
   document.body.appendChild(m);
   _ctxMenu=m;
@@ -994,6 +1030,27 @@ async function quickMarkDone(person, choreName){
     if(row){row.style.opacity='';row.style.pointerEvents='';}
     showToast('⚠️ Network error — try again', 'var(--orange)');
     console.error('quickMarkDone error',e);
+  }
+}
+
+// ── Mark job as NOT completed (score=0, status=not_done) ──────────────────────
+async function quickMarkNotDone(person, choreName){
+  if(!person||!choreName) return;
+  const fd=new FormData();
+  fd.append('person_name',person);
+  fd.append('chore_name',choreName);
+  fd.append('score','0');
+  fd.append('notes','Marked as not completed');
+  try{
+    const res=await fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd});
+    if(res.ok){
+      showToast(`✗ "${choreName}" marked as not completed`,'var(--rose)');
+      loadDashboard();
+    } else {
+      showToast('⚠️ Could not update — try again','var(--orange)');
+    }
+  }catch(e){
+    showToast('⚠️ Network error — try again','var(--orange)');
   }
 }
 
@@ -1334,32 +1391,31 @@ async function loadDashboard(){
   kv('kv-riseR', avgTimeStr(monthly.persons?.Rachel?.arrivals)||'—');
   kv('ks-riseL', `${(monthly.persons?.Liam?.arrivals||[]).length} days tracked`);
   kv('ks-riseR', `${(monthly.persons?.Rachel?.arrivals||[]).length} days tracked`);
-  // Jobs leader — use total_earned_today which counts ALL assessments, not just plan matches
-  const liamPts=plan.plan?.Liam?.total_earned_today||plan.plan?.Liam?.earned_points||0;
-  const rachelPts=plan.plan?.Rachel?.total_earned_today||plan.plan?.Rachel?.earned_points||0;
-  if(liamPts===0&&rachelPts===0){kv('kv-jobsL','—');kv('ks-jobsL','tap a job chip to log it');}
-  else if(liamPts>=rachelPts){kv('kv-jobsL','Dad 🏆');kv('ks-jobsL',liamPts+'pts vs Mom '+rachelPts);}
-  else{kv('kv-jobsL','Mom 🏆');kv('ks-jobsL',rachelPts+'pts vs Dad '+liamPts);}
-  // Family time leader — only show if meaningful data (>5 min total this month)
-  const liamFam=daily?.Liam?.family_mins||0, rachelFam=daily?.Rachel?.family_mins||0;
-  const mthLiamFam=monthly.persons?.Liam?.family_mins||0, mthRachelFam=monthly.persons?.Rachel?.family_mins||0;
-  if(mthLiamFam+mthRachelFam<5){kv('kv-famL','—');kv('ks-famL','no family time logged yet');}
-  else if(mthLiamFam>mthRachelFam){kv('kv-famL','Dad 🏆');kv('ks-famL',fmtM(mthLiamFam)+' vs Mom '+fmtM(mthRachelFam));}
-  else if(mthRachelFam>mthLiamFam){kv('kv-famL','Mom 🏆');kv('ks-famL',fmtM(mthRachelFam)+' vs Dad '+fmtM(mthLiamFam));}
-  else{kv('kv-famL','Tied');kv('ks-famL',fmtM(mthLiamFam)+' each');}
-  // Most present — use days_present (distinct sighting dates) not days_seen (PersonDailyStat rows)
-  const liamDays=monthly.persons?.Liam?.days_present||0, rachelDays=monthly.persons?.Rachel?.days_present||0;
-  if(liamDays===0&&rachelDays===0){kv('kv-presL','—');kv('ks-presL','no camera sightings this month');}
-  else if(liamDays>rachelDays){kv('kv-presL','Dad 🏆');kv('ks-presL',liamDays+' days vs Mom '+rachelDays);}
-  else if(rachelDays>liamDays){kv('kv-presL','Mom 🏆');kv('ks-presL',rachelDays+' days vs Dad '+liamDays);}
-  else{kv('kv-presL','Tied');kv('ks-presL',liamDays+' days each');}
-  // Carry-overs — store plan for modal use
+  // Jobs leader — today's points, fall back to this month if no today data
+  const liamPtsToday=plan.plan?.Liam?.total_earned_today||plan.plan?.Liam?.earned_points||0;
+  const rachelPtsToday=plan.plan?.Rachel?.total_earned_today||plan.plan?.Rachel?.earned_points||0;
+  const liamPtsMth=monthly.persons?.Liam?.total_earned||0;
+  const rachelPtsMth=monthly.persons?.Rachel?.total_earned||0;
+  const hasToday=liamPtsToday>0||rachelPtsToday>0;
+  const liamPts=hasToday?liamPtsToday:liamPtsMth;
+  const rachelPts=hasToday?rachelPtsToday:rachelPtsMth;
+  const ptsSuffix=hasToday?'pts today':'pts this month';
+  if(liamPts===0&&rachelPts===0){kv('kv-jobsL','—');kv('ks-jobsL','no jobs logged yet');}
+  else if(liamPts>=rachelPts){kv('kv-jobsL','Dad 🏆');kv('ks-jobsL',`${liamPts} vs Mom ${rachelPts} ${ptsSuffix}`);}
+  else{kv('kv-jobsL','Mom 🏆');kv('ks-jobsL',`${rachelPts} vs Dad ${liamPts} ${ptsSuffix}`);}
+  // Most Not Done today
   window._lastPlan=plan;
-  const liamCarryItems=(plan.plan?.Liam?.chores||[]).filter(c=>c.carried_forward);
-  const rachelCarryItems=(plan.plan?.Rachel?.chores||[]).filter(c=>c.carried_forward);
-  const totalCarry=liamCarryItems.length+rachelCarryItems.length;
-  kv('kv-carry', totalCarry||'0');
-  kv('ks-carry', totalCarry?`Dad ${liamCarryItems.length} · Mom ${rachelCarryItems.length}`:'All clear today ✓');
+  const liamNotDoneNow=(plan.plan?.Liam?.chores||[]).filter(c=>!c.carried_forward&&!c.done).length;
+  const rachelNotDoneNow=(plan.plan?.Rachel?.chores||[]).filter(c=>!c.carried_forward&&!c.done).length;
+  if(liamNotDoneNow===0&&rachelNotDoneNow===0){kv('kv-presL','✓ All done');kv('ks-presL','great work!');}
+  else if(liamNotDoneNow>=rachelNotDoneNow){kv('kv-presL',`Dad: ${liamNotDoneNow}`);kv('ks-presL',`Mom: ${rachelNotDoneNow} pending`);}
+  else{kv('kv-presL',`Mom: ${rachelNotDoneNow}`);kv('ks-presL',`Dad: ${liamNotDoneNow} pending`);}
+  // Not done yesterday (carried_forward = not done previous day)
+  const liamNotYest=(plan.plan?.Liam?.chores||[]).filter(c=>c.carried_forward).length;
+  const rachelNotYest=(plan.plan?.Rachel?.chores||[]).filter(c=>c.carried_forward).length;
+  const totalNotYest=liamNotYest+rachelNotYest;
+  kv('kv-carry', totalNotYest||'0');
+  kv('ks-carry', totalNotYest?`Dad ${liamNotYest} · Mom ${rachelNotYest}`:'✓ All done yesterday');
 
   // (charts removed — daily data shown in donuts and KPI tiles)
 
@@ -1424,11 +1480,6 @@ function renderPanel(person,data,viols,ds,ms){
 
   const partner=person==='Liam'?'Rachel':'Liam';
   const pct=data.pct||0;
-  const dayFamMins=ds.family_mins||0;
-  const dayPersonMins=ds.personal_mins||0;
-  // Scale to 100% based on 2h max family / 4h max present
-  const dayFamPct=Math.min(Math.round(dayFamMins/120*100),100);
-  const dayPersonPct=Math.min(Math.round(dayPersonMins/240*100),100);
   const arrTxt=ds.morning_arrival?`<strong>${esc(ds.morning_arrival)} GMT</strong>`:'<span style="color:var(--faint)">not yet seen</span>';
 
   // Extra jobs this person has picked up from partner (localStorage)
@@ -1447,26 +1498,23 @@ function renderPanel(person,data,viols,ds,ms){
   // Job count labels
   const totalJobs=(data.chores||[]).filter(c=>!c.carried_forward).length;
   const doneJobs=(data.chores||[]).filter(c=>!c.carried_forward&&c.done).length;
+  const notDoneJobs=Math.max(0,totalJobs-doneJobs);
+  const notDonePct=totalJobs>0?Math.round(notDoneJobs/totalJobs*100):0;
   const jobsCenterVal=pct+'%';
   const jobsCenterSub=`${doneJobs}/${totalJobs}${extraCount?'+'+extraCount:''}`;
 
-  // Time donut
-  const timeTotalMins=dayFamMins+dayPersonMins;
-  const timeCenterVal=fmtM(timeTotalMins)||'0m';
-
   // Onclick links
   const choreOnclick=`goToActivity('cleaning','${person}')`;
-  const famOnclick=`goToActivity('family','${person}')`;
 
-  // Donut 1: Jobs — own completion (blue) + extra picked up (amber)
+  // Donut 1: Jobs done — completion % (blue) + extra picked up (amber)
   const donut1=fullDonut(
     [{pct,color:'#60a5fa',glow:true},{pct:extraPct,color:'#fbbf24',glow:false}],
     jobsCenterVal, jobsCenterSub, choreOnclick, `fd-${person.toLowerCase()}-jobs`
   );
-  // Donut 2: Time — family (cyan) + present (purple)
+  // Donut 2: Not completed % (red)
   const donut2=fullDonut(
-    [{pct:dayFamPct,color:'#22d3ee',glow:true},{pct:dayPersonPct,color:'#c084fc',glow:false}],
-    timeCenterVal, 'today', famOnclick, `fd-${person.toLowerCase()}-time`
+    [{pct:notDonePct,color:'#f87171',glow:true}],
+    notDonePct+'%', `${notDoneJobs} pending`, '', `fd-${person.toLowerCase()}-notdone`
   );
 
   // All non-carried chores for this person
@@ -1556,16 +1604,14 @@ function renderPanel(person,data,viols,ds,ms){
       <div class="fd-col">
         ${donut1}
         <div class="fd-legend">
-          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#60a5fa"></div>Jobs</div>
+          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#60a5fa"></div>Done</div>
           ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>+${extraCount} extra</div>`:''}
-          ${givenJobs.length?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24;opacity:.5"></div>given away</div>`:''}
         </div>
       </div>
       <div class="fd-col">
         ${donut2}
         <div class="fd-legend">
-          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#22d3ee"></div>Family</div>
-          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#c084fc"></div>Present</div>
+          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#f87171"></div>Not done</div>
         </div>
       </div>
     </div>
@@ -2419,6 +2465,79 @@ async function loadCookingHistory(){
         <div style="font-size:.72rem;font-weight:600;color:var(--text)">${esc(i.chore_name)}</div>
         ${i.meal_name?`<div style="font-size:.7rem;color:var(--orange);font-weight:600;margin-top:.1rem">🍽️ ${esc(i.meal_name)}</div>`:''}
         ${i.assessment_text&&!i.assessment_text.startsWith('🍽️')?`<div style="font-size:.67rem;color:var(--sub);margin-top:.05rem">${esc(i.assessment_text)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Full-page Calendar Tab ────────────────────────────────────────────────────
+function tabCalNav(d){tabCalM+=d;if(tabCalM>12){tabCalM=1;tabCalY++;}if(tabCalM<1){tabCalM=12;tabCalY--;}tabSelDay=null;document.getElementById('tabDayDetail').style.display='none';renderTabCal();}
+
+function _barColor(p){return p>=80?'#4ade80':p>=50?'#fbbf24':'#f87171';}
+
+function _miniBar(label,pct){
+  const c=_barColor(pct);
+  return `<div style="display:flex;align-items:center;gap:2px;margin-bottom:1px">
+    <span style="font-size:.42rem;color:var(--sub);min-width:7px;flex-shrink:0">${label}</span>
+    <div style="flex:1;height:3px;background:#1e2540;border-radius:2px;min-width:0">
+      <div style="height:3px;background:${c};border-radius:2px;width:${pct}%"></div>
+    </div>
+    <span style="font-size:.42rem;color:${c};min-width:16px;text-align:right;flex-shrink:0">${pct}%</span>
+  </div>`;
+}
+
+async function renderTabCal(){
+  const ms=`${tabCalY}-${p2(tabCalM)}`;
+  document.getElementById('tabCalTitle').textContent=`${MONTHS[tabCalM-1]} ${tabCalY}`;
+  const data=await fetch(`${API}/api/chores/calendar?month=${ms}`).then(r=>r.json()).catch(()=>({days:{},person_max:{}}));
+  const fd=(new Date(Date.UTC(tabCalY,tabCalM-1,1)).getUTCDay()+6)%7;
+  const dim=new Date(Date.UTC(tabCalY,tabCalM,0)).getUTCDate();
+  const today=todayStr();
+  const grid=document.getElementById('tabCalGrid');
+  // Set explicit grid rows: 1 header row + up to 6 week rows
+  const weekCount=Math.ceil((fd+dim)/7);
+  grid.style.gridTemplateRows=`24px repeat(${weekCount},1fr)`;
+  let html=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="tcal-dow">${d}</div>`).join('');
+  for(let i=0;i<fd;i++) html+=`<div class="tcal-day is-empty"></div>`;
+  for(let d=1;d<=dim;d++){
+    const ds=`${tabCalY}-${p2(tabCalM)}-${p2(d)}`;
+    const fut=ds>today,isT=ds===today,isSel=ds===tabSelDay;
+    const info=data.days?.[ds]||{};
+    const LP=info.Liam?.pct??null,RP=info.Rachel?.pct??null;
+    const hasData=LP!==null||RP!==null;
+    const cls=`tcal-day${isT?' is-today':''}${isSel?' is-sel':''}${fut?' is-future':''}`;
+    const bars=hasData?`<div style="margin-top:3px">
+      ${LP!==null?_miniBar('D',LP):''}
+      ${RP!==null?_miniBar('M',RP):''}
+    </div>`:'';
+    html+=`<div class="${cls}" ${fut?'':` onclick="tabSelectDay('${ds}')"`}>
+      <div class="tcal-daynum" style="color:${isT?'var(--blue)':'var(--text)'};font-weight:${isT?700:400}">${d}</div>
+      ${bars}
+    </div>`;
+  }
+  grid.innerHTML=html;
+}
+
+async function tabSelectDay(ds){
+  tabSelDay=ds;
+  renderTabCal();
+  const detail=document.getElementById('tabDayDetail');
+  const titleEl=document.getElementById('tabDayDetailTitle');
+  const bodyEl=document.getElementById('tabDayDetailBody');
+  detail.style.display='block';
+  titleEl.textContent=ds;
+  bodyEl.innerHTML='<div class="empty" style="font-size:.75rem">Loading…</div>';
+  const ass=await fetch(`${API}/api/chores/assessments?date=${ds}`).then(r=>r.json()).catch(()=>[]);
+  if(!ass.length){bodyEl.innerHTML='<div class="empty" style="font-size:.75rem">No activity recorded.</div>';return;}
+  bodyEl.innerHTML=ass.map(a=>{
+    const sc=a.score>=7?'var(--green)':a.score>=4?'var(--amber)':'var(--rose)';
+    const ts=new Date(a.timestamp+'Z').toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    return `<div style="background:var(--bg);border-radius:7px;padding:.5rem;margin-bottom:.35rem;display:flex;gap:.5rem;align-items:flex-start">
+      ${a.thumbnail_url?`<img src="${a.thumbnail_url}" style="width:44px;height:33px;object-fit:cover;border-radius:4px;cursor:pointer;flex-shrink:0" onclick="openLB('${a.thumbnail_url}')">`:''}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.72rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.chore_name)}</div>
+        <div style="font-size:.62rem;color:var(--sub)">${esc(dn(a.person_name))} · ${ts}</div>
+        <div style="font-size:.6rem;color:${sc}">${a.score}/10 · ${a.status||''}</div>
       </div>
     </div>`;
   }).join('');
