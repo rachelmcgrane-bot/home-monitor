@@ -546,6 +546,25 @@ async def add_chore_to_day(
     else:
         assessment_text = notes.strip() or "Manually recorded"
 
+    # Upsert: update existing assessment if one already exists for this person/chore/date
+    existing_res = await db.execute(
+        select(ChoreAssessment).where(
+            ChoreAssessment.person_name == person_name,
+            ChoreAssessment.chore_name == chore_name,
+            ChoreAssessment.assessed_date == target_date,
+        ).order_by(ChoreAssessment.id.desc()).limit(1)
+    )
+    existing = existing_res.scalar_one_or_none()
+    if existing:
+        existing.score = score
+        existing.points_earned = pts_earned
+        existing.status = status
+        existing.assessment_text = assessment_text
+        await db.commit()
+        await db.refresh(existing)
+        return {"ok": True, "id": existing.id, "points_earned": pts_earned,
+                "status": status, "date": target_date}
+
     ca = ChoreAssessment(
         person_name=person_name,
         chore_name=chore_name,

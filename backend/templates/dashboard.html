@@ -93,6 +93,8 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .jl-item.jl-extra{border-left-color:var(--amber);background:rgba(251,191,36,.05)}
 .jl-item.jl-given{border-left-color:var(--amber);background:rgba(251,191,36,.04);opacity:.75}
 .jl-item.jl-given .jl-name{color:var(--amber);text-decoration:line-through}
+.jl-item.jl-doneby{border-left-color:var(--amber);background:rgba(251,191,36,.07)}
+.jl-item.jl-doneby .jl-name{color:var(--amber)}
 .jl-item.jl-carry{border-left-color:var(--amber);background:rgba(251,191,36,.03)}
 .jl-name.carry{color:var(--amber);font-style:italic;opacity:.8}
 /* Inline done button — appears next to detail items */
@@ -1062,6 +1064,60 @@ async function quickMarkNotDone(person, choreName){
   }
 }
 
+// ── Mark job done by other person (saves for both) ────────────────────────────
+// doingPerson = who did the work, originalPerson = whose job it is, date = optional
+async function quickMarkDoneByOther(doingPerson, choreName, originalPerson, date){
+  if(!doingPerson||!choreName||!originalPerson) return;
+  const fd1=new FormData();
+  fd1.append('person_name',doingPerson);
+  fd1.append('chore_name',choreName);
+  fd1.append('score','10');
+  if(date) fd1.append('date',date);
+  const fd2=new FormData();
+  fd2.append('person_name',originalPerson);
+  fd2.append('chore_name',choreName);
+  fd2.append('score','10');
+  fd2.append('notes',`Done by ${dn(doingPerson)}`);
+  if(date) fd2.append('date',date);
+  try{
+    await Promise.all([
+      fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd1}),
+      fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd2}),
+    ]);
+    playMarioCoin();
+    showToast(`⭐ "${choreName}" done by ${dn(doingPerson)}`,'var(--amber)');
+    loadDashboard();
+  }catch(e){showToast('⚠️ Network error — try again','var(--orange)');}
+}
+
+// ── Calendar: mark job done/not-done/done-by-other for a specific date ────────
+async function calMarkDone(person, choreName, date){
+  const fd=new FormData();
+  fd.append('person_name',person); fd.append('chore_name',choreName);
+  fd.append('score','10'); fd.append('date',date);
+  await fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd});
+  showToast(`✓ Marked done`,'var(--green)');
+  renderTabCal(); tabSelectDay(date);
+}
+async function calMarkNotDone(person, choreName, date){
+  const fd=new FormData();
+  fd.append('person_name',person); fd.append('chore_name',choreName);
+  fd.append('score','0'); fd.append('notes','Marked as not completed'); fd.append('date',date);
+  await fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd});
+  showToast(`✗ Marked not done`,'var(--rose)');
+  renderTabCal(); tabSelectDay(date);
+}
+async function calMarkDoneByOther(doingPerson, choreName, originalPerson, date){
+  // Only records for the original person (notes who did it); partner not double-credited
+  const fd=new FormData();
+  fd.append('person_name',originalPerson); fd.append('chore_name',choreName);
+  fd.append('score','10'); fd.append('notes',`Done by ${dn(doingPerson)}`); fd.append('date',date);
+  await fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd});
+  showToast(`↗ Done by ${dn(doingPerson)}`,'var(--amber)');
+  renderTabCal(); tabSelectDay(date);
+}
+
+
 // ── Chart drill-down helpers (kept for carry-over + assessments modals) ─────────
 
 // Render a single camera sighting row for drill-down modals
@@ -1508,9 +1564,9 @@ function renderPanel(person,data,viols,ds,ms){
   const ownJobCount=(data.chores||[]).filter(c=>!c.carried_forward).length||1;
   const extraPct=Math.min(Math.round(extraCount/ownJobCount*100),40); // cap visual at 40%
 
-  // Job count labels
+  // Job count labels (given-away jobs count as done for the donut)
   const totalJobs=(data.chores||[]).filter(c=>!c.carried_forward).length;
-  const doneJobs=(data.chores||[]).filter(c=>!c.carried_forward&&c.done).length;
+  const doneJobs=(data.chores||[]).filter(c=>!c.carried_forward&&(c.done||givenNames.has(c.chore_name))).length;
   const notDoneJobs=Math.max(0,totalJobs-doneJobs);
   const notDonePct=totalJobs>0?Math.round(notDoneJobs/totalJobs*100):0;
   const jobsCenterVal=pct+'%';
@@ -1537,9 +1593,10 @@ function renderPanel(person,data,viols,ds,ms){
   function jobRow(c){
     const isGiven=givenNames.has(c.chore_name);
     const isCarry=!isGiven&&carryNames.has(c.chore_name);
+    const isDoneByOther=!isGiven&&c.done&&c.assessment&&/^Done by /i.test(c.assessment);
     const done=c.done||isGiven, partial=!isGiven&&!isCarry&&c.status==='partial';
-    const cls=isGiven?'jl-given':isCarry?'jl-carry':done?'jl-done':partial?'jl-partial':'jl-pending';
-    const icon=isGiven?'':done?'✓':partial?'◑':isCarry?'🔄':'○';
+    const cls=isGiven?'jl-given':isCarry?'jl-carry':isDoneByOther?'jl-doneby':done?'jl-done':partial?'jl-partial':'jl-pending';
+    const icon=isGiven?'':isDoneByOther?'↗':done?'✓':partial?'◑':isCarry?'🔄':'○';
     const nameCls=done?'done':isCarry?'carry':'';
     const toDisplay=dn(partner);
     // Rotating deadline badge: overdue → red, <24h → amber, else standard
@@ -1596,7 +1653,7 @@ function renderPanel(person,data,viols,ds,ms){
     const fromDisplay=j.from==='Liam'?'Dad':'Mom';
     const safe=j.choreName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     return `<div class="jl-item jl-extra" style="cursor:pointer" title="Tap to mark done"
-      onclick="quickMarkDone('${person}','${safe}');removeExtraJob('${person}','${safe}')">
+      onclick="quickMarkDoneByOther('${person}','${safe}','${j.from}','');removeExtraJob('${person}','${safe}')">
       <span class="jl-icon">⭐</span>
       <span class="jl-name extra-name">${esc(j.choreName)}</span>
       <span class="jl-badge jlb-extra">+${fromDisplay}</span>
@@ -2523,7 +2580,7 @@ async function renderTabCal(){
       ${LP!==null?_miniBar('D',LP):''}
       ${RP!==null?_miniBar('M',RP):''}
     </div>`:'';
-    html+=`<div class="${cls}" ${fut?'':` onclick="tabSelectDay('${ds}')"`}>
+    html+=`<div class="${cls}" data-date="${ds}" ${fut?'':` onclick="tabSelectDay('${ds}')"`}>
       <div class="tcal-daynum" style="color:${isT?'var(--blue)':'var(--text)'};font-weight:${isT?700:400}">${d}</div>
       ${bars}
     </div>`;
@@ -2533,27 +2590,85 @@ async function renderTabCal(){
 
 async function tabSelectDay(ds){
   tabSelDay=ds;
-  renderTabCal();
+  // Update selected highlight on grid cells without re-fetching
+  document.querySelectorAll('#tabCalGrid .tcal-day[data-date]').forEach(el=>{
+    el.classList.toggle('is-sel',el.dataset.date===ds);
+  });
   const detail=document.getElementById('tabDayDetail');
   const titleEl=document.getElementById('tabDayDetailTitle');
   const bodyEl=document.getElementById('tabDayDetailBody');
   detail.style.display='block';
-  titleEl.textContent=ds;
+  const today=todayStr();
+  const isFuture=ds>today;
+  titleEl.innerHTML=`<div style="display:flex;align-items:center;gap:.5rem">
+    <span style="font-size:.78rem;font-weight:700">${ds}</span>
+    ${isFuture?'<span style="font-size:.6rem;color:var(--faint)">(future)</span>':''}
+    <button onclick="document.getElementById('tabDayDetail').style.display='none';tabSelDay=null;renderTabCal()" style="margin-left:auto;background:none;border:none;color:var(--sub);cursor:pointer;font-size:1.1rem;line-height:1">✕</button>
+  </div>`;
   bodyEl.innerHTML='<div class="empty" style="font-size:.75rem">Loading…</div>';
-  const ass=await fetch(`${API}/api/chores/assessments?date=${ds}`).then(r=>r.json()).catch(()=>[]);
-  if(!ass.length){bodyEl.innerHTML='<div class="empty" style="font-size:.75rem">No activity recorded.</div>';return;}
-  bodyEl.innerHTML=ass.map(a=>{
-    const sc=a.score>=7?'var(--green)':a.score>=4?'var(--amber)':'var(--rose)';
-    const ts=new Date(a.timestamp+'Z').toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    return `<div style="background:var(--bg);border-radius:7px;padding:.5rem;margin-bottom:.35rem;display:flex;gap:.5rem;align-items:flex-start">
-      ${a.thumbnail_url?`<img src="${a.thumbnail_url}" style="width:44px;height:33px;object-fit:cover;border-radius:4px;cursor:pointer;flex-shrink:0" onclick="openLB('${a.thumbnail_url}')">`:''}
-      <div style="flex:1;min-width:0">
-        <div style="font-size:.72rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.chore_name)}</div>
-        <div style="font-size:.62rem;color:var(--sub)">${esc(dn(a.person_name))} · ${ts}</div>
-        <div style="font-size:.6rem;color:${sc}">${a.score}/10 · ${a.status||''}</div>
-      </div>
-    </div>`;
-  }).join('');
+
+  const planData=await fetch(`${API}/api/chores/daily-plan?date=${ds}`).then(r=>r.json()).catch(()=>({plan:{}}));
+
+  let html='';
+  for(const person of ['Liam','Rachel']){
+    const partner=person==='Liam'?'Rachel':'Liam';
+    const chores=(planData.plan?.[person]?.chores||[]).filter(c=>!c.carried_forward);
+    if(!chores.length) continue;
+    const pct=planData.plan[person]?.pct||0;
+    const doneCount=chores.filter(c=>c.done).length;
+    const barC=pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--rose)';
+    html+=`<div style="margin-bottom:.8rem">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+        <span style="font-size:.65rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em">${dn(person)}</span>
+        <div style="flex:1;height:4px;background:var(--border);border-radius:2px">
+          <div style="height:4px;background:${barC};border-radius:2px;width:${pct}%"></div>
+        </div>
+        <span style="font-size:.62rem;color:${barC}">${doneCount}/${chores.length}</span>
+      </div>`;
+
+    for(const c of chores){
+      const isDone=c.done;
+      const isDoneByOther=isDone&&c.assessment&&/^Done by /i.test(c.assessment);
+      const isNotDone=!isDone&&c.score===0&&c.assessment;
+      const borderC=isDoneByOther?'var(--amber)':isDone?'var(--green)':isNotDone?'var(--rose)':'var(--border)';
+      const iconChar=isDoneByOther?'↗':isDone?'✓':isNotDone?'✗':'○';
+      const iconC=isDoneByOther?'var(--amber)':isDone?'var(--green)':isNotDone?'var(--rose)':'var(--faint)';
+      const nameStyle=isDone?'text-decoration:line-through;opacity:.55':'';
+      const noteText=isDoneByOther?`<span style="font-size:.5rem;color:var(--amber)">${esc(c.assessment)}</span>`:
+                     isNotDone?`<span style="font-size:.5rem;color:var(--rose)">not done</span>`:'';
+      const typeTag=c.chore_type==='core'
+        ?`<span style="font-size:.44rem;color:var(--blue);background:rgba(96,165,250,.12);padding:.05rem .2rem;border-radius:3px;flex-shrink:0">core</span>`
+        :c.chore_type==='rotating'
+        ?`<span style="font-size:.44rem;color:var(--purple);background:rgba(192,132,252,.12);padding:.05rem .2rem;border-radius:3px;flex-shrink:0">↻</span>`:'';
+      const safe=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+      let btns='';
+      if(!isFuture){
+        if(!isDone){
+          btns=`<button onclick="calMarkDone('${person}','${safe}','${ds}')"
+            style="background:rgba(74,222,128,.15);border:1px solid var(--green);color:var(--green);border-radius:4px;padding:.12rem .32rem;font-size:.56rem;cursor:pointer;white-space:nowrap">✓</button>
+          <button onclick="calMarkNotDone('${person}','${safe}','${ds}')"
+            style="background:rgba(251,113,133,.12);border:1px solid var(--rose);color:var(--rose);border-radius:4px;padding:.12rem .32rem;font-size:.56rem;cursor:pointer;white-space:nowrap">✗</button>
+          <button onclick="calMarkDoneByOther('${partner}','${safe}','${person}','${ds}')"
+            style="background:rgba(251,191,36,.12);border:1px solid var(--amber);color:var(--amber);border-radius:4px;padding:.12rem .32rem;font-size:.56rem;cursor:pointer;white-space:nowrap">→${dn(partner).charAt(0)}</button>`;
+        } else {
+          btns=`<button onclick="calMarkNotDone('${person}','${safe}','${ds}')"
+            style="background:rgba(100,100,120,.15);border:1px solid var(--faint);color:var(--faint);border-radius:4px;padding:.12rem .32rem;font-size:.56rem;cursor:pointer;white-space:nowrap">↩</button>`;
+        }
+      }
+
+      html+=`<div style="display:flex;align-items:center;gap:.35rem;padding:.28rem .32rem;border-radius:6px;background:var(--bg);margin-bottom:.18rem;border-left:2px solid ${borderC}">
+        <span style="color:${iconC};font-size:.68rem;flex-shrink:0">${iconChar}</span>
+        <span style="font-size:.63rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle}">${esc(c.chore_name)}</span>
+        ${noteText}${typeTag}
+        <div style="display:flex;gap:.2rem;flex-shrink:0">${btns}</div>
+      </div>`;
+    }
+    html+='</div>';
+  }
+
+  if(!html) html='<div class="empty" style="font-size:.75rem">No jobs for this day.</div>';
+  bodyEl.innerHTML=html;
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
