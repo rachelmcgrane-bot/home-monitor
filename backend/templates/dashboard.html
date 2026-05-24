@@ -409,6 +409,13 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
       </div>
     </div>
 
+    <!-- ── Dashboard refresh button ─────────────────────────────────── -->
+    <div style="display:flex;justify-content:flex-end;padding:2px 8px 0;flex-shrink:0">
+      <button id="dashRefreshBtn" onclick="dashRefresh()" style="background:var(--border);border:1px solid var(--faint);color:var(--sub);border-radius:6px;padding:.22rem .65rem;font-size:.72rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.3rem;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--faint)';this.style.color='var(--sub)'">
+        <span id="dashRefreshIcon" style="display:inline-block;transition:transform .4s">↻</span> Refresh
+      </button>
+    </div>
+
     <!-- ── Person panels side by side ────────────────────────────────── -->
     <div class="panels-row">
 <div class="person-panel" id="panel-Liam"></div>
@@ -1357,6 +1364,11 @@ function renderCharts(plan, viols, daily, calendar, todayAss, familySightings){
 */
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
+function dashRefresh(){
+  const icon=document.getElementById('dashRefreshIcon');
+  if(icon){icon.style.transform='rotate(360deg)';setTimeout(()=>{icon.style.transition='none';icon.style.transform='rotate(0deg)';setTimeout(()=>{icon.style.transition='transform .4s'},50)},420);}
+  loadDashboard();
+}
 async function loadDashboard(){
   const _td=todayStr();
   const [plan,viols,daily,monthly,todayAss]=await Promise.all([
@@ -1506,14 +1518,14 @@ function renderPanel(person,data,viols,ds,ms){
   // Onclick links
   const choreOnclick=`goToActivity('cleaning','${person}')`;
 
-  // Donut 1: Jobs done — completion % (blue) + extra picked up (amber)
+  // Donut 1: Jobs done — completion % (green) + extra picked up (amber)
   const donut1=fullDonut(
-    [{pct,color:'#60a5fa',glow:true},{pct:extraPct,color:'#fbbf24',glow:false}],
+    [{pct,color:'#4ade80',glow:true},{pct:extraPct,color:'#fbbf24',glow:false}],
     jobsCenterVal, jobsCenterSub, choreOnclick, `fd-${person.toLowerCase()}-jobs`
   );
-  // Donut 2: Not completed % (red)
+  // Donut 2: Not completed % (orange-red)
   const donut2=fullDonut(
-    [{pct:notDonePct,color:'#f87171',glow:true}],
+    [{pct:notDonePct,color:'#fb923c',glow:true}],
     notDonePct+'%', `${notDoneJobs} pending`, '', `fd-${person.toLowerCase()}-notdone`
   );
 
@@ -1604,14 +1616,14 @@ function renderPanel(person,data,viols,ds,ms){
       <div class="fd-col">
         ${donut1}
         <div class="fd-legend">
-          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#60a5fa"></div>Done</div>
+          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#4ade80"></div>Done</div>
           ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>+${extraCount} extra</div>`:''}
         </div>
       </div>
       <div class="fd-col">
         ${donut2}
         <div class="fd-legend">
-          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#f87171"></div>Not done</div>
+          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fb923c"></div>Not done</div>
         </div>
       </div>
     </div>
