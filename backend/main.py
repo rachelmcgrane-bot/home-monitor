@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from pathlib import Path
 
-from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,7 +29,42 @@ from ai import (describe_face, analyse_frame, assess_chore,
 
 BASE_DIR = Path(__file__).parent
 
+# ── Basic Auth ────────────────────────────────────────────────────────────────
+# Set AUTH_USER and AUTH_PASS as env vars on Render.
+# If neither is set the app runs open (dev mode).
+_AUTH_USER = os.environ.get("AUTH_USER", "")
+_AUTH_PASS = os.environ.get("AUTH_PASS", "")
+_AUTH_ENABLED = bool(_AUTH_USER and _AUTH_PASS)
+
+def _check_basic_auth(request: Request) -> bool:
+    """Return True if the request carries valid Basic Auth credentials."""
+    if not _AUTH_ENABLED:
+        return True
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Basic "):
+        return False
+    try:
+        decoded = base64.b64decode(auth[6:]).decode()
+        user, _, pwd = decoded.partition(":")
+        return user == _AUTH_USER and pwd == _AUTH_PASS
+    except Exception:
+        return False
+
 app = FastAPI(title="Home Monitor")
+
+@app.middleware("http")
+async def basic_auth_middleware(request: Request, call_next):
+    # Allow NFC endpoints unauthenticated (physical tag taps have no auth)
+    if request.url.path.startswith("/nfc"):
+        return await call_next(request)
+    if not _check_basic_auth(request):
+        return Response(
+            content="Unauthorised",
+            status_code=401,
+            headers={"WWW-Authenticate": 'Basic realm="Home Monitor"'},
+        )
+    return await call_next(request)
+
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 static_dir = BASE_DIR / "static"
