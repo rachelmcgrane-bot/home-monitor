@@ -151,6 +151,48 @@ let captureRotation = 0; // degrees: 0, 90, 180, 270
 let _currentLocation = '';
 const API_BASE = window.location.origin;
 
+// ── Wake lock — keep screen on while monitoring ───────────────────────────────
+let _wakeLock = null;
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    _wakeLock = await navigator.wakeLock.request('screen');
+    _wakeLock.addEventListener('release', () => {
+      // Re-acquire if still monitoring (OS can release it on battery/tab switch)
+      if (stream) requestWakeLock();
+    });
+  } catch (_) {}
+}
+function releaseWakeLock() {
+  if (_wakeLock) { _wakeLock.release().catch(()=>{}); _wakeLock = null; }
+}
+// Re-acquire wake lock when tab becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && stream) requestWakeLock();
+});
+
+// ── Keep-alive ping — stops Render free tier sleeping ─────────────────────────
+// Pings every 8 min; as long as this tab is open the server stays awake
+let _keepAliveTimer = null;
+function startKeepAlive() {
+  if (_keepAliveTimer) return;
+  _keepAliveTimer = setInterval(async () => {
+    try { await fetch(`${API_BASE}/api/debug`, { signal: AbortSignal.timeout(8000) }); } catch(_) {}
+  }, 8 * 60 * 1000); // every 8 minutes
+}
+function stopKeepAlive() {
+  if (_keepAliveTimer) { clearInterval(_keepAliveTimer); _keepAliveTimer = null; }
+}
+
+// ── Auto-start: remember last settings across page loads ─────────────────────
+const LS_KEY = 'camera_last_settings';
+function saveSettings(location, facing, interval, rotation) {
+  localStorage.setItem(LS_KEY, JSON.stringify({ location, facing, interval, rotation }));
+}
+function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch(_) { return null; }
+}
+
 // ── Motion detection state ────────────────────────────────────────────────────
 let motionMode = false;
 let motionActive = false;      // true when movement is currently detected
@@ -305,7 +347,15 @@ document.getElementById('startBtn').addEventListener('click', async () => {
   btn.textContent = 'Start Monitoring';
 
   const intervalVal = document.getElementById('intervalSelect').value;
+  const facingVal   = document.getElementById('cameraSelect').value;
   motionMode = (intervalVal === 'motion');
+
+  // Save settings for auto-restart on next page load
+  saveSettings(location, facingVal, intervalVal, captureRotation);
+
+  // Keep screen on + keep server awake
+  requestWakeLock();
+  startKeepAlive();
 
   document.getElementById('video').srcObject = stream;
   document.getElementById('setupScreen').classList.add('hidden');
@@ -334,9 +384,9 @@ document.getElementById('startBtn').addEventListener('click', async () => {
     // Fixed interval mode: capture immediately then on interval
     document.getElementById('motionBar').classList.add('hidden');
     document.getElementById('statusDot').classList.add('active');
-    const intervalMs = parseInt(intervalVal, 10) * 1000;
+    _intervalMs = parseInt(intervalVal, 10) * 1000;
     captureAndSend(location);
-    timer = setInterval(() => captureAndSend(location), intervalMs);
+    timer = setInterval(() => captureAndSend(location), _intervalMs);
   }
 });
 
@@ -344,9 +394,14 @@ document.getElementById('stopBtn').addEventListener('click', () => {
   // Stop all timers
   if (timer) { clearInterval(timer); timer = null; }
   if (motionPollTimer) { clearInterval(motionPollTimer); motionPollTimer = null; }
+  if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
   _networkErrors = 0;
+  _reconnecting = false;
   motionActive = false;
   prevFrameData = null;
+
+  releaseWakeLock();
+  stopKeepAlive();
 
   if (stream) stream.getTracks().forEach(t => t.stop());
 
@@ -389,6 +444,48 @@ function drawRotated(video, canvas) {
 }
 
 let _networkErrors = 0;
+let _reconnecting  = false;
+let _reconnectTimer = null;
+
+// Called when repeated failures detected — keeps retrying until server responds
+function enterReconnectMode(location) {
+  if (_reconnecting) return;
+  _reconnecting = true;
+  // Pause motion captures while reconnecting
+  if (timer) { clearInterval(timer); timer = null; }
+  showError('Server offline — reconnecting automatically…', true);
+
+  let attempt = 0;
+  const retry = async () => {
+    attempt++;
+    try {
+      const r = await fetch(`${API_BASE}/api/debug`, { signal: AbortSignal.timeout(15000) });
+      if (r.ok) {
+        _reconnecting = false;
+        _networkErrors = 0;
+        _reconnectTimer = null;
+        showError('✓ Reconnected — resuming…', false);
+        setTimeout(() => {
+          // Resume captures
+          if (motionMode) {
+            prevFrameData = null; // reset motion baseline
+            setMotionUI('watching');
+          } else {
+            captureAndSend(location);
+            timer = setInterval(() => captureAndSend(location), _intervalMs);
+          }
+        }, 1500);
+        return;
+      }
+    } catch(_) {}
+    const wait = Math.min(15, 5 + attempt * 2); // ramp up: 7s, 9s, 11s … max 15s
+    showError(`Server offline — retrying in ${wait}s (attempt ${attempt})…`, true);
+    _reconnectTimer = setTimeout(retry, wait * 1000);
+  };
+  retry();
+}
+
+let _intervalMs = 30000; // stored so reconnect can restore it
 
 async function captureAndSend(location) {
   const video     = document.getElementById('video');
@@ -418,7 +515,9 @@ async function captureAndSend(location) {
         let errText = `Server error ${res.status}`;
         try { const e = await res.json(); errText = e.detail || errText; } catch(_){}
         if (res.status === 503 || res.status === 502) {
-          showError('Server is starting up — will retry automatically…');
+          _networkErrors++;
+          if (_networkErrors > 2) enterReconnectMode(location);
+          else showError('Server is starting up — will retry automatically…', false);
         } else if (res.status === 500 && errText.includes('AI error')) {
           showError('AI error: ' + errText);
         } else {
@@ -428,10 +527,9 @@ async function captureAndSend(location) {
     } catch (e) {
       _networkErrors++;
       if (_networkErrors <= 3) {
-        showError(`Connection lost — retrying (${_networkErrors}/3)…`);
+        showError(`Connection lost — retrying (${_networkErrors}/3)…`, false);
       } else {
-        showError('No connection to server. Check your internet and that the app URL is correct.');
-        if (!motionMode) document.getElementById('statusDot').classList.remove('active');
+        enterReconnectMode(location);
       }
     } finally {
       indicator.classList.remove('show');
@@ -453,13 +551,15 @@ function showResult(data) {
   `;
 }
 
-function showError(msg) {
-  const isNetwork = msg.toLowerCase().includes('connection') || msg.toLowerCase().includes('network') || msg.toLowerCase().includes('retrying') || msg.toLowerCase().includes('starting up');
-  const hint = isNetwork
+function showError(msg, isReconnecting) {
+  const hint = isReconnecting
+    ? '🔄 Reconnecting automatically — do not close this tab'
+    : msg.toLowerCase().includes('starting up') || msg.toLowerCase().includes('retrying')
     ? 'Server may be waking up (free tier) — this usually resolves in 30–60s'
     : 'If this persists, check console.anthropic.com for API credit balance';
+  const col = isReconnecting ? '#f59e0b' : '#ef4444';
   document.getElementById('lastResult').innerHTML = `
-    <div class="who" style="color:#ef4444">⚠️ Error</div>
+    <div class="who" style="color:${col}">${isReconnecting ? '🔄' : '⚠️'} ${isReconnecting ? 'Reconnecting…' : 'Error'}</div>
     <div class="task" style="color:#fca5a5;font-size:.82rem">${msg}</div>
     <div class="meta" style="color:#64748b">${hint}</div>
   `;
@@ -467,6 +567,28 @@ function showError(msg) {
 
 // Initialise interval info box visibility
 onIntervalChange();
+
+// ── Auto-start: restore last session settings + offer one-tap resume ──────────
+(function() {
+  const s = loadSettings();
+  if (!s) return;
+  // Pre-fill the form with last used settings
+  document.getElementById('locationInput').value = s.location || '';
+  if (s.facing) document.getElementById('cameraSelect').value = s.facing;
+  if (s.interval) document.getElementById('intervalSelect').value = s.interval;
+  if (s.rotation !== undefined) {
+    document.getElementById('rotationSelect').value = s.rotation;
+    captureRotation = parseInt(s.rotation);
+    updateRotPreview();
+  }
+  onIntervalChange();
+  // Show a "Resume" banner above the start button
+  const banner = document.createElement('div');
+  banner.style.cssText = 'background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);border-radius:8px;padding:.6rem .9rem;font-size:.82rem;color:#86efac;line-height:1.5;';
+  banner.innerHTML = `<strong style="color:#4ade80">↺ Last session:</strong> ${s.location} — tap <em>Start Monitoring</em> to resume immediately.`;
+  const startBtn = document.getElementById('startBtn');
+  startBtn.parentNode.insertBefore(banner, startBtn);
+})();
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
