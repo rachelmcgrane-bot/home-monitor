@@ -612,6 +612,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
       <button class="tcal-nav-btn" onclick="tabCalNav(-1)">‹</button>
       <h3 id="tabCalTitle"></h3>
       <button class="tcal-nav-btn" onclick="tabCalNav(1)">›</button>
+      <button onclick="openBulkAdd()" style="margin-left:auto;background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.4);color:var(--blue);border-radius:7px;padding:.3rem .75rem;font-size:.72rem;font-weight:600;cursor:pointer">📅 Bulk Add</button>
     </div>
     <div class="tcal-bottom" style="flex:1;min-height:0">
       <div class="tcal-grid" id="tabCalGrid"></div>
@@ -619,6 +620,57 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
         <div style="font-size:.72rem;font-weight:700;margin-bottom:.5rem" id="tabDayDetailTitle"></div>
         <div id="tabDayDetailBody"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BULK ADD MODAL ══ -->
+<div id="bulkAddModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9990;align-items:center;justify-content:center">
+  <div style="background:var(--card);border-radius:14px;padding:1.3rem 1.5rem;max-width:420px;width:94vw;box-shadow:0 8px 40px rgba(0,0,0,.4);position:relative">
+    <button onclick="closeBulkAdd()" style="position:absolute;top:.7rem;right:.7rem;background:var(--bg);border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:.85rem;color:var(--sub)">✕</button>
+    <h3 style="font-size:.95rem;font-weight:700;margin-bottom:1rem">📅 Bulk Add Task</h3>
+    <div style="display:grid;gap:.6rem">
+      <div>
+        <label style="font-size:.65rem;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.25rem">Task name</label>
+        <input id="baChore" list="baChoreDL" placeholder="e.g. Lock front door at night" autocomplete="off"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.42rem .65rem;font-size:.82rem">
+        <datalist id="baChoreDL"></datalist>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+        <div>
+          <label style="font-size:.65rem;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.25rem">Person</label>
+          <select id="baPerson" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.42rem .55rem;font-size:.82rem">
+            <option value="Rachel">Rachel (Mum)</option>
+            <option value="Liam">Liam (Dad)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.65rem;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.25rem">Score (0–10)</label>
+          <input id="baScore" type="number" min="0" max="10" value="10"
+            style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.42rem .55rem;font-size:.82rem">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+        <div>
+          <label style="font-size:.65rem;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.25rem">From date</label>
+          <input id="baFrom" type="date" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.42rem .55rem;font-size:.82rem">
+        </div>
+        <div>
+          <label style="font-size:.65rem;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.25rem">To date</label>
+          <input id="baTo" type="date" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.42rem .55rem;font-size:.82rem">
+        </div>
+      </div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        <button onclick="baSetRange('month')" style="background:var(--border);border:1px solid var(--faint);color:var(--sub);border-radius:6px;padding:.22rem .6rem;font-size:.68rem;cursor:pointer;font-weight:600">This month</button>
+        <button onclick="baSetRange('week')" style="background:var(--border);border:1px solid var(--faint);color:var(--sub);border-radius:6px;padding:.22rem .6rem;font-size:.68rem;cursor:pointer;font-weight:600">This week</button>
+        <button onclick="baSetRange('today')" style="background:var(--border);border:1px solid var(--faint);color:var(--sub);border-radius:6px;padding:.22rem .6rem;font-size:.68rem;cursor:pointer;font-weight:600">Just today</button>
+      </div>
+      <div>
+        <label style="font-size:.65rem;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.25rem">Notes (optional)</label>
+        <input id="baNotes" placeholder="e.g. done every evening" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.42rem .65rem;font-size:.82rem">
+      </div>
+      <div id="baMsg" style="font-size:.75rem;font-weight:600;color:var(--green);min-height:1rem"></div>
+      <button onclick="submitBulkAdd()" style="width:100%;background:var(--blue);color:#fff;border:none;border-radius:9px;padding:.6rem;font-size:.88rem;font-weight:700;cursor:pointer;letter-spacing:.02em">✓ Add for all days</button>
     </div>
   </div>
 </div>
@@ -2184,6 +2236,75 @@ async function selectDay(ds){
     </div>`;
   }).join('');
   el.innerHTML=`${addBtn}<h4 style="font-size:.82rem;margin-bottom:.5rem;color:var(--text)">📋 ${ds} — ${ass.length} activit${ass.length===1?'y':'ies'}</h4>${html}`;
+}
+
+// ── Bulk Add ─────────────────────────────────────────────────────────────────
+function openBulkAdd(){
+  // Pre-populate datalist with known chore names
+  fetch(`${API}/api/chores/list`).then(r=>r.json()).then(chores=>{
+    const dl=document.getElementById('baChoreDL');
+    dl.innerHTML=[...new Set(chores.map(c=>c.chore_name))].map(n=>`<option value="${esc(n)}">`).join('');
+  }).catch(()=>{});
+  // Default dates: 1st → last of current month
+  baSetRange('month');
+  document.getElementById('baMsg').textContent='';
+  document.getElementById('bulkAddModal').style.display='flex';
+}
+function closeBulkAdd(){document.getElementById('bulkAddModal').style.display='none';}
+document.getElementById('bulkAddModal').addEventListener('click',e=>{if(e.target.id==='bulkAddModal')closeBulkAdd();});
+
+function baSetRange(preset){
+  const now=new Date();
+  const y=now.getFullYear(), m=now.getMonth();
+  let from,to;
+  if(preset==='month'){
+    from=new Date(Date.UTC(y,m,1));
+    to=new Date(Date.UTC(y,m+1,0));
+  } else if(preset==='week'){
+    const dow=(now.getDay()+6)%7; // Mon=0
+    from=new Date(Date.UTC(y,m,now.getDate()-dow));
+    to=new Date(Date.UTC(y,m,now.getDate()-dow+6));
+  } else {
+    from=to=new Date(Date.UTC(y,m,now.getDate()));
+  }
+  const fmt=d=>`${d.getUTCFullYear()}-${p2(d.getUTCMonth()+1)}-${p2(d.getUTCDate())}`;
+  document.getElementById('baFrom').value=fmt(from);
+  document.getElementById('baTo').value=fmt(to);
+}
+
+async function submitBulkAdd(){
+  const chore=document.getElementById('baChore').value.trim();
+  const person=document.getElementById('baPerson').value;
+  const from=document.getElementById('baFrom').value;
+  const to=document.getElementById('baTo').value;
+  const score=document.getElementById('baScore').value;
+  const notes=document.getElementById('baNotes').value.trim();
+  const msg=document.getElementById('baMsg');
+  if(!chore){msg.style.color='var(--rose)';msg.textContent='Please enter a task name.';return;}
+  if(!from||!to){msg.style.color='var(--rose)';msg.textContent='Please set a date range.';return;}
+  if(from>to){msg.style.color='var(--rose)';msg.textContent='From date must be before To date.';return;}
+  msg.style.color='var(--sub)';msg.textContent='Saving…';
+  const fd=new FormData();
+  fd.append('person_name',person);
+  fd.append('chore_name',chore);
+  fd.append('date_from',from);
+  fd.append('date_to',to);
+  fd.append('score',score);
+  fd.append('notes',notes||`Bulk added`);
+  try{
+    const res=await fetch(`${API}/api/chores/bulk-add`,{method:'POST',body:fd});
+    const d=await res.json();
+    if(res.ok){
+      const days=d.added+d.updated;
+      msg.style.color='var(--green)';
+      msg.textContent=`✓ Recorded across ${days} day${days===1?'':'s'} (${d.added} new, ${d.updated} updated)`;
+      // Refresh calendar view
+      renderCal();renderMiniCal();
+      setTimeout(closeBulkAdd,2200);
+    } else {
+      msg.style.color='var(--rose)';msg.textContent=`✗ ${d.detail||'Error'}`;
+    }
+  }catch(e){msg.style.color='var(--rose)';msg.textContent='✗ Network error';}
 }
 
 // ── Push notifications ────────────────────────────────────────────────────────

@@ -1539,6 +1539,88 @@ async def close_day(date: Optional[str] = Form(None), db: AsyncSession = Depends
     return {"ok": True, "date": target_date, "marked_not_done": added}
 
 
+@app.post("/api/chores/bulk-add")
+async def bulk_add_assessments(
+    person_name: str = Form(...),
+    chore_name: str = Form(...),
+    date_from: str = Form(...),
+    date_to: str = Form(...),
+    score: int = Form(10),
+    notes: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+):
+    """Add (or upsert) an assessment for a person for every day in a date range.
+    Use this to bulk-record recurring tasks like 'lock front door' for a whole month."""
+    try:
+        from_dt = datetime.strptime(date_from, "%Y-%m-%d")
+        to_dt = datetime.strptime(date_to, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format — use YYYY-MM-DD")
+    if to_dt < from_dt:
+        raise HTTPException(status_code=400, detail="date_to must be on or after date_from")
+    if (to_dt - from_dt).days > 366:
+        raise HTTPException(status_code=400, detail="Range cannot exceed 366 days")
+
+    # Resolve chore points
+    res = await db.execute(
+        select(Chore).where(
+            Chore.chore_name == chore_name,
+            Chore.person_name == person_name,
+            Chore.active == True
+        ))
+    chore = res.scalars().first()
+    if not chore:
+        res2 = await db.execute(
+            select(Chore).where(Chore.chore_name == chore_name, Chore.active == True))
+        chore = res2.scalars().first()
+
+    base_pts = chore.points if chore else 5
+    score = max(0, min(10, score))
+    pts_earned = int(base_pts * score / 10)
+    status = "done" if score >= 7 else "partial" if score >= 4 else "not_done"
+    text = notes.strip() or "Bulk added"
+
+    added = updated = 0
+    current = from_dt
+    while current <= to_dt:
+        date_str = current.strftime("%Y-%m-%d")
+        ex_res = await db.execute(
+            select(ChoreAssessment).where(
+                ChoreAssessment.person_name == person_name,
+                ChoreAssessment.chore_name == chore_name,
+                ChoreAssessment.assessed_date == date_str,
+            ).order_by(ChoreAssessment.id.desc()).limit(1)
+        )
+        existing = ex_res.scalar_one_or_none()
+        if existing:
+            existing.score = score
+            existing.points_earned = pts_earned
+            existing.status = status
+            existing.assessment_text = text
+            updated += 1
+        else:
+            db.add(ChoreAssessment(
+                person_name=person_name,
+                chore_name=chore_name,
+                status=status,
+                score=score,
+                points_earned=pts_earned,
+                assessment_text=text,
+                commentary_text="",
+                assessed_date=date_str,
+                time_spent_mins=0,
+            ))
+            added += 1
+        current += timedelta(days=1)
+
+    await db.commit()
+    return {
+        "ok": True, "added": added, "updated": updated,
+        "from": date_from, "to": date_to,
+        "person": person_name, "chore": chore_name,
+    }
+
+
 @app.get("/api/chores/capacity-check")
 async def capacity_check(db: AsyncSession = Depends(get_db)):
     """Analyse weekly chore load for 2 people and estimate whether it is achievable."""
