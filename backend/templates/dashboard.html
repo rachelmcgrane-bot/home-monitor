@@ -68,11 +68,13 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .pp-arrival{font-size:.68rem;color:var(--sub);font-weight:400}
 .pp-arrival strong{color:var(--blue);font-weight:600}
 /* ── Full donut gauges ── */
-.hd-row{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:.4rem .4rem .1rem;flex-shrink:0}
-.fd-col{display:flex;flex-direction:column;align-items:center;gap:2px}
+.hd-row{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:.25rem .25rem .05rem;flex-shrink:0}
+.fd-col{display:flex;flex-direction:column;align-items:center;gap:1px}
 .fd-wrap{cursor:pointer;border-radius:10px;transition:background .15s;display:flex;justify-content:center}
 .fd-wrap:hover{background:rgba(255,255,255,.04)}
-.fd-svg{width:130px;height:130px;display:block;flex-shrink:0}
+.fd-svg{width:110px;height:110px;display:block;flex-shrink:0}
+.fd-rot-strip{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;padding:2px 4px;max-width:130px}
+.fd-rot-chip{font-size:.48rem;color:var(--cyan);background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.25);border-radius:10px;padding:.1rem .32rem;white-space:nowrap}
 .fd-legend{display:flex;flex-wrap:wrap;gap:2px 8px;padding:0 2px 2px;justify-content:center}
 .fd-leg-item{display:flex;align-items:center;gap:3px;font-size:.52rem;color:var(--sub);font-family:'SF Mono','Courier New',monospace;letter-spacing:.03em}
 .fd-leg-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
@@ -99,6 +101,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .jl-name.carry{color:var(--amber);font-style:italic;opacity:.8}
 /* Inline done button — appears next to detail items */
 .jl-done-btn{background:var(--green);color:#fff;border:none;border-radius:5px;padding:.15rem .4rem;font-size:.7rem;font-weight:700;cursor:pointer;flex-shrink:0;margin-left:2px}
+.jl-num{flex-shrink:0;width:16px;text-align:right;font-size:.58rem;font-weight:700;color:var(--faint);margin-right:1px;line-height:1}
 /* Scroll indicator: fade-out at bottom of job list */
 .job-list-wrap{flex:1;display:flex;flex-direction:column;min-height:0;position:relative;overflow:hidden}
 .job-list-wrap::after{content:'';position:absolute;bottom:0;left:0;right:0;height:28px;background:linear-gradient(transparent,#191d30);pointer-events:none;border-radius:0 0 8px 8px}
@@ -381,7 +384,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
         <div class="sk-sub" id="ks-todayL">today's first seen</div>
       </div>
       <div class="stat-kpi sk-pink" data-icon="🌅">
-        <div class="sk-label">Mom — Wake Time</div>
+        <div class="sk-label">Mum — Wake Time</div>
         <div class="sk-value" id="kv-todayR">—</div>
         <div class="sk-sub" id="ks-todayR">today's first seen</div>
       </div>
@@ -391,7 +394,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
         <div class="sk-sub" id="ks-riseL">avg this month</div>
       </div>
       <div class="stat-kpi sk-purple" data-icon="⏰">
-        <div class="sk-label">Mom — Avg Rise</div>
+        <div class="sk-label">Mum — Avg Rise</div>
         <div class="sk-value" id="kv-riseR">—</div>
         <div class="sk-sub" id="ks-riseR">avg this month</div>
       </div>
@@ -412,8 +415,11 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
       </div>
     </div>
 
-    <!-- ── Dashboard refresh button ─────────────────────────────────── -->
-    <div style="display:flex;justify-content:flex-end;padding:2px 8px 0;flex-shrink:0">
+    <!-- ── Dashboard toolbar ─────────────────────────────────── -->
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:.4rem;padding:2px 8px 0;flex-shrink:0">
+      <button onclick="closeDay()" title="Mark any unlogged core & rotating chores as Not Done for today" style="background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.3);color:var(--rose);border-radius:6px;padding:.22rem .65rem;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--rose)'" onmouseout="this.style.borderColor='rgba(251,113,133,.3)'">
+        ✗ Close Day
+      </button>
       <button id="dashRefreshBtn" onclick="dashRefresh()" style="background:var(--border);border:1px solid var(--faint);color:var(--sub);border-radius:6px;padding:.22rem .65rem;font-size:.72rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.3rem;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--faint)';this.style.color='var(--sub)'">
         <span id="dashRefreshIcon" style="display:inline-block;transition:transform .4s">↻</span> Refresh
       </button>
@@ -443,7 +449,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     <h3 style="font-size:.88rem;font-weight:700;margin-bottom:.9rem" id="pickupTitle">Who picks this up?</h3>
     <div style="display:flex;gap:.6rem;justify-content:center">
       <button class="btn" style="background:#60a5fa;flex:1" onclick="doPickup('Liam')">👨 Dad</button>
-      <button class="btn" style="background:#f472b6;flex:1" onclick="doPickup('Rachel')">👩 Mom</button>
+      <button class="btn" style="background:#f472b6;flex:1" onclick="doPickup('Rachel')">👩 Mum</button>
     </div>
     <div class="msg" id="pickupMsg" style="margin-top:.5rem;text-align:center"></div>
   </div>
@@ -506,10 +512,11 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     </div>
     <div class="comparison-box" id="compBox"></div>
     <div class="weight-box" id="weightBox"></div>
+    <div id="capacityBox" style="margin-bottom:.8rem"></div>
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:.8rem">
       <table class="chore-table" id="choreTable">
         <thead><tr>
-          <th>Job</th><th>Freq</th><th>Type</th>
+          <th style="width:20px">#</th><th>Job</th><th>Freq</th><th>Type</th>
           <th>Assigned to</th><th style="text-align:center">Pts</th>
           <th style="text-align:center">📋</th><th></th>
         </tr></thead>
@@ -530,8 +537,10 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
             <option value="daily">Daily</option>
             <option value="every-2-days">Every 2 days</option>
             <option value="weekly">Weekly</option>
+            <option value="bi-weekly">Bi-weekly</option>
             <option value="when-suits">When suits</option>
             <option value="monthly">Monthly</option>
+            <option value="bi-monthly">Bi-monthly</option>
           </select>
           <select id="newType" onchange="toggleRot()">
             <option value="standard">Standard</option>
@@ -647,7 +656,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 
 <script>
 const API='';
-const DISPLAY={'Liam':'Dad','Rachel':'Mom'};
+const DISPLAY={'Liam':'Dad','Rachel':'Mum'};
 function dn(n){return DISPLAY[n]||n;}
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const ACT_ICONS={cleaning:'🧹',family:'❤️',present:'👁'};
@@ -751,7 +760,7 @@ function switchTab(name){
   if(feedTimer){clearInterval(feedTimer);feedTimer=null;}
   if(name==='dashboard') loadDashboard();
   if(name==='activity'){loadPersons();_feedLoading=false;loadFeed();renderKids();feedTimer=setInterval(loadFeed,15000);}
-  if(name==='chores'){loadChoreTable();loadChoreDL();}
+  if(name==='chores'){loadChoreTable();loadChoreDL();loadCapacityCheck();}
   if(name==='calendar') renderTabCal();
 }
 
@@ -918,6 +927,36 @@ function playMarioFanfare(){
   });
 }
 
+// 🎺 Mario Triumph — full Super Mario level-complete fanfare (over 100% bonus!)
+function playMarioTriumph(){
+  const ctx=_ac(), t=ctx.currentTime;
+  // Classic Super Mario Bros level-complete jingle
+  const notes=[
+    [392,.00,.12],[392,.13,.12],[392,.26,.12],[311,.39,.36],
+    [392,.76,.36],[494,1.13,.36],[311,1.50,.36],
+    [294,1.90,.12],[330,2.02,.12],[349,2.14,.12],[392,.00,.0],
+    [440,2.27,.36],[587,2.64,.36],[523,3.01,.36],
+  ];
+  // Simpler but recognisable triumph sequence
+  const seq=[
+    [392,.00,.10],[392,.11,.10],[392,.22,.10],
+    [311,.34,.28],[392,.63,.28],[494,.92,.28],[311,1.21,.28],
+    [440,1.52,.22],[440,1.75,.22],[440,1.98,.22],[466,2.21,.22],
+    [440,2.44,.22],[392,2.67,.44],[523,3.12,.28],[523,3.41,.28],
+    [523,3.70,.28],[587,3.99,.55],[523,4.55,.80],
+  ];
+  seq.forEach(([freq,start,dur])=>{
+    const osc=ctx.createOscillator(), gain=ctx.createGain();
+    osc.type='square';
+    osc.frequency.setValueAtTime(freq,t+start);
+    gain.gain.setValueAtTime(.22,t+start);
+    gain.gain.exponentialRampToValueAtTime(.001,t+start+dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t+start); osc.stop(t+start+dur+.02);
+  });
+  showToast('🔥 Over 100%! Legendary performance!','var(--amber)');
+}
+
 // ── Toast notification ─────────────────────────────────────────────────────────
 function showToast(msg, color='var(--blue)'){
   let t=document.getElementById('_toast');
@@ -1008,7 +1047,7 @@ function carryOverClick(){
     </div>
     <div style="font-weight:700;font-size:.8rem;color:var(--blue);margin-bottom:.3rem">Dad (${liamItems.length})</div>
     ${itemList(liamItems,'var(--blue)','Liam')}
-    <div style="font-weight:700;font-size:.8rem;color:var(--purple);margin:.7rem 0 .3rem">Mom (${rachelItems.length})</div>
+    <div style="font-weight:700;font-size:.8rem;color:var(--purple);margin:.7rem 0 .3rem">Mum (${rachelItems.length})</div>
     ${itemList(rachelItems,'var(--purple)','Rachel')}
   `);
 }
@@ -1235,7 +1274,7 @@ async function drillMonthDay(date, dayNums, calDays){
       <div style="font-size:1rem;font-weight:700;color:var(--blue)">${liamPct}%</div>
     </div>
     <div style="flex:1;background:rgba(244,114,182,.1);border:1px solid rgba(244,114,182,.3);border-radius:8px;padding:.4rem .6rem;text-align:center">
-      <div style="font-size:.7rem;color:var(--sub)">Mom</div>
+      <div style="font-size:.7rem;color:var(--sub)">Mum</div>
       <div style="font-size:1rem;font-weight:700;color:var(--pink)">${rachelPct}%</div>
     </div>
   </div>`;
@@ -1244,7 +1283,7 @@ async function drillMonthDay(date, dayNums, calDays){
     html+=liamAss.map(_assessRow).join('');
   }
   if(rachelAss.length){
-    html+=`<div style="font-size:.68rem;font-weight:700;color:var(--pink);text-transform:uppercase;letter-spacing:.05em;margin:.6rem 0 .15rem">📋 Mom — verified by camera</div>`;
+    html+=`<div style="font-size:.68rem;font-weight:700;color:var(--pink);text-transform:uppercase;letter-spacing:.05em;margin:.6rem 0 .15rem">📋 Mum — verified by camera</div>`;
     html+=rachelAss.map(_assessRow).join('');
   }
   if(liamSeen.length||rachelSeen.length){
@@ -1421,12 +1460,25 @@ function renderCharts(plan, viols, daily, calendar, todayAss, familySightings){
 */
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
+async function closeDay(){
+  if(!confirm('Mark all unlogged core & rotating chores as NOT DONE for today?\nThis cannot be undone easily — only do this at end of day.'))return;
+  const fd=new FormData();
+  const res=await fetch(`${API}/api/chores/close-day`,{method:'POST',body:fd}).then(r=>r.json()).catch(()=>({ok:false}));
+  if(res.ok){
+    showToast(`✗ ${res.marked_not_done} chores marked as not done for ${res.date}`,'var(--rose)');
+    loadDashboard();
+  } else {
+    showToast('⚠️ Could not close day','var(--orange)');
+  }
+}
 function dashRefresh(){
   const icon=document.getElementById('dashRefreshIcon');
   if(icon){icon.style.transform='rotate(360deg)';setTimeout(()=>{icon.style.transition='none';icon.style.transform='rotate(0deg)';setTimeout(()=>{icon.style.transition='transform .4s'},50)},420);}
   loadDashboard();
 }
 async function loadDashboard(){
+  // Reset over-100% triumph flags (new load = fresh check)
+  delete window._triumph_Liam; delete window._triumph_Rachel;
   const _td=todayStr();
   const [plan,viols,daily,monthly,todayAss]=await Promise.all([
     fetch(`${API}/api/chores/daily-plan`).then(r=>r.json()).catch(()=>({plan:{},unassigned:[]})),
@@ -1469,22 +1521,33 @@ async function loadDashboard(){
   const liamPts=hasToday?liamPtsToday:liamPtsMth;
   const rachelPts=hasToday?rachelPtsToday:rachelPtsMth;
   const ptsSuffix=hasToday?'pts today':'pts this month';
-  if(liamPts===0&&rachelPts===0){kv('kv-jobsL','—');kv('ks-jobsL','no jobs logged yet');}
-  else if(liamPts>=rachelPts){kv('kv-jobsL','Dad 🏆');kv('ks-jobsL',`${liamPts} vs Mom ${rachelPts} ${ptsSuffix}`);}
-  else{kv('kv-jobsL','Mom 🏆');kv('ks-jobsL',`${rachelPts} vs Dad ${liamPts} ${ptsSuffix}`);}
+  // Check 100%+ leaderboard override (valid for 24h)
+  const _override=JSON.parse(localStorage.getItem('leaderOverride100')||'null');
+  const _overrideActive=_override&&Date.now()<_override.expiresAt;
+  if(_overrideActive){
+    const _op=_override.person, _oName=_op==='Liam'?'Dad':'Mum';
+    const _hrs=Math.ceil((_override.expiresAt-Date.now())/3600000);
+    kv('kv-jobsL',`${_oName} 🔥`);kv('ks-jobsL',`Over 100%! Leader ${_hrs}h`);
+    document.getElementById('kv-jobsL')?.closest?.('.stat-kpi')?.style.setProperty('background','linear-gradient(135deg,#78350f 0%,#f59e0b 100%)');
+  } else {
+    if(_override) localStorage.removeItem('leaderOverride100');
+    if(liamPts===0&&rachelPts===0){kv('kv-jobsL','—');kv('ks-jobsL','no jobs logged yet');}
+    else if(liamPts>=rachelPts){kv('kv-jobsL','Dad 🏆');kv('ks-jobsL',`${liamPts} vs Mum ${rachelPts} ${ptsSuffix}`);}
+    else{kv('kv-jobsL','Mum 🏆');kv('ks-jobsL',`${rachelPts} vs Dad ${liamPts} ${ptsSuffix}`);}
+  }
   // Most Not Done today
   window._lastPlan=plan;
   const liamNotDoneNow=(plan.plan?.Liam?.chores||[]).filter(c=>!c.carried_forward&&!c.done).length;
   const rachelNotDoneNow=(plan.plan?.Rachel?.chores||[]).filter(c=>!c.carried_forward&&!c.done).length;
   if(liamNotDoneNow===0&&rachelNotDoneNow===0){kv('kv-presL','✓ All done');kv('ks-presL','great work!');}
   else if(liamNotDoneNow>=rachelNotDoneNow){kv('kv-presL',`Dad: ${liamNotDoneNow}`);kv('ks-presL',`Mom: ${rachelNotDoneNow} pending`);}
-  else{kv('kv-presL',`Mom: ${rachelNotDoneNow}`);kv('ks-presL',`Dad: ${liamNotDoneNow} pending`);}
+  else{kv('kv-presL',`Mum: ${rachelNotDoneNow}`);kv('ks-presL',`Dad: ${liamNotDoneNow} pending`);}
   // Not done yesterday (carried_forward = not done previous day)
   const liamNotYest=(plan.plan?.Liam?.chores||[]).filter(c=>c.carried_forward).length;
   const rachelNotYest=(plan.plan?.Rachel?.chores||[]).filter(c=>c.carried_forward).length;
   const totalNotYest=liamNotYest+rachelNotYest;
   kv('kv-carry', totalNotYest||'0');
-  kv('ks-carry', totalNotYest?`Dad ${liamNotYest} · Mom ${rachelNotYest}`:'✓ All done yesterday');
+  kv('ks-carry', totalNotYest?`Dad ${liamNotYest} · Mum ${rachelNotYest}`:'✓ All done yesterday');
 
   // (charts removed — daily data shown in donuts and KPI tiles)
 
@@ -1576,8 +1639,10 @@ function renderPanel(person,data,viols,ds,ms){
   const choreOnclick=`goToActivity('cleaning','${person}')`;
 
   // Donut 1: Jobs done — completion % (green) + extra picked up (amber)
+  // Clamp visual % to 100 for the donut ring, but show real number in center
+  const donutPct=Math.min(pct,100);
   const donut1=fullDonut(
-    [{pct,color:'#4ade80',glow:true},{pct:extraPct,color:'#fbbf24',glow:false}],
+    [{pct:donutPct,color:'#4ade80',glow:true},{pct:Math.min(extraPct,100-donutPct),color:'#fbbf24',glow:false}],
     jobsCenterVal, jobsCenterSub, choreOnclick, `fd-${person.toLowerCase()}-jobs`
   );
   // Donut 2: Not completed % (orange-red)
@@ -1585,12 +1650,27 @@ function renderPanel(person,data,viols,ds,ms){
     [{pct:notDonePct,color:'#fb923c',glow:true}],
     notDonePct+'%', `${notDoneJobs} pending`, '', `fd-${person.toLowerCase()}-notdone`
   );
+  // Rotating chore chips (show current active rotating chores for this person)
+  const rotChores=(data.chores||[]).filter(c=>c.chore_type==='rotating');
+  const rotStrip=rotChores.length
+    ?`<div class="fd-rot-strip">${rotChores.map(c=>`<span class="fd-rot-chip"${c.is_overdue?' style="color:var(--rose);border-color:rgba(251,113,133,.35)"':''}>${c.done?'✓':c.is_overdue?'⚠':'↻'} ${esc(c.chore_name.split(' ').slice(0,3).join(' '))}</span>`).join('')}</div>`
+    :'';
+  // 🎺 Over-100% triumphant music (once per page load, not on every render)
+  if(pct>100&&!window[`_triumph_${person}`]){
+    window[`_triumph_${person}`]=true;
+    playMarioTriumph();
+    // Override leader tile for 24h
+    const exp=Date.now()+24*60*60*1000;
+    const existing=JSON.parse(localStorage.getItem('leaderOverride100')||'null');
+    if(!existing||existing.expiresAt<Date.now())
+      localStorage.setItem('leaderOverride100',JSON.stringify({person,expiresAt:exp}));
+  }
 
   // All non-carried chores for this person
   const shown=(data.chores||[]).filter(c=>!c.carried_forward);
 
   // ── Job row builder ───────────────────────────────────────────────────────
-  function jobRow(c){
+  function jobRow(c, num){
     const isGiven=givenNames.has(c.chore_name);
     const isCarry=!isGiven&&carryNames.has(c.chore_name);
     const isDoneByOther=!isGiven&&c.done&&c.assessment&&/^Done by /i.test(c.assessment);
@@ -1639,10 +1719,11 @@ function renderPanel(person,data,viols,ds,ms){
       ?`<button class="jl-done-btn" onclick="event.stopPropagation();quickMarkDone('${person}','${safe}')" title="Mark done">✓</button>`
       :'';
 
+    const numBadge=num?`<span class="jl-num">${num}</span>`:'';
     return `<div class="jl-item ${cls}" ${dragAttrs}${rowClick} ${ctxAttr}>
       ${!isGiven?`<span class="jl-drag" data-person="${person}" data-chore-name="${esc(c.chore_name)}" title="Drag to give to ${dn(partner)}">⠿</span>`
                :`<span class="jl-icon" style="color:var(--amber)">→</span>`}
-      <span class="jl-icon">${isGiven?'':icon}</span>
+      ${numBadge}<span class="jl-icon">${isGiven?'':icon}</span>
       <span class="jl-name ${nameCls}">${esc(c.chore_name)}</span>
       ${badge}${markBtn}
     </div>`;
@@ -1650,7 +1731,7 @@ function renderPanel(person,data,viols,ds,ms){
 
   // ── Extra (picked-up) job row ─────────────────────────────────────────────
   function extraRow(j){
-    const fromDisplay=j.from==='Liam'?'Dad':'Mom';
+    const fromDisplay=j.from==='Liam'?'Dad':'Mum';
     const safe=j.choreName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     return `<div class="jl-item jl-extra" style="cursor:pointer" title="Tap to mark done"
       onclick="quickMarkDoneByOther('${person}','${safe}','${j.from}','');removeExtraJob('${person}','${safe}')">
@@ -1674,9 +1755,11 @@ function renderPanel(person,data,viols,ds,ms){
       <div class="fd-col">
         ${donut1}
         <div class="fd-legend">
-          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#4ade80"></div>Done</div>
+          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#4ade80"></div>Done${pct>100?` <span style="color:var(--amber);font-weight:700">🔥${pct}%</span>`:''}
+          </div>
           ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>+${extraCount} extra</div>`:''}
         </div>
+        ${rotStrip}
       </div>
       <div class="fd-col">
         ${donut2}
@@ -1693,7 +1776,7 @@ function renderPanel(person,data,viols,ds,ms){
     </div>
     <div class="job-list-wrap">
       <div class="job-list panel-drop-zone" id="chips-${person}" data-person="${person}">
-        ${shown.map(jobRow).join('')}
+        ${shown.map((c,i)=>jobRow(c,i+1)).join('')}
         ${extraJobsForMe.map(extraRow).join('')}
         ${!shown.length&&!extraCount?'<div class="empty" style="padding:.8rem;font-size:.75rem">No chores assigned</div>':''}
       </div>
@@ -2118,6 +2201,36 @@ function checkPushNotif(){
   }
 }
 
+// ── Capacity / workload check ─────────────────────────────────────────────────
+async function loadCapacityCheck(){
+  const box=document.getElementById('capacityBox');if(!box)return;
+  const data=await fetch(`${API}/api/chores/capacity-check`).then(r=>r.json()).catch(()=>null);
+  if(!data){box.innerHTML='';return;}
+  const barHtml=(pct,color)=>{
+    const w=Math.min(pct,150);
+    const barColor=pct>100?'var(--rose)':pct>80?'var(--amber)':'var(--green)';
+    return `<div style="background:var(--border);border-radius:4px;height:6px;width:100%;margin:.3rem 0">
+      <div style="background:${barColor};height:6px;border-radius:4px;width:${Math.min(w,100)}%;transition:width .5s"></div>
+    </div>`;
+  };
+  const persons=Object.entries(data.capacity||{});
+  const rows=persons.map(([name,c])=>{
+    const dName=name==='Liam'?'Dad':'Mum';
+    const col=name==='Liam'?'var(--blue)':'var(--purple)';
+    const icon=c.achievable?'✅':'⚠️';
+    return `<div style="flex:1;min-width:160px;background:var(--bg);border-radius:8px;padding:.55rem .75rem;border:1px solid ${c.achievable?'rgba(74,222,128,.2)':'rgba(251,191,36,.35)'}">
+      <div style="font-size:.7rem;font-weight:700;color:${col};margin-bottom:.25rem">${icon} ${dName}</div>
+      ${barHtml(c.load_pct)}
+      <div style="font-size:.65rem;color:var(--sub)">~${c.est_daily_mins} min/day · ${c.load_pct}% of ${c.budget_mins}m budget</div>
+      <div style="font-size:.58rem;color:var(--faint);margin-top:.25rem">Core ${c.core_pts}pts · Rot ${c.rotating_pts}pts · Wkly ${c.weekly_pts}pts · Mthly ${c.monthly_pts}pts</div>
+    </div>`;
+  }).join('');
+  box.innerHTML=`<div style="background:#191d30;border-radius:10px;border:1px solid var(--border);padding:.6rem .75rem;margin-bottom:.8rem">
+    <div style="font-size:.65rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.5rem">📊 Workload Capacity (est. ${data.mins_per_point} min/pt · budget ${data.budget_mins_per_day} min/day)</div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">${rows}</div>
+  </div>`;
+}
+
 // ── Chore table (grouped by person, no Person column, renamed rotating_with) ──
 async function loadChoreTable(){
   const chores=await fetch(`${API}/api/chores/list`).then(r=>r.json()).catch(()=>[]);
@@ -2128,15 +2241,16 @@ async function loadChoreTable(){
     if(!groups[g])groups[g]=[];
     groups[g].push(c);
   });
-  const FREQ_OPTIONS=['daily','every-2-days','weekly','when-suits','monthly','once'];
+  const FREQ_OPTIONS=['daily','every-2-days','weekly','bi-weekly','when-suits','monthly','bi-monthly','once'];
   let html='';
   for(const [person,pChores] of Object.entries(groups)){
     const col=person==='Liam'?'#3b82f6':person==='Rachel'?'#a855f7':person==='both'?'#22c55e':'#64748b';
-    html+=`<tr class="person-section"><td colspan="7" style="color:${col}">👤 ${esc(person)}</td></tr>`;
-    html+=pChores.map(c=>{
+    html+=`<tr class="person-section"><td colspan="8" style="color:${col}">👤 ${esc(person)}</td></tr>`;
+    html+=pChores.map((c,ci)=>{
       // "Person" column: for rotating show partner, for others show person_name (already shown in header, so show partner or "—")
       const personCol=c.chore_type==='rotating'&&c.rotating_with?c.rotating_with:(person==='both'?'both':'—');
       return `<tr>
+        <td style="color:var(--faint);font-size:.62rem;width:20px;padding-right:0">${ci+1}</td>
         <td><input class="editable" value="${esc(c.chore_name)}" onblur="updChore(${c.id},'chore_name',this.value)" style="min-width:120px"></td>
         <td><select class="freq-sel" onchange="updChore(${c.id},'frequency',this.value)">
           ${FREQ_OPTIONS.map(f=>`<option${f===c.frequency?' selected':''}>${f}</option>`).join('')}

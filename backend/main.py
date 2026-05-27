@@ -563,13 +563,22 @@ async def add_chore_to_day(
     db: AsyncSession = Depends(get_db),
 ):
     target_date = date or _today()
-    # Look up the chore to get points value
+    # Look up the chore to get points value (filter by person to avoid MultipleResultsFound)
     res = await db.execute(
         select(Chore).where(
             Chore.chore_name == chore_name,
+            Chore.person_name == person_name,
             Chore.active == True
         ))
-    chore = res.scalar_one_or_none()
+    chore = res.scalars().first()
+    # Fallback: try without person filter (e.g. "both" chores, unassigned)
+    if not chore:
+        res2 = await db.execute(
+            select(Chore).where(
+                Chore.chore_name == chore_name,
+                Chore.active == True
+            ))
+        chore = res2.scalars().first()
     base_pts = chore.points if chore else 10
     score = max(0, min(10, score))
     pts_earned = int(base_pts * score / 10)
@@ -1415,9 +1424,17 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
                 earned_pts += pts_earned
 
         # ── Standard and "both" chores (skip monthly here — handled above) ──
+        today_iso_week = datetime.strptime(today, "%Y-%m-%d").isocalendar()[1]
+        today_month_num = int(today.split("-")[1])
         for c in all_chores:
             is_for_person = (c.person_name == person or c.person_name == "both")
             if c.chore_type == "standard" and is_for_person and c.frequency != "monthly":
+                # Bi-weekly: show on alternating ISO weeks
+                if c.frequency == "bi-weekly" and today_iso_week % 2 != c.id % 2:
+                    continue
+                # Bi-monthly: show on alternating months
+                if c.frequency == "bi-monthly" and today_month_num % 2 != c.id % 2:
+                    continue
                 ta = best(today_ass, person, c.chore_name)
                 ya = best(yest_ass, person, c.chore_name)
                 day_before_ya = best(day_before_ass, person, c.chore_name)
@@ -1425,7 +1442,7 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
                 pts_earned = ta.points_earned if ta else 0
                 done = score >= 5
                 is_when_suits = c.frequency == "when-suits"
-                is_weekly = c.frequency in ("weekly", "when-suits")
+                is_weekly = c.frequency in ("weekly", "when-suits", "bi-weekly", "bi-monthly")
                 carried = (c.frequency == "daily" and not done
                            and (not ya or ya.score < 5))
                 adj_pts = carry_pts(c.points, ya, day_before_ya) if carried else c.points
@@ -1484,6 +1501,96 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
         })
 
     return {"date": today, "plan": plan, "unassigned": unassigned_list}
+
+
+@app.post("/api/chores/close-day")
+async def close_day(date: Optional[str] = Form(None), db: AsyncSession = Depends(get_db)):
+    """Mark all unassessed core & rotating chores as not_done for the given date.
+    Idempotent — skips chores that already have any assessment for that date."""
+    target_date = date or _today()
+    chores_res = await db.execute(select(Chore).where(Chore.active == True))
+    all_chores = chores_res.scalars().all()
+    existing_res = await db.execute(
+        select(ChoreAssessment).where(ChoreAssessment.assessed_date == target_date))
+    existing = existing_res.scalars().all()
+    existing_keys = {(a.person_name, a.chore_name) for a in existing}
+
+    added = 0
+    for c in all_chores:
+        if c.chore_type not in ("core", "rotating"):
+            continue
+        if c.person_name in ("both", "unassigned"):
+            continue
+        key = (c.person_name, c.chore_name)
+        if key not in existing_keys:
+            db.add(ChoreAssessment(
+                person_name=c.person_name,
+                chore_name=c.chore_name,
+                status="not_done",
+                score=0,
+                points_earned=0,
+                assessment_text="Not done (auto-closed)",
+                commentary_text="",
+                assessed_date=target_date,
+                time_spent_mins=0,
+            ))
+            added += 1
+    await db.commit()
+    return {"ok": True, "date": target_date, "marked_not_done": added}
+
+
+@app.get("/api/chores/capacity-check")
+async def capacity_check(db: AsyncSession = Depends(get_db)):
+    """Analyse weekly chore load for 2 people and estimate whether it is achievable."""
+    MINS_PER_POINT = 5        # rough effort: 1 point ≈ 5 minutes
+    DAILY_BUDGET_MINS = 60    # realistic daily chore budget per person (60 min)
+
+    chores_res = await db.execute(select(Chore).where(Chore.active == True))
+    all_chores = chores_res.scalars().all()
+
+    persons = ["Liam", "Rachel"]
+    result = {}
+    for person in persons:
+        core_pts   = sum(c.points for c in all_chores if c.person_name == person and c.chore_type == "core")
+        # Rotating: only 2 of the pool are active at any time
+        rot_pool   = [c for c in all_chores if c.person_name == person and c.chore_type == "rotating"]
+        rot_pts    = sum(c.points for c in rot_pool[:2])  # assume 2 active
+        weekly_pts = sum(c.points for c in all_chores if c.person_name == person and c.frequency in ("weekly",))
+        biw_pts    = sum(c.points for c in all_chores if c.person_name == person and c.frequency == "bi-weekly")
+        monthly_pts= sum(c.points for c in all_chores if c.person_name == person and c.frequency == "monthly")
+        bim_pts    = sum(c.points for c in all_chores if c.person_name == person and c.frequency == "bi-monthly")
+        both_pts   = sum(c.points for c in all_chores if c.person_name == "both") / 2  # shared
+
+        # Convert everything to daily-equivalent points
+        daily_equiv = (
+            core_pts + rot_pts
+            + weekly_pts / 7
+            + biw_pts / 14
+            + monthly_pts / 30
+            + bim_pts / 60
+            + both_pts / 7
+        )
+        est_mins = daily_equiv * MINS_PER_POINT
+        load_pct = round(est_mins / DAILY_BUDGET_MINS * 100)
+
+        result[person] = {
+            "core_pts": core_pts,
+            "rotating_pts": rot_pts,
+            "weekly_pts": weekly_pts,
+            "bi_weekly_pts": biw_pts,
+            "monthly_pts": monthly_pts,
+            "bi_monthly_pts": bim_pts,
+            "daily_equiv_pts": round(daily_equiv, 1),
+            "est_daily_mins": round(est_mins),
+            "budget_mins": DAILY_BUDGET_MINS,
+            "achievable": est_mins <= DAILY_BUDGET_MINS,
+            "load_pct": load_pct,
+        }
+    return {
+        "capacity": result,
+        "mins_per_point": MINS_PER_POINT,
+        "budget_mins_per_day": DAILY_BUDGET_MINS,
+    }
 
 
 @app.get("/api/chores/cooking-history")
