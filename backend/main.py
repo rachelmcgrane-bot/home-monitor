@@ -1941,40 +1941,80 @@ async def nfc_complete(chore_id: int, person: str, token: str,
                        db: AsyncSession = Depends(get_db)):
     expected = _nfc_token(chore_id, person)
     if token != expected:
-        return HTMLResponse("<html><body><h2>❌ Invalid token</h2></body></html>", status_code=403)
+        return HTMLResponse(_nfc_error_page("Invalid token"), status_code=403)
     chore = await db.get(Chore, chore_id)
     if not chore:
-        return HTMLResponse("<html><body><h2>❌ Chore not found</h2></body></html>", status_code=404)
+        return HTMLResponse(_nfc_error_page("Chore not found"), status_code=404)
+
     chore_name = chore.chore_name
     target_date = _today()
-    ca = ChoreAssessment(
-        person_name=person,
-        chore_name=chore_name,
-        status="done",
-        score=10,
-        points_earned=chore.points,
-        assessment_text="Recorded via NFC tag",
-        commentary_text="",
-        assessed_date=target_date,
-        time_spent_mins=0,
+    pts = chore.points
+
+    # Upsert: update today's record for same person/chore rather than stacking rows
+    existing_res = await db.execute(
+        select(ChoreAssessment).where(
+            ChoreAssessment.person_name == person,
+            ChoreAssessment.chore_name == chore_name,
+            ChoreAssessment.assessed_date == target_date,
+        ).order_by(ChoreAssessment.id.desc()).limit(1)
     )
-    db.add(ca)
+    existing = existing_res.scalar_one_or_none()
+    if existing:
+        existing.score = 10
+        existing.points_earned = pts
+        existing.status = "done"
+        existing.assessment_text = "Recorded via NFC tag"
+    else:
+        db.add(ChoreAssessment(
+            person_name=person, chore_name=chore_name,
+            status="done", score=10, points_earned=pts,
+            assessment_text="Recorded via NFC tag", commentary_text="",
+            assessed_date=target_date, time_spent_mins=0,
+        ))
     await db.commit()
-    display_person = "Dad" if person == "Liam" else "Mom" if person == "Rachel" else person
+
+    display_person = "Dad" if person == "Liam" else "Mum" if person == "Rachel" else person
     html = f"""<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="3;url=/">
-<title>NFC Complete</title>
-<style>body{{font-family:system-ui,sans-serif;background:#0d0f1a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}}
-.box{{background:#141726;border-radius:16px;padding:2rem 2.5rem;border:1px solid #1e2540;box-shadow:0 8px 32px rgba(0,0,0,.4)}}
-h1{{font-size:2.5rem;margin:.3rem 0}}.name{{color:#60a5fa;font-weight:700}}.chore{{color:#4ade80;font-weight:700}}
-p{{color:#94a3b8;font-size:.9rem}}</style></head>
+<meta http-equiv="refresh" content="4;url=/">
+<title>Done!</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:system-ui,sans-serif;background:#0d0f1a;color:#e2e8f0;
+  display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem}}
+.box{{background:#141726;border-radius:20px;padding:2.5rem 2rem;border:1px solid #1e2540;
+  box-shadow:0 12px 40px rgba(0,0,0,.5);text-align:center;max-width:340px;width:100%}}
+.tick{{font-size:4rem;line-height:1;margin-bottom:.75rem;animation:pop .4s ease-out}}
+@keyframes pop{{0%{{transform:scale(0)}}70%{{transform:scale(1.2)}}100%{{transform:scale(1)}}}}
+h2{{font-size:1.25rem;font-weight:700;margin-bottom:.4rem;line-height:1.3}}
+.chore{{color:#4ade80}}.name{{color:#60a5fa}}
+.pts{{display:inline-block;background:#1a2e1a;color:#4ade80;border:1px solid #166534;
+  border-radius:999px;padding:.25rem .9rem;font-size:.85rem;font-weight:600;margin:.75rem 0}}
+.sub{{color:#64748b;font-size:.82rem;margin-top:.5rem}}
+.dash{{display:block;margin-top:1.25rem;color:#60a5fa;text-decoration:none;
+  font-size:.88rem;padding:.6rem 1.2rem;border:1px solid #1e3a5e;border-radius:10px;
+  background:#0d1a2e;transition:background .15s}}
+.dash:hover{{background:#1e2540}}
+</style></head>
 <body><div class="box">
-<h1>✅</h1>
-<h2><span class="chore">{chore_name}</span> marked complete<br>for <span class="name">{display_person}</span>!</h2>
-<p>+{chore.points} pts · Redirecting to dashboard in 3 seconds…</p>
+<div class="tick">✅</div>
+<h2><span class="chore">{chore_name}</span><br>done by <span class="name">{display_person}</span></h2>
+<span class="pts">+{pts} pts</span>
+<p class="sub">Redirecting to dashboard in 4s…</p>
+<a class="dash" href="/">Go to dashboard →</a>
 </div></body></html>"""
     return HTMLResponse(html)
+
+
+def _nfc_error_page(msg: str) -> str:
+    return f"""<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Error</title>
+<style>body{{font-family:system-ui,sans-serif;background:#0d0f1a;color:#e2e8f0;
+  display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}}
+.box{{background:#141726;border-radius:16px;padding:2rem;border:1px solid #3b1e1e}}
+h2{{color:#f87171}}a{{color:#60a5fa;margin-top:1rem;display:block}}</style></head>
+<body><div class="box"><h2>❌ {msg}</h2><a href="/nfc">← NFC Setup</a></div></body></html>"""
 
 
 @app.get("/nfc", response_class=HTMLResponse)
@@ -1984,28 +2024,84 @@ async def nfc_setup_page(db: AsyncSession = Depends(get_db)):
         .order_by(Chore.person_name, Chore.chore_name))
     chores = chores_res.scalars().all()
 
-    rows = ""
+    # Build per-person card sections
+    sections: dict[str, str] = {"Liam": "", "Rachel": ""}
     for c in chores:
-        if c.person_name in ("Liam", "Rachel"):
-            tok = _nfc_token(c.id, c.person_name)
-            url = f"/nfc/complete?chore_id={c.id}&person={c.person_name}&token={tok}"
-            display = "Dad" if c.person_name == "Liam" else "Mom"
-            rows += f"<tr><td>{display}</td><td>{c.chore_name}</td><td>{c.frequency}</td><td>{c.points}pts</td><td><a href='{url}' style='color:#60a5fa;word-break:break-all'>{url}</a></td></tr>\n"
+        if c.person_name not in sections:
+            continue
+        tok = _nfc_token(c.id, c.person_name)
+        url = f"/nfc/complete?chore_id={c.id}&person={c.person_name}&token={tok}"
+        freq_badge = f'<span class="freq">{c.frequency}</span>' if c.frequency else ""
+        sections[c.person_name] += f"""
+<div class="card">
+  <div class="card-info">
+    <div class="card-name">{c.chore_name} {freq_badge}</div>
+    <div class="card-meta">{c.points} pts &nbsp;·&nbsp; <span class="url-preview">{url}</span></div>
+  </div>
+  <div class="card-btns">
+    <button class="copy-btn" onclick="copyUrl(this,'{url}')">Copy</button>
+    <a class="test-btn" href="{url}" target="_blank">Test</a>
+  </div>
+</div>"""
+
+    person_labels = {"Liam": "🦖 Dad", "Rachel": "👩 Mum"}
+    html_sections = ""
+    for person, cards in sections.items():
+        if not cards:
+            continue
+        html_sections += f"""
+<div class="person-section">
+  <div class="person-label">{person_labels.get(person, person)}</div>
+  {cards}
+</div>"""
 
     html = f"""<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NFC Setup</title>
-<style>body{{font-family:system-ui,sans-serif;background:#0d0f1a;color:#e2e8f0;padding:1.5rem;max-width:1100px;margin:0 auto}}
-h1{{color:#60a5fa;margin-bottom:1rem}}table{{width:100%;border-collapse:collapse;font-size:.85rem}}
-th{{text-align:left;padding:.5rem .7rem;color:#94a3b8;border-bottom:2px solid #1e2540;font-size:.78rem;text-transform:uppercase}}
-td{{padding:.45rem .7rem;border-bottom:1px solid #1e2540}}tr:hover td{{background:#141726}}
-a{{color:#60a5fa}}.back{{color:#94a3b8;font-size:.85rem;margin-bottom:1rem;display:block}}</style></head>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:system-ui,sans-serif;background:#0d0f1a;color:#e2e8f0;
+  padding:1rem;max-width:680px;margin:0 auto}}
+.back{{color:#94a3b8;font-size:.85rem;margin-bottom:1.25rem;display:block;text-decoration:none}}
+h1{{color:#60a5fa;font-size:1.4rem;margin-bottom:.3rem}}
+.sub{{color:#64748b;font-size:.85rem;margin-bottom:1.5rem;line-height:1.5}}
+.person-section{{margin-bottom:1.5rem}}
+.person-label{{font-size:.72rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.08em;color:#64748b;margin-bottom:.5rem}}
+.card{{background:#141726;border:1px solid #1e2540;border-radius:12px;
+  padding:.7rem 1rem;margin-bottom:.5rem;display:flex;align-items:center;gap:.75rem}}
+.card-info{{flex:1;min-width:0}}
+.card-name{{font-weight:600;font-size:.95rem;margin-bottom:.2rem}}
+.card-meta{{color:#64748b;font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+.url-preview{{font-family:monospace;font-size:.7rem}}
+.freq{{background:#1e2540;color:#94a3b8;border-radius:4px;padding:1px 5px;font-size:.7rem;font-weight:600}}
+.card-btns{{display:flex;gap:.4rem;flex-shrink:0}}
+.copy-btn{{background:#0f1e3a;border:1px solid #1e3a5e;color:#60a5fa;border-radius:8px;
+  padding:.35rem .7rem;font-size:.8rem;cursor:pointer;transition:all .15s;white-space:nowrap}}
+.copy-btn:hover{{background:#1e2d50}}
+.copy-btn.copied{{background:#14291a;border-color:#166534;color:#4ade80}}
+.test-btn{{color:#64748b;text-decoration:none;font-size:.78rem;padding:.35rem .6rem;
+  border:1px solid #1e2540;border-radius:8px;white-space:nowrap;transition:background .15s}}
+.test-btn:hover{{background:#1e2540;color:#94a3b8}}
+@media(max-width:400px){{.card{{flex-wrap:wrap}}.card-btns{{width:100%;justify-content:flex-end}}}}
+</style></head>
 <body>
-<a class="back" href="/">← Back to Dashboard</a>
+<a class="back" href="/">← Dashboard</a>
 <h1>📡 NFC Tag Setup</h1>
-<p style="color:#94a3b8;margin-bottom:1rem">Copy a URL below and write it to an NFC tag. Tapping the tag will mark that chore as done.</p>
-<table><thead><tr><th>Person</th><th>Chore</th><th>Frequency</th><th>Points</th><th>NFC URL</th></tr></thead>
-<tbody>{rows}</tbody></table>
+<p class="sub">Copy a URL and write it to an NFC tag using any NFC writer app (e.g. NFC Tools). Tapping the tag opens that URL and marks the chore done.</p>
+{html_sections}
+<script>
+function copyUrl(btn, path) {{
+  const full = window.location.origin + path;
+  navigator.clipboard.writeText(full).then(() => {{
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {{ btn.textContent = 'Copy'; btn.classList.remove('copied'); }}, 2500);
+  }}).catch(() => {{
+    prompt('Copy this URL:', window.location.origin + path);
+  }});
+}}
+</script>
 </body></html>"""
     return HTMLResponse(html)
 
