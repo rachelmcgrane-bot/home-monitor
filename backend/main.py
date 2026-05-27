@@ -54,8 +54,9 @@ app = FastAPI(title="Home Monitor")
 
 @app.middleware("http")
 async def basic_auth_middleware(request: Request, call_next):
-    # Allow NFC endpoints unauthenticated (physical tag taps have no auth)
-    if request.url.path.startswith("/nfc"):
+    # Allow NFC, camera page, frame submissions, and debug unauthenticated
+    _open = ("/nfc", "/camera", "/api/frame", "/api/debug", "/api/persons", "/static")
+    if any(request.url.path.startswith(p) for p in _open):
         return await call_next(request)
     if not _check_basic_auth(request):
         return Response(
