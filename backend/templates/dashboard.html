@@ -2911,23 +2911,29 @@ loadDashboard();
 setInterval(loadDashboard,60000);
 
 // ── Auto-refresh after camera assessment ─────────────────────────────────────
-// Polls a tiny in-memory endpoint every 8 s; refreshes dashboard when the
-// camera creates a new ChoreAssessment (e.g. Liam seen cleaning in kitchen).
+// 1. Polls latest-ts every 8s — if a new assessment landed, reload dashboard
+// 2. Hard 30s fallback — dashboard always stays fresh even without camera events
 let _lastKnownTs=null;
+let _lastDashLoad=Date.now();
 async function checkForUpdates(){
   try{
     const d=await fetch(`${API}/api/events/latest-ts`,{cache:'no-store'}).then(r=>r.json());
-    if(d.ts&&d.ts!==_lastKnownTs){
-      if(_lastKnownTs!==null){
-        // A new assessment arrived — refresh dashboard if it's the active tab
-        const dp=document.getElementById('tab-dashboard');
-        if(dp&&dp.classList.contains('active')) loadDashboard();
-      }
-      _lastKnownTs=d.ts;
+    const newTs=d.ts!=null?String(d.ts):null;
+    const dashEl=document.getElementById('tab-dashboard');
+    const dashActive=dashEl&&dashEl.classList.contains('active');
+    if(newTs!==null&&newTs!==_lastKnownTs){
+      // New assessment detected (or first load) — refresh immediately
+      _lastKnownTs=newTs;
+      if(dashActive) { loadDashboard(); _lastDashLoad=Date.now(); }
+    } else if(dashActive&&Date.now()-_lastDashLoad>30000){
+      // Fallback: refresh every 30s regardless
+      loadDashboard(); _lastDashLoad=Date.now();
     }
   }catch(e){}
 }
 setInterval(checkForUpdates,8000);
+// Also run immediately on page load
+setTimeout(checkForUpdates,1000);
 
 // ── PWA Service Worker ────────────────────────────────────────────────────────
 if('serviceWorker' in navigator){

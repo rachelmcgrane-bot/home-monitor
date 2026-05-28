@@ -952,7 +952,7 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
 
             # Notify dashboard to refresh (polled by frontend every ~8s)
             global _last_assessment_ts
-            _last_assessment_ts = datetime.utcnow().isoformat()
+            _last_assessment_ts = ca.id  # use DB id so it survives value checks
 
             # Cap assessment violations too — never exceed 3/person/day total
             if assessment.get("violations") and person_name != "Unknown":
@@ -1004,11 +1004,13 @@ async def submit_frame(location: str = Form(...), frame: UploadFile = File(...),
 # ── Dashboard push-refresh polling ───────────────────────────────────────────
 
 @app.get("/api/events/latest-ts")
-async def latest_event_ts():
+async def latest_event_ts(db: AsyncSession = Depends(get_db)):
     """Lightweight endpoint the dashboard polls every ~8 s to detect new assessments.
-    Returns the ISO timestamp of the most recent ChoreAssessment created via the camera.
-    No DB query — purely in-memory."""
-    return {"ts": _last_assessment_ts}
+    Returns the id of the most recent ChoreAssessment so the dashboard knows to reload."""
+    res = await db.execute(
+        select(ChoreAssessment.id).order_by(ChoreAssessment.id.desc()).limit(1))
+    latest_id = res.scalar_one_or_none()
+    return {"ts": latest_id}
 
 
 # ── Announcements ─────────────────────────────────────────────────────────────
