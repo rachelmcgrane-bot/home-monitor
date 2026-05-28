@@ -449,7 +449,44 @@ async def list_persons(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Person).order_by(Person.name))
     return [{"id": p.id, "name": p.name,
              "photo_url": _uri(p.photo_data) if p.photo_data else None,
+             "face_description": p.face_description or "",
+             "has_description": bool(p.face_description and p.face_description.strip()),
              "created_at": p.created_at.isoformat()} for p in result.scalars().all()]
+
+
+@app.post("/api/persons/{pid}/refresh-description")
+async def refresh_face_description(pid: int, db: AsyncSession = Depends(get_db)):
+    """Re-run face description AI on the stored photo for a person."""
+    p = await db.get(Person, pid)
+    if not p:
+        raise HTTPException(404, "Person not found")
+    if not p.photo_data:
+        raise HTTPException(400, "No photo stored for this person")
+    try:
+        raw = base64.standard_b64decode(p.photo_data)
+    except Exception:
+        raise HTTPException(400, "Could not decode stored photo")
+    face_desc = await describe_face(raw)
+    p.face_description = face_desc
+    await db.commit()
+    return {"id": p.id, "name": p.name, "face_description": face_desc}
+
+
+@app.delete("/api/persons/duplicates")
+async def remove_duplicate_persons(db: AsyncSession = Depends(get_db)):
+    """Keep only the most recent record per name, delete the rest."""
+    result = await db.execute(select(Person).order_by(Person.name, Person.id))
+    persons = result.scalars().all()
+    seen: dict[str, int] = {}  # name -> highest id to keep
+    for p in persons:
+        seen[p.name] = p.id  # last wins (highest id)
+    removed = 0
+    for p in persons:
+        if seen[p.name] != p.id:
+            await db.delete(p)
+            removed += 1
+    await db.commit()
+    return {"ok": True, "removed": removed}
 
 @app.delete("/api/persons/{pid}")
 async def delete_person(pid: int, db: AsyncSession = Depends(get_db)):

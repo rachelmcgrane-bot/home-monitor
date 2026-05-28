@@ -468,6 +468,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
           <button type="submit" class="btn" id="enrolBtn">Add Person</button>
         </form>
         <div class="person-list" id="personList"></div>
+        <button class="btn-sm" onclick="removeDuplicatePersons()" style="margin-top:.6rem;background:var(--orange);color:#fff;border:none;border-radius:7px;padding:.32rem .75rem;font-size:.72rem;cursor:pointer">🗑 Remove Duplicates</button>
         <!-- Kids section -->
         <div style="margin-top:.9rem;border-top:1px solid var(--border);padding-top:.7rem">
           <div class="card-title" style="margin-bottom:.5rem">👶 Kids</div>
@@ -2668,14 +2669,28 @@ async function loadPersons(){
   list.innerHTML=persons.length?'':'<p class="empty">No people enrolled yet.</p>';
   persons.forEach(p=>{
     const el=document.createElement('div');el.className='person-item';
+    const descBadge=p.has_description
+      ?`<span style="font-size:.58rem;background:rgba(74,222,128,.15);color:var(--green);border:1px solid rgba(74,222,128,.3);border-radius:10px;padding:.1rem .4rem;white-space:nowrap">✓ AI profile</span>`
+      :`<span style="font-size:.58rem;background:rgba(251,191,36,.15);color:var(--amber);border:1px solid rgba(251,191,36,.3);border-radius:10px;padding:.1rem .4rem;white-space:nowrap">⚠ No profile</span>`;
+    const refreshBtn=`<button onclick="refreshDesc(${p.id},'${esc(p.name)}')" title="Re-generate AI face description from stored photo" style="background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.3);color:var(--blue);border-radius:5px;padding:.12rem .4rem;font-size:.62rem;cursor:pointer;font-weight:600">↻ Fix</button>`;
     el.innerHTML=`${p.photo_url?`<img src="${p.photo_url}" onclick="openLB('${p.photo_url}')">`:'<div style="width:32px;height:32px;background:var(--border);border-radius:50%"></div>'}
-      <span class="pname">${esc(p.name)}</span>
+      <span class="pname">${esc(p.name)}</span>${descBadge}${!p.has_description?refreshBtn:''}
       <button class="btn-del" onclick="delPerson(${p.id},'${esc(p.name)}')">✕</button>`;
     list.appendChild(el);
     const opt=document.createElement('option');opt.value=p.id;opt.textContent=p.name;sel.appendChild(opt);
   });
 }
+async function refreshDesc(id,name){
+  showToast(`↻ Generating AI profile for ${name}…`,'var(--blue)');
+  const r=await fetch(`${API}/api/persons/${id}/refresh-description`,{method:'POST'}).then(r=>r.json()).catch(()=>({error:true}));
+  if(r.face_description){showToast(`✓ ${name} profile ready!`,'var(--green)');loadPersons();}
+  else showToast(`⚠️ Could not generate profile`,'var(--orange)');
+}
 async function delPerson(id,name){if(!confirm(`Remove ${name}?`))return;await fetch(`${API}/api/persons/${id}`,{method:'DELETE'});loadPersons();}
+async function removeDuplicatePersons(){
+  const r=await fetch(`${API}/api/persons/duplicates`,{method:'DELETE'}).then(r=>r.json()).catch(()=>({ok:false}));
+  if(r.ok){showToast(`✓ Removed ${r.removed} duplicate${r.removed!==1?'s':''}`,r.removed?'var(--green)':'var(--sub)');loadPersons();}
+}
 
 // ── Kids (localStorage) ───────────────────────────────────────────────────────
 const DEFAULT_KIDS=[{name:'Ben',age:7},{name:'Louis',age:4},{name:'Lidia',age:1.5}];
