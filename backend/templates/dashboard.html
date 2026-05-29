@@ -92,7 +92,24 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .jl-item.jl-done{border-left-color:var(--green)}
 .jl-item.jl-partial{border-left-color:var(--orange)}
 .jl-item.jl-pending{border-left-color:var(--border)}
+/* Non-core pending jobs get amber highlight so they stand out */
+.jl-item.jl-pending.jl-noncore{border-left-color:var(--amber);background:rgba(251,191,36,.04)}
+.jl-item.jl-pending.jl-noncore .jl-name{color:var(--amber)}
 .jl-item.jl-extra{border-left-color:var(--amber);background:rgba(251,191,36,.05)}
+/* Weekly / monthly assigned job rows */
+.jl-item.jl-weekly{border-left-color:#f59e0b;background:rgba(245,158,11,.06)}
+.jl-item.jl-weekly .jl-name{color:#fcd34d}
+.jl-item.jl-weekly-done{border-left-color:var(--green);opacity:.55}
+.jl-item.jl-weekly-done .jl-name{color:var(--green);text-decoration:line-through}
+/* Countdown chips under donuts */
+.wk-countdown{font-size:.56rem;color:var(--amber);background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:.12rem .4rem;text-align:center;white-space:nowrap;font-weight:600;margin:.1rem auto}
+.wk-countdown.overdue{color:var(--rose);background:rgba(251,113,133,.12);border-color:rgba(251,113,133,.3)}
+/* Weekly jobs section divider */
+.wk-section-hdr{font-size:.52rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.07em;padding:.25rem .5rem .1rem;flex-shrink:0;display:flex;align-items:center;gap:.35rem}
+.wk-section-hdr::before{content:'';flex:0 0 1px;height:1px;background:rgba(245,158,11,.3)}
+.wk-badge-wkly{background:rgba(245,158,11,.18);color:#fcd34d;font-size:.44rem;padding:.06rem .25rem;border-radius:3px;font-weight:700;flex-shrink:0}
+.wk-badge-mthly{background:rgba(192,132,252,.18);color:var(--purple);font-size:.44rem;padding:.06rem .25rem;border-radius:3px;font-weight:700;flex-shrink:0}
+.wk-timer{font-size:.48rem;color:var(--faint);flex-shrink:0;font-family:'SF Mono','Courier New',monospace}
 .jl-item.jl-given{border-left-color:var(--amber);background:rgba(251,191,36,.04);opacity:.75}
 .jl-item.jl-given .jl-name{color:var(--amber);text-decoration:line-through}
 .jl-item.jl-doneby{border-left-color:var(--amber);background:rgba(251,191,36,.07)}
@@ -1544,13 +1561,15 @@ async function loadDashboard(){
   // Reset over-100% triumph flags (new load = fresh check)
   delete window._triumph_Liam; delete window._triumph_Rachel;
   const _td=todayStr();
-  const [plan,viols,daily,monthly,todayAss]=await Promise.all([
+  const [plan,viols,daily,monthly,todayAss,weeklyPlan]=await Promise.all([
     fetch(`${API}/api/chores/daily-plan`).then(r=>r.json()).catch(()=>({plan:{},unassigned:[]})),
     fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({by_person:{},violations:[]})),
     fetch(`${API}/api/stats/daily`).then(r=>r.json()).catch(()=>({})),
     fetch(`${API}/api/stats/monthly`).then(r=>r.json()).catch(()=>({persons:{}})),
     fetch(`${API}/api/chores/assessments`).then(r=>r.json()).catch(()=>[]),
+    fetch(`${API}/api/chores/weekly-plan`).then(r=>r.json()).catch(()=>({jobs:[],weekly_deadline:null,monthly_deadline:null})),
   ]);
+  window._weeklyPlan=weeklyPlan;
   if(!_persons.length) _persons=await fetch(`${API}/api/persons`).then(r=>r.json()).catch(()=>[]);
   // ── KPI stat boxes ────────────────────────────────────────────────────────
   const kv=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
@@ -1616,7 +1635,7 @@ async function loadDashboard(){
   // (charts removed — daily data shown in donuts and KPI tiles)
 
   ['Liam','Rachel'].forEach(p=>{
-    try{renderPanel(p,plan.plan?.[p]||{chores:[],total_points:100,earned_points:0,pct:0},viols,daily[p]||{},(monthly.persons||{})[p]||{});}
+    try{renderPanel(p,plan.plan?.[p]||{chores:[],total_points:100,earned_points:0,pct:0},viols,daily[p]||{},(monthly.persons||{})[p]||{},window._weeklyPlan||{});}
     catch(e){console.error('renderPanel error',p,e);}
   });
   renderUnassigned(plan.unassigned||[]);
@@ -1667,7 +1686,32 @@ async function doPickup(person){
   }catch(err){msg.className='msg err';msg.textContent='✗ '+err.message;}
 }
 
-function renderPanel(person,data,viols,ds,ms){
+function countdownStr(deadlineDateStr){
+  if(!deadlineDateStr)return'—';
+  const dl=new Date(deadlineDateStr+'T07:00:00Z');
+  const diff=dl-Date.now();
+  if(diff<=0)return'overdue';
+  const d=Math.floor(diff/86400000);
+  const h=Math.floor((diff%86400000)/3600000);
+  const m=Math.floor((diff%3600000)/60000);
+  return d>0?`${d}d ${h}h`:`${h}h ${m}m`;
+}
+// Tick countdowns every minute
+setInterval(()=>{
+  document.querySelectorAll('[data-countdown]').forEach(el=>{
+    const s=countdownStr(el.dataset.countdown);
+    el.textContent=s;
+    el.className=el.className.replace(' overdue','')+(s==='overdue'?' overdue':'');
+  });
+},60000);
+
+async function weeklyJobDone(id,done){
+  const fd=new FormData();fd.append('done',done?'true':'false');
+  await fetch(`${API}/api/chores/weekly-job/${id}/done`,{method:'POST',body:fd}).catch(()=>{});
+  loadDashboard();
+}
+
+function renderPanel(person,data,viols,ds,ms,wp){
   const el=document.getElementById(`panel-${person}`);if(!el)return;
   const po=_persons.find(p=>p.name===person);
   const photoHtml=po?.photo_url
@@ -1741,7 +1785,9 @@ function renderPanel(person,data,viols,ds,ms){
     // done_by_other is set server-side; fallback to assessment text check for older records
     const isDoneByOther=!isGiven&&(c.done_by_other||(!c.done&&c.assessment&&/^Done by /i.test(c.assessment)));
     const done=c.done||isGiven, partial=!isGiven&&!isCarry&&!isDoneByOther&&c.status==='partial';
-    const cls=isGiven?'jl-given':isCarry?'jl-carry':isDoneByOther?'jl-doneby':done?'jl-done':partial?'jl-partial':'jl-pending';
+    const _baseCls=isGiven?'jl-given':isCarry?'jl-carry':isDoneByOther?'jl-doneby':done?'jl-done':partial?'jl-partial':'jl-pending';
+    // Non-core pending jobs get amber highlight so they stand out
+    const cls=_baseCls==='jl-pending'&&c.chore_type!=='core'?'jl-pending jl-noncore':_baseCls;
     const icon=isGiven?'':isDoneByOther?'↗':done?'✓':partial?'◑':isCarry?'🔄':'○';
     const nameCls=done?'done':isCarry?'carry':'';
     const toDisplay=dn(partner);
@@ -1809,6 +1855,39 @@ function renderPanel(person,data,viols,ds,ms){
     </div>`;
   }
 
+  // ── Weekly plan for this person ──────────────────────────────────────────
+  const myWeeklyJobs=(wp&&wp.jobs?wp.jobs:[]).filter(j=>j.person_name===person);
+  const wklyDL=wp&&wp.weekly_deadline?wp.weekly_deadline:null;
+  const mthlyDL=wp&&wp.monthly_deadline?wp.monthly_deadline:null;
+  const wklyStr=countdownStr(wklyDL);
+  const mthlyStr=countdownStr(mthlyDL);
+  const wklyOverdue=wklyStr==='overdue';
+  const mthlyOverdue=mthlyStr==='overdue';
+
+  function weeklyRow(j,num){
+    const safe=j.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const isMthly=j.job_type==='monthly';
+    const cls=j.done?'jl-weekly-done':'jl-weekly';
+    const tBadge=isMthly?`<span class="wk-badge-mthly">📅 mthly</span>`:`<span class="wk-badge-wkly">📅 wkly</span>`;
+    const timerStr=countdownStr(j.deadline);
+    const actionBtn=j.done
+      ?`<button style="background:none;border:1px solid var(--faint);color:var(--faint);border-radius:5px;padding:.12rem .3rem;font-size:.58rem;cursor:pointer" onclick="weeklyJobDone(${j.id},false)" title="Undo">↩</button>`
+      :`<button class="jl-done-btn" onclick="weeklyJobDone(${j.id},true)" title="Mark done">✓</button>`;
+    return `<div class="jl-item ${cls}" draggable="false">
+      <span class="jl-num">${num}</span>
+      <span class="jl-icon">${j.done?'✓':'📅'}</span>
+      <span class="jl-name">${esc(j.chore_name)}</span>
+      ${tBadge}
+      <span class="wk-timer" data-countdown="${j.deadline}">${timerStr}</span>
+      ${actionBtn}
+    </div>`;
+  }
+
+  const weeklySection=myWeeklyJobs.length?`
+    <div class="wk-section-hdr">📅 This Week's Jobs</div>
+    ${myWeeklyJobs.map((j,i)=>weeklyRow(j,i+1)).join('')}
+  `:'';
+
   el.innerHTML=`
     <div class="pp-head">
       <div class="pp-name-row">${photoHtml}<div>
@@ -1830,12 +1909,14 @@ function renderPanel(person,data,viols,ds,ms){
             ${rotStrip}
           </div>
         </div>
+        ${wklyDL?`<div class="wk-countdown${wklyOverdue?' overdue':''}" data-countdown="${wklyDL}">⏱ Wkly: ${wklyStr}</div>`:''}
         <div class="fd-col" style="flex-direction:row;align-items:center;gap:.4rem;padding:0 .3rem">
           ${donut2}
           <div class="fd-legend" style="justify-content:flex-start">
             <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fb923c"></div>Not done</div>
           </div>
         </div>
+        ${mthlyDL?`<div class="wk-countdown${mthlyOverdue?' overdue':''}" data-countdown="${mthlyDL}">📅 Mthly: ${mthlyStr}</div>`:''}
       </div>
       <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
         <div class="chore-list-hdr">
@@ -1848,6 +1929,7 @@ function renderPanel(person,data,viols,ds,ms){
             ${shown.map((c,i)=>jobRow(c,i+1)).join('')}
             ${extraJobsForMe.map(extraRow).join('')}
             ${!shown.length&&!extraCount?'<div class="empty" style="padding:.8rem;font-size:.75rem">No chores assigned</div>':''}
+            ${weeklySection}
           </div>
         </div>
       </div>

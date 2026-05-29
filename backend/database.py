@@ -155,6 +155,19 @@ class ChorePointProposal(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
+class WeeklyJob(Base):
+    """Jobs assigned each Saturday from the shared/weekly/standard pool."""
+    __tablename__ = "weekly_jobs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    week_start = Column(String(10), nullable=False, index=True)  # YYYY-MM-DD (Saturday)
+    person_name = Column(String(64), nullable=False)
+    chore_name = Column(String(256), nullable=False)
+    job_type = Column(String(16), default="weekly")   # "weekly" | "monthly"
+    deadline = Column(String(10))                      # YYYY-MM-DD
+    done = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 # Safe idempotent migrations
 _MIGRATIONS = [
     "ALTER TABLE chore_violations ADD COLUMN IF NOT EXISTS confirmed BOOLEAN DEFAULT NULL",

@@ -21,7 +21,7 @@ except ImportError:
 from database import (init_db, get_db, SessionLocal,
                       Person, Sighting, Chore, ChoreAssessment, ChoreViolation,
                       PersonDailyStat, ChoreDispute, TrendReport,
-                      ViolationReview, ChorePointProposal)
+                      ViolationReview, ChorePointProposal, WeeklyJob)
 from ai import (describe_face, analyse_frame, assess_chore,
                 suggest_chore_points, check_point_weights, recheck_violation,
                 announce_morning_chores, generate_summary,
@@ -1305,6 +1305,116 @@ async def get_assessments(date: Optional[str] = None, person_name: Optional[str]
              "dispute_status": a.dispute_status,
              "thumbnail_url": _uri(a.thumbnail_data) if a.thumbnail_data else None,
              "timestamp": a.timestamp.isoformat()} for a in result.scalars().all()]
+
+
+# ── Weekly-job helpers ────────────────────────────────────────────────────────
+
+def _current_week_start() -> str:
+    """Most recent Saturday YYYY-MM-DD (using same UTC-6h offset as _today())."""
+    now = datetime.utcnow() - timedelta(hours=6)
+    days_since_sat = (now.weekday() - 5) % 7
+    return (now - timedelta(days=days_since_sat)).strftime("%Y-%m-%d")
+
+
+def _generate_weekly_jobs(week_start: str, all_chores) -> list:
+    """Assign 3 weekly + 1 monthly job per person, seeded by week number."""
+    from random import Random
+    week_dt = datetime.strptime(week_start, "%Y-%m-%d")
+    week_num = week_dt.isocalendar()[1]
+    rng = Random(week_num * 31337)
+
+    weekly_deadline = (week_dt + timedelta(days=7)).strftime("%Y-%m-%d")
+    monthly_deadline = (week_dt + timedelta(days=14)).strftime("%Y-%m-%d")
+
+    # Weekly pool: standard chores that are shared or weekly-frequency
+    weekly_pool = [c for c in all_chores if c.active and c.chore_type == "standard"
+                   and (c.person_name == "both"
+                        or c.frequency in ("weekly", "when-suits", "bi-weekly"))]
+    rng.shuffle(weekly_pool)
+    take = min(len(weekly_pool), 6)
+    chosen = weekly_pool[:take]
+    # Alternate who gets "first pick" each week
+    if week_num % 2 == 0:
+        liam_w, rachel_w = chosen[:3], chosen[3:]
+    else:
+        rachel_w, liam_w = chosen[:3], chosen[3:]
+
+    # Monthly pool
+    monthly_pool = [c for c in all_chores if c.active and c.frequency == "monthly"
+                    and c.person_name in ("both", "Liam", "Rachel")]
+    rng.shuffle(monthly_pool)
+    liam_m  = monthly_pool[:1]
+    rachel_m = monthly_pool[1:2] if len(monthly_pool) > 1 else monthly_pool[:1]
+
+    jobs: list = []
+    for c in liam_w:
+        jobs.append(WeeklyJob(week_start=week_start, person_name="Liam",
+                              chore_name=c.chore_name, job_type="weekly",
+                              deadline=weekly_deadline))
+    for c in rachel_w:
+        jobs.append(WeeklyJob(week_start=week_start, person_name="Rachel",
+                              chore_name=c.chore_name, job_type="weekly",
+                              deadline=weekly_deadline))
+    for c in liam_m:
+        jobs.append(WeeklyJob(week_start=week_start, person_name="Liam",
+                              chore_name=c.chore_name, job_type="monthly",
+                              deadline=monthly_deadline))
+    for c in rachel_m:
+        jobs.append(WeeklyJob(week_start=week_start, person_name="Rachel",
+                              chore_name=c.chore_name, job_type="monthly",
+                              deadline=monthly_deadline))
+    return jobs
+
+
+@app.get("/api/chores/weekly-plan")
+async def get_weekly_plan(db: AsyncSession = Depends(get_db)):
+    week_start = _current_week_start()
+    result = await db.execute(
+        select(WeeklyJob).where(WeeklyJob.week_start == week_start)
+        .order_by(WeeklyJob.person_name, WeeklyJob.job_type))
+    jobs = result.scalars().all()
+    if not jobs:
+        chores_res = await db.execute(select(Chore).where(Chore.active == True))
+        jobs = _generate_weekly_jobs(week_start, chores_res.scalars().all())
+        for j in jobs:
+            db.add(j)
+        await db.commit()
+    week_dt = datetime.strptime(week_start, "%Y-%m-%d")
+    return {
+        "week_start": week_start,
+        "weekly_deadline": (week_dt + timedelta(days=7)).strftime("%Y-%m-%d"),
+        "monthly_deadline": (week_dt + timedelta(days=14)).strftime("%Y-%m-%d"),
+        "jobs": [{"id": j.id, "person_name": j.person_name, "chore_name": j.chore_name,
+                  "job_type": j.job_type, "deadline": j.deadline, "done": j.done}
+                 for j in jobs]
+    }
+
+
+@app.post("/api/chores/weekly-job/{job_id}/done")
+async def mark_weekly_job_done(job_id: int, done: bool = Form(True),
+                               db: AsyncSession = Depends(get_db)):
+    job = await db.get(WeeklyJob, job_id)
+    if not job:
+        raise HTTPException(404, "Not found")
+    job.done = done
+    await db.commit()
+    return {"ok": True, "id": job_id, "done": done}
+
+
+@app.post("/api/chores/weekly-plan/regenerate")
+async def regenerate_weekly_plan(db: AsyncSession = Depends(get_db)):
+    """Delete this week's assignments and regenerate fresh."""
+    week_start = _current_week_start()
+    old = await db.execute(select(WeeklyJob).where(WeeklyJob.week_start == week_start))
+    for j in old.scalars().all():
+        await db.delete(j)
+    await db.commit()
+    chores_res = await db.execute(select(Chore).where(Chore.active == True))
+    jobs = _generate_weekly_jobs(week_start, chores_res.scalars().all())
+    for j in jobs:
+        db.add(j)
+    await db.commit()
+    return {"ok": True, "week_start": week_start, "generated": len(jobs)}
 
 
 @app.get("/api/chores/daily-plan")
