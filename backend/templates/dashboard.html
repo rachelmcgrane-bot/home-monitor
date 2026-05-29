@@ -348,7 +348,9 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .tcal-nav-btn:hover{background:var(--blue);color:#fff}
 .tcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:1;min-height:0}
 .tcal-dow{font-size:.6rem;color:var(--faint);text-align:center;padding:2px 0;font-weight:700;letter-spacing:.04em}
-.tcal-day{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:2px 3px;cursor:pointer;transition:background .1s;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.tcal-day{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:2px 3px;cursor:pointer;transition:background .1s;display:flex;flex-direction:column;min-height:0;overflow-y:auto;overflow-x:hidden}
+.tcal-day::-webkit-scrollbar{width:2px}
+.tcal-day::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 .tcal-day:hover{background:#1e2540}
 .tcal-day.is-today{border-color:var(--blue);background:rgba(96,165,250,.1)}
 .tcal-day.is-sel{border-color:var(--blue);background:rgba(96,165,250,.22)}
@@ -2847,13 +2849,15 @@ async function renderTabCal(){
     const rachelChores=info.Rachel?.chores||[];
     function jobChip(c,person){
       const isDone=c.done,isNotDone=!c.done&&c.score===0&&c.assessment;
-      const dotC=isDone?'#4ade80':isNotDone?'#f87171':'#64748b';
-      const nameW=c.chore_name.split(' ').slice(0,3).join(' ');
-      const safe=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      const partner=person==='Liam'?'Rachel':'Liam';
-      return `<div style="display:flex;align-items:center;gap:1px;background:var(--bg);border-radius:3px;padding:1px 2px;margin-bottom:1px;cursor:pointer;border-left:2px solid ${dotC}"
+      const isDad=person==='Liam';
+      // Border colour = person identity; faded when done or not-done
+      const borderC=isDad?'#3b82f6':'#a855f7';
+      const textC=isDone?'var(--faint)':isNotDone?'rgba(248,113,113,.6)':(isDad?'#93c5fd':'#d8b4fe');
+      const textDecor=isDone?'line-through':'none';
+      const opacity=isDone?'.55':'1';
+      return `<div style="display:flex;align-items:center;gap:1px;background:var(--bg);border-radius:3px;padding:1px 3px;margin-bottom:1px;cursor:pointer;border-left:2px solid ${borderC};opacity:${opacity}"
         onclick="event.stopPropagation();tabSelectDay('${ds}')" title="${c.chore_name}">
-        <span style="font-size:.38rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sub);max-width:100%">${nameW}</span>
+        <span style="font-size:.4rem;color:${textC};text-decoration:${textDecor};line-height:1.3;word-break:break-word">${esc(c.chore_name)}</span>
       </div>`;
     }
     const allChips=[
