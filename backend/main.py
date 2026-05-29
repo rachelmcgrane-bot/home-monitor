@@ -1554,6 +1554,9 @@ async def close_day(date: Optional[str] = Form(None), db: AsyncSession = Depends
         select(ChoreAssessment).where(ChoreAssessment.assessed_date == target_date))
     existing = existing_res.scalars().all()
     existing_keys = {(a.person_name, a.chore_name) for a in existing}
+    # Chores actually done (non-not_done) by anyone today — don't auto-close these
+    # as not_done even if it was done by the other person picking it up
+    done_by_anyone = {a.chore_name for a in existing if a.status not in ("not_done",)}
 
     added = 0
     for c in all_chores:
@@ -1562,7 +1565,8 @@ async def close_day(date: Optional[str] = Form(None), db: AsyncSession = Depends
         if c.person_name in ("both", "unassigned"):
             continue
         key = (c.person_name, c.chore_name)
-        if key not in existing_keys:
+        # Skip if this person already has a record, OR if someone else did this chore
+        if key not in existing_keys and c.chore_name not in done_by_anyone:
             db.add(ChoreAssessment(
                 person_name=c.person_name,
                 chore_name=c.chore_name,

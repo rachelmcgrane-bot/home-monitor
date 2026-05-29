@@ -41,7 +41,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 /* Dashboard scroll wrapper */
 .dash-scroll{flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:0}
 /* ── KPI stat strip ── */
-.stats-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:6px 8px 0;flex-shrink:0}
+.stats-strip{display:none}
 .stat-kpi{border-radius:8px;border:1px solid transparent;box-shadow:var(--sh);padding:.32rem .55rem;position:relative;overflow:hidden;cursor:default;min-width:0}
 .stat-kpi::before{display:none}
 .sk-blue{background:linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%)}
@@ -68,11 +68,11 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .pp-arrival{font-size:.68rem;color:var(--sub);font-weight:400}
 .pp-arrival strong{color:var(--blue);font-weight:600}
 /* ── Full donut gauges ── */
-.hd-row{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:.25rem .25rem .05rem;flex-shrink:0}
-.fd-col{display:flex;flex-direction:column;align-items:center;gap:1px}
+.hd-row{display:flex;flex-direction:column;align-items:center;gap:4px;padding:.25rem .25rem .05rem;flex-shrink:0}
+.fd-col{display:flex;flex-direction:column;align-items:center;gap:1px;width:100%}
 .fd-wrap{cursor:pointer;border-radius:10px;transition:background .15s;display:flex;justify-content:center}
 .fd-wrap:hover{background:rgba(255,255,255,.04)}
-.fd-svg{width:110px;height:110px;display:block;flex-shrink:0}
+.fd-svg{width:150px;height:150px;display:block;flex-shrink:0}
 .fd-rot-strip{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;padding:2px 4px;max-width:130px}
 .fd-rot-chip{font-size:.48rem;color:var(--cyan);background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.25);border-radius:10px;padding:.1rem .32rem;white-space:nowrap}
 .fd-legend{display:flex;flex-wrap:wrap;gap:2px 8px;padding:0 2px 2px;justify-content:center}
@@ -369,6 +369,16 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     <button class="tab-btn" onclick="switchTab('chores')">🧹 Jobs</button>
     <button class="tab-btn" onclick="switchTab('calendar')">📅 Calendar</button>
   </nav>
+  <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+    <div style="display:flex;flex-direction:column;align-items:center;background:linear-gradient(135deg,#1e3a8a,#3b82f6);border-radius:7px;padding:.18rem .45rem;min-width:52px">
+      <span style="font-size:.42rem;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.06em">Dad 🌅</span>
+      <span id="kv-todayL" style="font-size:.78rem;font-weight:800;color:#fff;line-height:1.1">—</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;background:linear-gradient(135deg,#831843,#ec4899);border-radius:7px;padding:.18rem .45rem;min-width:52px">
+      <span style="font-size:.42rem;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.06em">Mum 🌅</span>
+      <span id="kv-todayR" style="font-size:.78rem;font-weight:800;color:#fff;line-height:1.1">—</span>
+    </div>
+  </div>
   <a class="cam-link" href="/camera" target="_blank">📷 Camera</a>
 </header>
 
@@ -1805,18 +1815,20 @@ function renderPanel(person,data,viols,ds,ms){
     </div>
 
     <div class="hd-row">
-      <div class="fd-col">
+      <div class="fd-col" style="flex-direction:row;align-items:center;gap:.5rem;padding:0 .4rem">
         ${donut1}
-        <div class="fd-legend">
-          <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#4ade80"></div>Done${pct>100?` <span style="color:var(--amber);font-weight:700">🔥${pct}%</span>`:''}
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <div class="fd-legend" style="justify-content:flex-start">
+            <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#4ade80"></div>Done${pct>100?` <span style="color:var(--amber);font-weight:700">🔥${pct}%</span>`:''}
+            </div>
+            ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>+${extraCount} extra</div>`:''}
           </div>
-          ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>+${extraCount} extra</div>`:''}
+          ${rotStrip}
         </div>
-        ${rotStrip}
       </div>
-      <div class="fd-col">
+      <div class="fd-col" style="flex-direction:row;align-items:center;gap:.5rem;padding:0 .4rem">
         ${donut2}
-        <div class="fd-legend">
+        <div class="fd-legend" style="justify-content:flex-start">
           <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fb923c"></div>Not done</div>
         </div>
       </div>
