@@ -628,6 +628,13 @@ async def add_chore_to_day(
     else:
         assessment_text = notes.strip() or "Manually recorded"
 
+    # "Done by <other person>" records give the original person zero credit.
+    # Force score/pts to 0 at storage time so nothing downstream can count them.
+    if assessment_text.lower().startswith("done by "):
+        score = 0
+        pts_earned = 0
+        status = "not_done"
+
     # Upsert: update existing assessment if one already exists for this person/chore/date
     existing_res = await db.execute(
         select(ChoreAssessment).where(
@@ -1629,7 +1636,11 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
                     weekly_earned += pts_earned
 
         # Sum ALL assessments for this person today (for KPI total, not just plan items)
-        total_earned_today = sum(a.points_earned or 0 for a in today_ass if a.person_name == person)
+        total_earned_today = sum(
+            a.points_earned or 0 for a in today_ass
+            if a.person_name == person
+            and not (a.assessment_text or "").lower().startswith("done by ")
+        )
         plan[person] = {
             "chores": chore_list,
             "total_points": total_pts,
