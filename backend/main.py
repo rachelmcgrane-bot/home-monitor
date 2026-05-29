@@ -1772,22 +1772,31 @@ async def get_calendar(month: Optional[str] = None, db: AsyncSession = Depends(g
         .order_by(ChoreAssessment.assessed_date))
     assessments = result.scalars().all()
 
-    raw: dict[str, dict[str, int]] = {}
-    for a in assessments:
-        raw.setdefault(a.assessed_date, {})
-        raw[a.assessed_date][a.person_name] = (
-            raw[a.assessed_date].get(a.person_name, 0) + (a.points_earned or 0))
-
     calendar: dict[str, dict] = {}
-    for date, by_person in raw.items():
-        calendar[date] = {}
-        for person, earned in by_person.items():
+    for a in assessments:
+        date = a.assessed_date
+        person = a.person_name
+        if date not in calendar:
+            calendar[date] = {}
+        if person not in calendar[date]:
+            calendar[date][person] = {"earned": 0, "max": 0, "pct": 0, "status": "not_done", "chores": []}
+        calendar[date][person]["earned"] += a.points_earned or 0
+        calendar[date][person]["chores"].append({
+            "chore_name": a.chore_name,
+            "done": (a.status or "") in ("done", "partial") or (a.score or 0) >= 5,
+            "score": a.score or 0,
+            "assessment": a.assessment_text or "",
+        })
+
+    for date, by_person in calendar.items():
+        for person, info in by_person.items():
             max_pts = person_max.get(person, 100)
+            earned = info["earned"]
             pct = int(earned / max_pts * 100) if max_pts else 0
-            calendar[date][person] = {
-                "earned": earned, "max": max_pts, "pct": pct,
-                "status": "done" if pct >= 80 else "partial" if pct >= 40 else "not_done",
-            }
+            info["max"] = max_pts
+            info["pct"] = pct
+            info["status"] = "done" if pct >= 80 else "partial" if pct >= 40 else "not_done"
+
     return {"month": month, "days": calendar, "person_max": person_max}
 
 
