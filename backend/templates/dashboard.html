@@ -1691,7 +1691,8 @@ function renderPanel(person,data,viols,ds,ms){
 
   // Job count labels (given-away jobs count as done for the donut)
   const totalJobs=(data.chores||[]).filter(c=>!c.carried_forward).length;
-  const doneJobs=(data.chores||[]).filter(c=>!c.carried_forward&&(c.done||givenNames.has(c.chore_name))).length;
+  // done_by_other chores are NOT counted as done for this person — the other person did them
+  const doneJobs=(data.chores||[]).filter(c=>!c.carried_forward&&!c.done_by_other&&(c.done||givenNames.has(c.chore_name))).length;
   const notDoneJobs=Math.max(0,totalJobs-doneJobs);
   const notDonePct=totalJobs>0?Math.round(notDoneJobs/totalJobs*100):0;
   const jobsCenterVal=pct+'%';
@@ -1735,8 +1736,9 @@ function renderPanel(person,data,viols,ds,ms){
   function jobRow(c, num){
     const isGiven=givenNames.has(c.chore_name);
     const isCarry=!isGiven&&carryNames.has(c.chore_name);
-    const isDoneByOther=!isGiven&&c.done&&c.assessment&&/^Done by /i.test(c.assessment);
-    const done=c.done||isGiven, partial=!isGiven&&!isCarry&&c.status==='partial';
+    // done_by_other is set server-side; fallback to assessment text check for older records
+    const isDoneByOther=!isGiven&&(c.done_by_other||(!c.done&&c.assessment&&/^Done by /i.test(c.assessment)));
+    const done=c.done||isGiven, partial=!isGiven&&!isCarry&&!isDoneByOther&&c.status==='partial';
     const cls=isGiven?'jl-given':isCarry?'jl-carry':isDoneByOther?'jl-doneby':done?'jl-done':partial?'jl-partial':'jl-pending';
     const icon=isGiven?'':isDoneByOther?'↗':done?'✓':partial?'◑':isCarry?'🔄':'○';
     const nameCls=done?'done':isCarry?'carry':'';

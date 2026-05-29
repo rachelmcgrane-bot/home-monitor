@@ -1342,6 +1342,17 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
         matches = [a for a in assessments if a.person_name == person and a.chore_name == chore]
         return max(matches, key=lambda a: a.score, default=None)
 
+    def resolve_assessment(ta):
+        """Returns (score, pts_earned, done, done_by_other).
+        If the assessment was recorded as 'Done by <other person>', the original
+        person receives no credit and the chore is flagged as done_by_other."""
+        if not ta:
+            return 0, 0, False, False
+        if (ta.assessment_text or "").strip().lower().startswith("done by "):
+            return 0, 0, False, True
+        s = ta.score or 0
+        return s, (ta.points_earned or 0), s >= 5, False
+
     def carry_pts(original_pts: int, ya, day_before_ya) -> int:
         if ya and ya.score < 5:
             if day_before_ya and day_before_ya.score < 5:
@@ -1371,16 +1382,15 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
             if c.chore_type == "core" and c.person_name == person:
                 ta = best(today_ass, person, c.chore_name)
                 ya = best(yest_ass, person, c.chore_name)
-                score = ta.score if ta else 0
-                pts_earned = ta.points_earned if ta else 0
-                done = score >= 5
+                score, pts_earned, done, done_by_other = resolve_assessment(ta)
                 chore_list.append({
                     "id": c.id, "chore_name": c.chore_name,
                     "frequency": c.frequency, "chore_type": "core",
                     "rotating_with": None, "points": c.points,
                     "points_earned": pts_earned, "score": score,
                     "status": ta.status if ta else "pending", "done": done,
-                    "carried_forward": not done and ya is not None and ya.score < 5,
+                    "done_by_other": done_by_other,
+                    "carried_forward": not done and not done_by_other and ya is not None and ya.score < 5,
                     "when_suits": False, "is_weekly_target": False,
                     "assessment": ta.assessment_text if ta else None,
                     "commentary": ta.commentary_text if ta else None,
@@ -1403,15 +1413,14 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
         for c in all_chores:
             if c.chore_type == "rotating" and c.person_name == person and c.chore_name in _sel_rotating:
                 ta = best(today_ass, person, c.chore_name)
-                score = ta.score if ta else 0
-                pts_earned = ta.points_earned if ta else 0
-                done = score >= 5
+                score, pts_earned, done, done_by_other = resolve_assessment(ta)
                 chore_list.append({
                     "id": c.id, "chore_name": c.chore_name,
                     "frequency": c.frequency, "chore_type": "rotating",
                     "rotating_with": c.rotating_with, "points": c.points,
                     "points_earned": pts_earned, "score": score,
                     "status": ta.status if ta else "pending", "done": done,
+                    "done_by_other": done_by_other,
                     "carried_forward": False,
                     "when_suits": False, "is_weekly_target": False,
                     "assessment": ta.assessment_text if ta else None,
@@ -1440,9 +1449,7 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
             if monthly_candidates:
                 c = monthly_candidates[0]
                 ta = best(today_ass, person, c.chore_name)
-                score = ta.score if ta else 0
-                pts_earned = ta.points_earned if ta else 0
-                done = score >= 5
+                score, pts_earned, done, done_by_other = resolve_assessment(ta)
                 chore_list.append({
                     "id": c.id, "chore_name": c.chore_name,
                     "frequency": c.frequency, "chore_type": "standard",
@@ -1451,6 +1458,7 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
                     "person_name": c.person_name,
                     "points_earned": pts_earned, "score": score,
                     "status": ta.status if ta else "pending", "done": done,
+                    "done_by_other": done_by_other,
                     "carried_forward": False,
                     "when_suits": False, "is_weekly_target": False,
                     "assessment": ta.assessment_text if ta else None,
@@ -1478,12 +1486,10 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
                 ta = best(today_ass, person, c.chore_name)
                 ya = best(yest_ass, person, c.chore_name)
                 day_before_ya = best(day_before_ass, person, c.chore_name)
-                score = ta.score if ta else 0
-                pts_earned = ta.points_earned if ta else 0
-                done = score >= 5
+                score, pts_earned, done, done_by_other = resolve_assessment(ta)
                 is_when_suits = c.frequency == "when-suits"
                 is_weekly = c.frequency in ("weekly", "when-suits", "bi-weekly", "bi-monthly")
-                carried = (c.frequency == "daily" and not done
+                carried = (c.frequency == "daily" and not done and not done_by_other
                            and (not ya or ya.score < 5))
                 adj_pts = carry_pts(c.points, ya, day_before_ya) if carried else c.points
                 chore_list.append({
@@ -1494,6 +1500,7 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
                     "person_name": c.person_name,
                     "points_earned": pts_earned, "score": score,
                     "status": ta.status if ta else "pending", "done": done,
+                    "done_by_other": done_by_other,
                     "carried_forward": carried,
                     "when_suits": is_when_suits,
                     "is_weekly_target": is_weekly,
