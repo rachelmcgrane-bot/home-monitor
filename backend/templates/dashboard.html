@@ -1142,7 +1142,7 @@ async function quickMarkDone(person, choreName){
   try{
     const res=await fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd});
     if(res.ok){
-      playMarioCoin();
+      playMarioFanfare();
       loadDashboard();
     }else{
       const d=await res.json().catch(()=>({}));
@@ -1169,6 +1169,7 @@ async function quickMarkNotDone(person, choreName){
   try{
     const res=await fetch(`${API}/api/chores/day-add`,{method:'POST',body:fd});
     if(res.ok){
+      playSadTrombone();
       showToast(`✗ "${choreName}" marked as not completed`,'var(--rose)');
       loadDashboard();
     } else {
@@ -1884,10 +1885,10 @@ function renderPanel(person,data,viols,ds,ms,wp){
         </div>
         <div class="job-list-wrap">
           <div class="job-list panel-drop-zone" id="chips-${person}" data-person="${person}">
+            ${weeklySection}
             ${shown.map((c,i)=>jobRow(c,i+1)).join('')}
             ${extraJobsForMe.map(extraRow).join('')}
             ${!shown.length&&!extraCount?'<div class="empty" style="padding:.8rem;font-size:.75rem">No chores assigned</div>':''}
-            ${weeklySection}
           </div>
         </div>
       </div>
@@ -2880,29 +2881,28 @@ async function renderTabCal(){
     const LP=info.Liam?.pct??null,RP=info.Rachel?.pct??null;
     const hasData=LP!==null||RP!==null;
     const cls=`tcal-day${isT?' is-today':''}${isSel?' is-sel':''}${fut?' is-future':''}`;
-    // Build job chips for Liam and Rachel
+    // Build L/R summary lines for each day cell
     const liamChores=info.Liam?.chores||[];
     const rachelChores=info.Rachel?.chores||[];
-    function jobChip(c,person){
-      const isDone=c.done,isNotDone=!c.done&&c.score===0&&c.assessment;
-      const isDad=person==='Liam';
-      // Border colour = person identity; faded when done or not-done
-      const borderC=isDad?'#3b82f6':'#a855f7';
-      const textC=isDone?'var(--faint)':isNotDone?'rgba(248,113,113,.6)':(isDad?'#93c5fd':'#d8b4fe');
-      const textDecor=isDone?'line-through':'none';
-      const opacity=isDone?'.55':'1';
-      return `<div style="display:flex;align-items:center;gap:1px;background:var(--bg);border-radius:3px;padding:1px 3px;margin-bottom:1px;cursor:pointer;border-left:2px solid ${borderC};opacity:${opacity}"
-        onclick="event.stopPropagation();tabSelectDay('${ds}')" title="${c.chore_name}">
-        <span style="font-size:.4rem;color:${textC};text-decoration:${textDecor};line-height:1.3;word-break:break-word">${esc(c.chore_name)}</span>
+    function personSum(chores,person){
+      if(!chores.length) return '';
+      const isD=person==='Liam';
+      const col=isD?'#93c5fd':'#d8b4fe';
+      const lbl=isD?'L':'R';
+      const done=chores.filter(c=>c.done).length;
+      const notDone=chores.length-done;
+      const dbo=chores.filter(c=>!c.done&&c.assessment&&/^Done by /i.test(c.assessment)).length;
+      return `<div style="display:flex;align-items:center;gap:2px;font-size:.54rem;font-weight:700;line-height:1.55;padding:0 1px">
+        <span style="color:${col}">${lbl}:</span>
+        <span style="color:#4ade80">${done}✓</span>
+        ${notDone?`<span style="color:rgba(248,113,133,.8)">${notDone}✗</span>`:''}
+        ${dbo?`<span style="color:#fbbf24">${dbo}↗</span>`:''}
       </div>`;
     }
-    const allChips=[
-      ...liamChores.map(c=>jobChip(c,'Liam')),
-      ...rachelChores.map(c=>jobChip(c,'Rachel'))
-    ].join('');
-    html+=`<div class="${cls}" data-date="${ds}" ${fut?'':` onclick="tabSelectDay('${ds}')"`}>
+    const summaryHtml=personSum(liamChores,'Liam')+personSum(rachelChores,'Rachel');
+    html+=`<div class="${cls}" data-date="${ds}" ${fut?'':` onclick="tabSelectDay('${ds}')"`} title="${fut?'':'Tap to view & assign jobs'}">
       <div class="tcal-daynum" style="color:${isT?'var(--blue)':'var(--text)'};font-weight:${isT?700:400}">${d}</div>
-      ${allChips}
+      ${summaryHtml}
     </div>`;
   }
   grid.innerHTML=html;
