@@ -320,8 +320,15 @@ async def startup():
         seen_persons: dict = {}
         for p in persons_all:
             if p.name in seen_persons:
-                await db.delete(seen_persons[p.name])   # delete lower-id duplicate
-            seen_persons[p.name] = p                     # keep latest (highest id)
+                old_p = seen_persons[p.name]   # lower-id (older) duplicate
+                keep_id = p.id
+                # Re-point any sightings that reference the old person to the kept one
+                await db.execute(
+                    sql_update(Sighting)
+                    .where(Sighting.person_id == old_p.id)
+                    .values(person_id=keep_id))
+                await db.delete(old_p)
+            seen_persons[p.name] = p           # keep latest (highest id)
 
         await db.commit()
 
