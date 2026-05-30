@@ -1334,9 +1334,11 @@ def _generate_weekly_jobs(week_start: str, all_chores) -> list:
     monthly_deadline = (week_dt + timedelta(days=14)).strftime("%Y-%m-%d")
 
     # Weekly pool: standard chores that are shared or weekly-frequency
+    # Exclude "unassigned" — those are pick-up-when-suits jobs, not auto-allocated
     weekly_pool = [c for c in all_chores if c.active and c.chore_type == "standard"
+                   and c.person_name != "unassigned"
                    and (c.person_name == "both"
-                        or c.frequency in ("weekly", "when-suits", "bi-weekly"))]
+                        or c.frequency in ("weekly", "bi-weekly"))]
     rng.shuffle(weekly_pool)
     take = min(len(weekly_pool), 6)
     chosen = weekly_pool[:take]
@@ -1346,9 +1348,10 @@ def _generate_weekly_jobs(week_start: str, all_chores) -> list:
     else:
         rachel_w, liam_w = chosen[:3], chosen[3:]
 
-    # Monthly pool
+    # Monthly pool — exclude unassigned for the same reason
     monthly_pool = [c for c in all_chores if c.active and c.frequency == "monthly"
-                    and c.person_name in ("both", "Liam", "Rachel")]
+                    and c.person_name in ("both", "Liam", "Rachel")
+                    and c.person_name != "unassigned"]
     rng.shuffle(monthly_pool)
     liam_m  = monthly_pool[:1]
     rachel_m = monthly_pool[1:2] if len(monthly_pool) > 1 else monthly_pool[:1]
