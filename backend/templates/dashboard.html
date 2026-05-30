@@ -101,15 +101,11 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .jl-item.jl-weekly .jl-name{color:#fcd34d}
 .jl-item.jl-weekly-done{border-left-color:var(--green);opacity:.55}
 .jl-item.jl-weekly-done .jl-name{color:var(--green);text-decoration:line-through}
-/* Countdown chips under donuts */
-.wk-countdown{font-size:.56rem;color:var(--amber);background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:.12rem .4rem;text-align:center;white-space:nowrap;font-weight:600;margin:.1rem auto}
-.wk-countdown.overdue{color:var(--rose);background:rgba(251,113,133,.12);border-color:rgba(251,113,133,.3)}
 /* Weekly jobs section divider */
 .wk-section-hdr{font-size:.52rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.07em;padding:.25rem .5rem .1rem;flex-shrink:0;display:flex;align-items:center;gap:.35rem}
 .wk-section-hdr::before{content:'';flex:0 0 1px;height:1px;background:rgba(245,158,11,.3)}
 .wk-badge-wkly{background:rgba(245,158,11,.18);color:#fcd34d;font-size:.44rem;padding:.06rem .25rem;border-radius:3px;font-weight:700;flex-shrink:0}
 .wk-badge-mthly{background:rgba(192,132,252,.18);color:var(--purple);font-size:.44rem;padding:.06rem .25rem;border-radius:3px;font-weight:700;flex-shrink:0}
-.wk-timer{font-size:.48rem;color:var(--faint);flex-shrink:0;font-family:'SF Mono','Courier New',monospace}
 .jl-item.jl-given{border-left-color:var(--amber);background:rgba(251,191,36,.04);opacity:.75}
 .jl-item.jl-given .jl-name{color:var(--amber);text-decoration:line-through}
 .jl-item.jl-doneby{border-left-color:var(--amber);background:rgba(251,191,36,.07)}
@@ -497,7 +493,6 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
           <button type="submit" class="btn" id="enrolBtn">Add Person</button>
         </form>
         <div class="person-list" id="personList"></div>
-        <button class="btn-sm" onclick="removeDuplicatePersons()" style="margin-top:.6rem;background:var(--orange);color:#fff;border:none;border-radius:7px;padding:.32rem .75rem;font-size:.72rem;cursor:pointer">🗑 Remove Duplicates</button>
         <!-- Kids section -->
         <div style="margin-top:.9rem;border-top:1px solid var(--border);padding-top:.7rem">
           <div class="card-title" style="margin-bottom:.5rem">👶 Kids</div>
@@ -1686,24 +1681,6 @@ async function doPickup(person){
   }catch(err){msg.className='msg err';msg.textContent='✗ '+err.message;}
 }
 
-function countdownStr(deadlineDateStr){
-  if(!deadlineDateStr)return'—';
-  const dl=new Date(deadlineDateStr+'T07:00:00Z');
-  const diff=dl-Date.now();
-  if(diff<=0)return'overdue';
-  const d=Math.floor(diff/86400000);
-  const h=Math.floor((diff%86400000)/3600000);
-  const m=Math.floor((diff%3600000)/60000);
-  return d>0?`${d}d ${h}h`:`${h}h ${m}m`;
-}
-// Tick countdowns every minute
-setInterval(()=>{
-  document.querySelectorAll('[data-countdown]').forEach(el=>{
-    const s=countdownStr(el.dataset.countdown);
-    el.textContent=s;
-    el.className=el.className.replace(' overdue','')+(s==='overdue'?' overdue':'');
-  });
-},60000);
 
 async function weeklyJobDone(id,done){
   const fd=new FormData();fd.append('done',done?'true':'false');
@@ -1810,26 +1787,17 @@ function renderPanel(person,data,viols,ds,ms,wp){
                     `data-person="${person}" data-chore-name="${esc(c.chore_name)}"`;
     const safe=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 
-    // Build onclick: given-away jobs have no action; others open detail or mark done
+    // Single click = toggle done/undone; right-click = context menu
     let rowClick='';
-    if(!isGiven){
-      if(hasDetail){
-        const choreJson=JSON.stringify({...c,person_name:person})
-          .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-          .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-        rowClick=` data-chore='${choreJson}' onclick="choreClick(this)" style="cursor:pointer"`;
-      } else if(!done){
-        rowClick=` onclick="quickMarkDone('${person}','${safe}')" style="cursor:pointer" title="Tap to mark done"`;
-      }
+    if(!isGiven&&!isDoneByOther){
+      const toggleFn=done
+        ?`quickMarkNotDone('${person}','${safe}')`
+        :`quickMarkDone('${person}','${safe}')`;
+      rowClick=` onclick="${toggleFn}" style="cursor:pointer" title="${done?'Tap to undo':'Tap to mark done'}"`;
     }
 
     // Right-click context menu trigger (even for done / given items)
     const ctxAttr=`data-ctx-person="${person}" data-ctx-chore="${esc(c.chore_name)}" data-ctx-done="${done?1:0}"`;
-
-    // Tap-to-done button shown alongside detail items (fixes "won't mark as done")
-    const markBtn=(!isGiven&&hasDetail&&!done)
-      ?`<button class="jl-done-btn" onclick="event.stopPropagation();quickMarkDone('${person}','${safe}')" title="Mark done">✓</button>`
-      :'';
 
     const numBadge=num?`<span class="jl-num">${num}</span>`:'';
     return `<div class="jl-item ${cls}" ${dragAttrs}${rowClick} ${ctxAttr}>
@@ -1837,7 +1805,7 @@ function renderPanel(person,data,viols,ds,ms,wp){
                :`<span class="jl-icon" style="color:var(--amber)">→</span>`}
       ${numBadge}<span class="jl-icon">${isGiven?'':icon}</span>
       <span class="jl-name ${nameCls}">${esc(c.chore_name)}</span>
-      ${badge}${markBtn}
+      ${badge}
     </div>`;
   }
 
@@ -1857,19 +1825,12 @@ function renderPanel(person,data,viols,ds,ms,wp){
 
   // ── Weekly plan for this person ──────────────────────────────────────────
   const myWeeklyJobs=(wp&&wp.jobs?wp.jobs:[]).filter(j=>j.person_name===person);
-  const wklyDL=wp&&wp.weekly_deadline?wp.weekly_deadline:null;
-  const mthlyDL=wp&&wp.monthly_deadline?wp.monthly_deadline:null;
-  const wklyStr=countdownStr(wklyDL);
-  const mthlyStr=countdownStr(mthlyDL);
-  const wklyOverdue=wklyStr==='overdue';
-  const mthlyOverdue=mthlyStr==='overdue';
 
   function weeklyRow(j,num){
     const safe=j.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     const isMthly=j.job_type==='monthly';
     const cls=j.done?'jl-weekly-done':'jl-weekly';
     const tBadge=isMthly?`<span class="wk-badge-mthly">📅 mthly</span>`:`<span class="wk-badge-wkly">📅 wkly</span>`;
-    const timerStr=countdownStr(j.deadline);
     const actionBtn=j.done
       ?`<button style="background:none;border:1px solid var(--faint);color:var(--faint);border-radius:5px;padding:.12rem .3rem;font-size:.58rem;cursor:pointer" onclick="weeklyJobDone(${j.id},false)" title="Undo">↩</button>`
       :`<button class="jl-done-btn" onclick="weeklyJobDone(${j.id},true)" title="Mark done">✓</button>`;
@@ -1878,7 +1839,6 @@ function renderPanel(person,data,viols,ds,ms,wp){
       <span class="jl-icon">${j.done?'✓':'📅'}</span>
       <span class="jl-name">${esc(j.chore_name)}</span>
       ${tBadge}
-      <span class="wk-timer" data-countdown="${j.deadline}">${timerStr}</span>
       ${actionBtn}
     </div>`;
   }
@@ -1909,14 +1869,12 @@ function renderPanel(person,data,viols,ds,ms,wp){
             ${rotStrip}
           </div>
         </div>
-        ${wklyDL?`<div class="wk-countdown${wklyOverdue?' overdue':''}" data-countdown="${wklyDL}">⏱ Wkly: ${wklyStr}</div>`:''}
         <div class="fd-col" style="flex-direction:row;align-items:center;gap:.4rem;padding:0 .3rem">
           ${donut2}
           <div class="fd-legend" style="justify-content:flex-start">
             <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fb923c"></div>Not done</div>
           </div>
         </div>
-        ${mthlyDL?`<div class="wk-countdown${mthlyOverdue?' overdue':''}" data-countdown="${mthlyDL}">📅 Mthly: ${mthlyStr}</div>`:''}
       </div>
       <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
         <div class="chore-list-hdr">
@@ -2787,10 +2745,6 @@ async function refreshDesc(id,name){
   else showToast(`⚠️ Could not generate profile`,'var(--orange)');
 }
 async function delPerson(id,name){if(!confirm(`Remove ${name}?`))return;await fetch(`${API}/api/persons/${id}`,{method:'DELETE'});loadPersons();}
-async function removeDuplicatePersons(){
-  const r=await fetch(`${API}/api/persons/duplicates`,{method:'DELETE'}).then(r=>r.json()).catch(()=>({ok:false}));
-  if(r.ok){showToast(`✓ Removed ${r.removed} duplicate${r.removed!==1?'s':''}`,r.removed?'var(--green)':'var(--sub)');loadPersons();}
-}
 
 // ── Kids (localStorage) ───────────────────────────────────────────────────────
 const DEFAULT_KIDS=[{name:'Ben',age:7},{name:'Louis',age:4},{name:'Lidia',age:1.5}];

@@ -313,6 +313,16 @@ async def startup():
                 sql_update(Chore)
                 .where(Chore.person_name == person, Chore.chore_name == name)
                 .values(chore_type="rotating", rotating_with=partner))
+
+        # ── Auto-dedup Person records: keep highest id per name ──────────────
+        persons_res = await db.execute(select(Person).order_by(Person.name, Person.id))
+        persons_all = persons_res.scalars().all()
+        seen_persons: dict = {}
+        for p in persons_all:
+            if p.name in seen_persons:
+                await db.delete(seen_persons[p.name])   # delete lower-id duplicate
+            seen_persons[p.name] = p                     # keep latest (highest id)
+
         await db.commit()
 
 
@@ -341,16 +351,16 @@ def _date_minus(date_str: str, days: int) -> str:
 
 def _chore_matches(chore_name: str, task: str) -> bool:
     """Return True if the AI task description plausibly refers to this chore.
-    Uses 5-char word stems with a 60% match threshold to reduce false positives."""
+    Uses 4-char word stems with a 40% match threshold for looser matching."""
     stop = {"the","a","an","is","are","and","or","to","of","in","on","up","out","down"}
     words = [w.strip(".,!?").lower() for w in chore_name.split()
-             if w.lower() not in stop and len(w) > 3]
+             if w.lower() not in stop and len(w) > 2]
     task_low = task.lower()
     if not words:
         return False
-    # Use 5-char stem and require 60% of significant words to match
-    matched = sum(1 for w in words if w[:5] in task_low)
-    return matched / len(words) >= 0.6
+    # 4-char stem OR full word substring; require 40% of significant words to match
+    matched = sum(1 for w in words if w[:4] in task_low or w in task_low)
+    return matched / len(words) >= 0.4
 
 def _day_qualifies_every2(chore_id: int, today: str) -> bool:
     """Return True if an every-2-days chore should appear today."""
