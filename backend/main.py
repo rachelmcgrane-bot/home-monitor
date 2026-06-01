@@ -285,6 +285,16 @@ async def startup():
                 .where(Chore.person_name == person, Chore.chore_name == name)
                 .values(active=False))
 
+        # ── Fix milk chores FIRST (before dedup) so all copies land on the
+        #    same (unassigned, standard) key and the dedup below collapses them
+        for _milk in ["Bring in milk delivery", "Put milk in fridge"]:
+            await db.execute(
+                sql_update(Chore)
+                .where(Chore.chore_name == _milk)
+                .values(chore_type="standard", person_name="unassigned",
+                        rotating_with=None, frequency="daily", active=True))
+        await db.commit()
+
         # ── Deduplicate: if the same (person, name) has multiple active rows,
         #    keep the one with the lowest id and deactivate the rest ──────────
         all_active_res = await db.execute(
@@ -313,14 +323,6 @@ async def startup():
                 sql_update(Chore)
                 .where(Chore.person_name == person, Chore.chore_name == name)
                 .values(chore_type="rotating", rotating_with=partner))
-
-        # ── Fix milk chores: must be unassigned/standard, never rotating ──────
-        for _milk in ["Bring in milk delivery", "Put milk in fridge"]:
-            await db.execute(
-                sql_update(Chore)
-                .where(Chore.chore_name == _milk)
-                .values(chore_type="standard", person_name="unassigned",
-                        rotating_with=None, active=True))
 
         # ── Auto-dedup Person records: keep highest id per name ──────────────
         persons_res = await db.execute(select(Person).order_by(Person.name, Person.id))

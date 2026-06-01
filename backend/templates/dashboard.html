@@ -359,31 +359,39 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .tcal-nav h3{flex:1;text-align:center;font-size:.95rem;font-weight:700}
 .tcal-nav-btn{background:var(--border);border:none;color:var(--text);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center}
 .tcal-nav-btn:hover{background:var(--blue);color:#fff}
-.tcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;flex:0 0 46%;min-height:0;overflow:hidden}
-.tcal-dow{font-size:.58rem;color:var(--faint);text-align:center;padding:2px 0;font-weight:700;letter-spacing:.04em}
-.tcal-day{background:var(--card);border:1px solid var(--border);border-radius:5px;padding:2px 3px;cursor:pointer;transition:background .1s;display:flex;flex-direction:column;min-height:0}
+.tcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;flex:1;min-height:0;overflow:hidden}
+.tcal-dow{font-size:.6rem;color:var(--faint);text-align:center;padding:2px 0;font-weight:700;letter-spacing:.04em}
+.tcal-day{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 4px;cursor:pointer;transition:background .1s;display:flex;flex-direction:column;min-height:0}
 .tcal-day:hover{background:#1e2540}
 .tcal-day.is-today{border-color:var(--blue);background:rgba(96,165,250,.1)}
 .tcal-day.is-sel{border-color:var(--blue);background:rgba(96,165,250,.22)}
 .tcal-day.is-future{opacity:.3;pointer-events:none;cursor:default}
 .tcal-day.is-empty{background:transparent;border-color:transparent;pointer-events:none}
-.tcal-daynum{font-size:.6rem;font-weight:500;margin-bottom:1px}
-.tcal-detail{flex:1;overflow-y:auto;background:var(--card);border-radius:10px;padding:.7rem .8rem;border:1px solid var(--border);display:flex;flex-direction:column;gap:0}
-.tcal-bottom{display:flex;gap:8px;min-height:0}
+.tcal-daynum{font-size:.62rem;font-weight:500;margin-bottom:2px}
+.tcal-bottom{flex:1;min-height:0}
+/* Day detail modal */
+.cdj-modal{display:none;position:fixed;inset:0;z-index:9900;background:rgba(0,0,0,.55);align-items:flex-end;justify-content:center}
+.cdj-modal.open{display:flex}
+.cdj-sheet{background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:600px;max-height:85vh;display:flex;flex-direction:column;padding:0;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.5)}
+.cdj-sheet-hdr{display:flex;align-items:center;padding:.8rem 1rem .6rem;border-bottom:1px solid var(--border);flex-shrink:0;gap:.6rem}
+.cdj-sheet-body{flex:1;overflow-y:auto;padding:.6rem 1rem 1.2rem}
 /* Calendar detail job rows */
-.cdj-row{display:flex;align-items:center;gap:.5rem;padding:.42rem .5rem;border-radius:7px;background:var(--bg);margin-bottom:.22rem;border-left:3px solid transparent;cursor:pointer;transition:background .1s}
+.cdj-row{display:flex;align-items:center;gap:.55rem;padding:.5rem .55rem;border-radius:8px;background:var(--bg);margin-bottom:.28rem;border-left:3px solid transparent;transition:background .1s}
 .cdj-row:hover{background:#1e2540}
-.cdj-done{border-left-color:var(--green);opacity:.65}
+.cdj-done{border-left-color:var(--green);opacity:.6}
 .cdj-notdone{border-left-color:var(--rose)}
 .cdj-byother{border-left-color:var(--amber)}
 .cdj-pending{border-left-color:var(--border)}
-.cdj-icon{font-size:.75rem;flex-shrink:0;width:14px;text-align:center}
-.cdj-name{font-size:.72rem;flex:1;min-width:0}
-.cdj-btns{display:flex;gap:.25rem;flex-shrink:0}
-.cdj-btn{border-radius:5px;padding:.18rem .42rem;font-size:.62rem;font-weight:600;cursor:pointer;border:1px solid;white-space:nowrap}
+.cdj-icon{font-size:.8rem;flex-shrink:0;width:16px;text-align:center}
+.cdj-name{font-size:.78rem;flex:1;min-width:0}
+.cdj-btns{display:flex;gap:.3rem;flex-shrink:0}
+.cdj-btn{border-radius:6px;padding:.22rem .52rem;font-size:.66rem;font-weight:600;cursor:pointer;border:1px solid;white-space:nowrap}
 .cdj-btn-done{background:rgba(74,222,128,.15);border-color:var(--green);color:var(--green)}
 .cdj-btn-undo{background:rgba(100,100,120,.12);border-color:var(--faint);color:var(--faint)}
 .cdj-btn-other{background:rgba(251,191,36,.12);border-color:var(--amber);color:var(--amber)}
+.cdj-person-hdr{display:flex;align-items:center;gap:.5rem;margin:.6rem 0 .35rem;padding-bottom:.3rem;border-bottom:1px solid var(--border)}
+.cdj-person-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.cdj-person-fill{height:100%;border-radius:3px;transition:width .3s}
 </style>
 </head>
 <body>
@@ -659,15 +667,29 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
       <button class="tcal-nav-btn" onclick="tabCalNav(1)">›</button>
       <button onclick="openBulkAdd()" style="margin-left:auto;background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.4);color:var(--blue);border-radius:7px;padding:.3rem .75rem;font-size:.72rem;font-weight:600;cursor:pointer">📅 Add</button>
     </div>
-    <div class="tcal-bottom" style="flex:1;min-height:0">
+    <div class="tcal-bottom">
       <div class="tcal-grid" id="tabCalGrid"></div>
-      <div class="tcal-detail" id="tabDayDetail">
-        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-shrink:0" id="tabDayDetailTitle">
-          <span style="font-size:.78rem;font-weight:700;color:var(--sub)">← Select a day</span>
-        </div>
-        <div id="tabDayDetailBody" style="flex:1;overflow-y:auto"></div>
-      </div>
     </div>
+  </div>
+</div>
+
+<!-- ══ Calendar day detail modal (bottom sheet) ══ -->
+<div class="cdj-modal" id="cdjModal" onclick="if(event.target===this)closeDayModal()">
+  <div class="cdj-sheet">
+    <div class="cdj-sheet-hdr">
+      <div style="flex:1">
+        <div id="cdjModalTitle" style="font-size:.88rem;font-weight:800;color:var(--text)"></div>
+        <div id="cdjModalSub" style="font-size:.62rem;color:var(--sub);margin-top:.1rem"></div>
+      </div>
+      <button onclick="closeDayModal()" style="background:var(--border);border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--text);font-size:.9rem;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div class="cdj-sheet-body" id="cdjModalBody"></div>
+  </div>
+</div>
+
+<!-- ══ (placeholder to keep structure) ══ -->
+<div style="display:none" id="tabDayDetail"><div id="tabDayDetailTitle"></div><div id="tabDayDetailBody"></div></div>
+<div style="display:none" id="tab-calendar-close">
   </div>
 </div>
 
@@ -2972,12 +2994,13 @@ async function renderTabCal(){
     </div>`;
   }
   grid.innerHTML=html;
-  // Auto-select today if viewing current month and nothing selected
-  if(!tabSelDay && tabCalY===parseInt(today.slice(0,4)) && tabCalM===parseInt(today.slice(5,7))){
-    tabSelectDay(today);
-  } else if(tabSelDay){
-    tabSelectDay(tabSelDay);
-  }
+}
+
+function closeDayModal(){
+  const m=document.getElementById('cdjModal');
+  if(m) m.classList.remove('open');
+  tabSelDay=null;
+  document.querySelectorAll('#tabCalGrid .tcal-day[data-date]').forEach(el=>el.classList.remove('is-sel'));
 }
 
 async function tabSelectDay(ds){
@@ -2985,16 +3008,20 @@ async function tabSelectDay(ds){
   document.querySelectorAll('#tabCalGrid .tcal-day[data-date]').forEach(el=>{
     el.classList.toggle('is-sel',el.dataset.date===ds);
   });
-  const titleEl=document.getElementById('tabDayDetailTitle');
-  const bodyEl=document.getElementById('tabDayDetailBody');
+  const modal=document.getElementById('cdjModal');
+  const titleEl=document.getElementById('cdjModalTitle');
+  const subEl=document.getElementById('cdjModalSub');
+  const bodyEl=document.getElementById('cdjModalBody');
   const today=todayStr();
   const isFuture=ds>today;
   const isToday=ds===today;
-  const dateLabel=isToday?`Today (${ds})`:ds;
-  titleEl.innerHTML=`
-    <span style="font-size:.82rem;font-weight:700;color:${isToday?'var(--blue)':'var(--text)'}">${dateLabel}</span>
-    ${isFuture?'<span style="font-size:.6rem;color:var(--faint)">(future)</span>':''}`;
-  bodyEl.innerHTML='<div style="color:var(--sub);font-size:.75rem;padding:.5rem">Loading…</div>';
+  const dt=new Date(ds+'T12:00:00');
+  const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const MTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  titleEl.textContent=`${DAYS[dt.getDay()]} ${dt.getDate()} ${MTHS[dt.getMonth()]}`;
+  subEl.textContent=isToday?'Today · tap a job to mark done/undo':isFuture?'Future':'Tap a job to correct it';
+  bodyEl.innerHTML='<div style="color:var(--sub);font-size:.8rem;padding:.5rem">Loading…</div>';
+  modal.classList.add('open');
 
   const planData=await fetch(`${API}/api/chores/daily-plan?date=${ds}`).then(r=>r.json()).catch(()=>({plan:{}}));
 
@@ -3005,16 +3032,14 @@ async function tabSelectDay(ds){
     if(!chores.length) continue;
     const pct=planData.plan[person]?.pct||0;
     const doneCount=chores.filter(c=>c.done).length;
+    const notDoneCount=chores.length-doneCount;
     const barC=pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--rose)';
     const personCol=person==='Liam'?'#93c5fd':'#d8b4fe';
-    html+=`<div style="margin-bottom:1rem">
-      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--border)">
-        <span style="font-size:.72rem;font-weight:700;color:${personCol}">${dn(person)}</span>
-        <div style="flex:1;height:5px;background:var(--border);border-radius:3px">
-          <div style="height:5px;background:${barC};border-radius:3px;width:${pct}%;transition:width .3s"></div>
-        </div>
-        <span style="font-size:.68rem;font-weight:700;color:${barC}">${doneCount}/${chores.length}</span>
-      </div>`;
+    html+=`<div class="cdj-person-hdr">
+      <span style="font-size:.75rem;font-weight:700;color:${personCol};min-width:36px">${dn(person)}</span>
+      <div class="cdj-person-bar"><div class="cdj-person-fill" style="background:${barC};width:${pct}%"></div></div>
+      <span style="font-size:.7rem;font-weight:700;color:${barC};min-width:40px;text-align:right">${doneCount}✓ ${notDoneCount}✗</span>
+    </div>`;
 
     for(const c of chores){
       const isDone=c.done;
@@ -3022,21 +3047,21 @@ async function tabSelectDay(ds){
       const isNotDone=!isDone&&c.score===0&&c.assessment&&!isDoneByOther;
       const rowCls=isDoneByOther?'cdj-byother':isDone?'cdj-done':isNotDone?'cdj-notdone':'cdj-pending';
       const icon=isDoneByOther?'↗':isDone?'✓':isNotDone?'✗':'○';
-      const nameDecor=isDone?'text-decoration:line-through;':'';
+      const nameDecor=isDone?'text-decoration:line-through;color:var(--faint);':'';
       const safe=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       const typeTag=c.chore_type==='core'
-        ?`<span style="font-size:.5rem;color:var(--blue);background:rgba(96,165,250,.12);padding:.07rem .25rem;border-radius:3px">core</span>`
+        ?`<span style="font-size:.52rem;color:var(--blue);background:rgba(96,165,250,.12);padding:.08rem .28rem;border-radius:3px">core</span>`
         :c.chore_type==='rotating'
-        ?`<span style="font-size:.5rem;color:var(--purple);background:rgba(192,132,252,.12);padding:.07rem .25rem;border-radius:3px">↻</span>`:'';
-      const byOtherNote=isDoneByOther?`<span style="font-size:.58rem;color:var(--amber)">${esc(c.assessment)}</span>`:'';
+        ?`<span style="font-size:.52rem;color:var(--purple);background:rgba(192,132,252,.12);padding:.08rem .28rem;border-radius:3px">↻</span>`:'';
+      const byOtherNote=isDoneByOther?`<span style="font-size:.62rem;color:var(--amber);margin-left:.2rem">${esc(c.assessment)}</span>`:'';
 
       let btns='';
       if(!isFuture){
         if(!isDone){
-          btns=`<button class="cdj-btn cdj-btn-done" onclick="calMarkDone('${person}','${safe}','${ds}')">✓ Done</button>
-          <button class="cdj-btn cdj-btn-other" onclick="calMarkDoneByOther('${partner}','${safe}','${person}','${ds}')">→${dn(partner).charAt(0)}</button>`;
+          btns=`<button class="cdj-btn cdj-btn-done" onclick="calMarkDone('${person}','${safe}','${ds}');tabSelectDay('${ds}')">✓</button>
+          <button class="cdj-btn cdj-btn-other" onclick="calMarkDoneByOther('${partner}','${safe}','${person}','${ds}');tabSelectDay('${ds}')">→${dn(partner).charAt(0)}</button>`;
         } else {
-          btns=`<button class="cdj-btn cdj-btn-undo" onclick="calMarkNotDone('${person}','${safe}','${ds}')">↩ Undo</button>`;
+          btns=`<button class="cdj-btn cdj-btn-undo" onclick="calMarkNotDone('${person}','${safe}','${ds}');tabSelectDay('${ds}')">↩</button>`;
         }
       }
 
@@ -3047,10 +3072,9 @@ async function tabSelectDay(ds){
         <div class="cdj-btns">${btns}</div>
       </div>`;
     }
-    html+='</div>';
   }
 
-  if(!html) html='<div style="color:var(--faint);font-size:.75rem;padding:.5rem">No jobs for this day.</div>';
+  if(!html) html='<div style="color:var(--faint);font-size:.8rem;padding:.5rem 0">No jobs recorded for this day.</div>';
   bodyEl.innerHTML=html;
 }
 
