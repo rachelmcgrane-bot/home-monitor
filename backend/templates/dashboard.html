@@ -359,19 +359,31 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .tcal-nav h3{flex:1;text-align:center;font-size:.95rem;font-weight:700}
 .tcal-nav-btn{background:var(--border);border:none;color:var(--text);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center}
 .tcal-nav-btn:hover{background:var(--blue);color:#fff}
-.tcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:1;min-height:0}
-.tcal-dow{font-size:.6rem;color:var(--faint);text-align:center;padding:2px 0;font-weight:700;letter-spacing:.04em}
-.tcal-day{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:2px 3px;cursor:pointer;transition:background .1s;display:flex;flex-direction:column;min-height:0;overflow-y:auto;overflow-x:hidden}
-.tcal-day::-webkit-scrollbar{width:2px}
-.tcal-day::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.tcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;flex:0 0 46%;min-height:0;overflow:hidden}
+.tcal-dow{font-size:.58rem;color:var(--faint);text-align:center;padding:2px 0;font-weight:700;letter-spacing:.04em}
+.tcal-day{background:var(--card);border:1px solid var(--border);border-radius:5px;padding:2px 3px;cursor:pointer;transition:background .1s;display:flex;flex-direction:column;min-height:0}
 .tcal-day:hover{background:#1e2540}
 .tcal-day.is-today{border-color:var(--blue);background:rgba(96,165,250,.1)}
 .tcal-day.is-sel{border-color:var(--blue);background:rgba(96,165,250,.22)}
 .tcal-day.is-future{opacity:.3;pointer-events:none;cursor:default}
 .tcal-day.is-empty{background:transparent;border-color:transparent;pointer-events:none}
 .tcal-daynum{font-size:.6rem;font-weight:500;margin-bottom:1px}
-.tcal-detail{flex:0 0 220px;overflow-y:auto;background:var(--card);border-radius:10px;padding:.6rem;border:1px solid var(--border)}
-.tcal-bottom{display:flex;gap:6px;min-height:0}
+.tcal-detail{flex:1;overflow-y:auto;background:var(--card);border-radius:10px;padding:.7rem .8rem;border:1px solid var(--border);display:flex;flex-direction:column;gap:0}
+.tcal-bottom{display:flex;gap:8px;min-height:0}
+/* Calendar detail job rows */
+.cdj-row{display:flex;align-items:center;gap:.5rem;padding:.42rem .5rem;border-radius:7px;background:var(--bg);margin-bottom:.22rem;border-left:3px solid transparent;cursor:pointer;transition:background .1s}
+.cdj-row:hover{background:#1e2540}
+.cdj-done{border-left-color:var(--green);opacity:.65}
+.cdj-notdone{border-left-color:var(--rose)}
+.cdj-byother{border-left-color:var(--amber)}
+.cdj-pending{border-left-color:var(--border)}
+.cdj-icon{font-size:.75rem;flex-shrink:0;width:14px;text-align:center}
+.cdj-name{font-size:.72rem;flex:1;min-width:0}
+.cdj-btns{display:flex;gap:.25rem;flex-shrink:0}
+.cdj-btn{border-radius:5px;padding:.18rem .42rem;font-size:.62rem;font-weight:600;cursor:pointer;border:1px solid;white-space:nowrap}
+.cdj-btn-done{background:rgba(74,222,128,.15);border-color:var(--green);color:var(--green)}
+.cdj-btn-undo{background:rgba(100,100,120,.12);border-color:var(--faint);color:var(--faint)}
+.cdj-btn-other{background:rgba(251,191,36,.12);border-color:var(--amber);color:var(--amber)}
 </style>
 </head>
 <body>
@@ -441,7 +453,13 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     </div>
 
     <!-- ── Dashboard toolbar ─────────────────────────────────── -->
-    <div style="display:flex;justify-content:flex-end;align-items:center;gap:.4rem;padding:2px 8px 0;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:.4rem;padding:2px 8px 0;flex-shrink:0">
+      <!-- Day navigation -->
+      <button onclick="dashNavDay(-1)" title="Previous day" style="background:var(--border);border:1px solid var(--faint);color:var(--text);border-radius:6px;padding:.22rem .55rem;font-size:.78rem;cursor:pointer">‹</button>
+      <span id="dashDateDisplay" style="font-size:.72rem;font-weight:700;color:var(--blue);min-width:60px;text-align:center">Today</span>
+      <button id="dashNextDayBtn" onclick="dashNavDay(1)" title="Next day" style="display:none;background:var(--border);border:1px solid var(--faint);color:var(--text);border-radius:6px;padding:.22rem .55rem;font-size:.78rem;cursor:pointer">›</button>
+      <button id="dashTodayBtn" onclick="dashGoToday()" title="Back to today" style="display:none;background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.4);color:var(--blue);border-radius:6px;padding:.22rem .55rem;font-size:.7rem;font-weight:600;cursor:pointer">↩ Today</button>
+      <div style="flex:1"></div>
       <button onclick="closeDay()" title="Mark any unlogged core & rotating chores as Not Done for today" style="background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.3);color:var(--rose);border-radius:6px;padding:.22rem .65rem;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--rose)'" onmouseout="this.style.borderColor='rgba(251,113,133,.3)'">
         ✗ Close Day
       </button>
@@ -640,9 +658,11 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     </div>
     <div class="tcal-bottom" style="flex:1;min-height:0">
       <div class="tcal-grid" id="tabCalGrid"></div>
-      <div class="tcal-detail" id="tabDayDetail" style="display:none">
-        <div style="font-size:.72rem;font-weight:700;margin-bottom:.5rem" id="tabDayDetailTitle"></div>
-        <div id="tabDayDetailBody"></div>
+      <div class="tcal-detail" id="tabDayDetail">
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-shrink:0" id="tabDayDetailTitle">
+          <span style="font-size:.78rem;font-weight:700;color:var(--sub)">← Select a day</span>
+        </div>
+        <div id="tabDayDetailBody" style="flex:1;overflow-y:auto"></div>
       </div>
     </div>
   </div>
@@ -1536,6 +1556,39 @@ function renderCharts(plan, viols, daily, calendar, todayAss, familySightings){
       });
 */
 
+// ── Dashboard day navigation ──────────────────────────────────────────────────
+window._dashDate = null; // null = today; 'YYYY-MM-DD' = past day
+
+function _dashDateStr(){ return window._dashDate || todayStr(); }
+
+function _updateDashDateDisplay(){
+  const today=todayStr(), d=window._dashDate;
+  const label=document.getElementById('dashDateDisplay');
+  const nextBtn=document.getElementById('dashNextDayBtn');
+  const todayBtn=document.getElementById('dashTodayBtn');
+  if(label) label.textContent=d?d:'Today';
+  if(nextBtn) nextBtn.style.display=d?'':'none';
+  if(todayBtn) todayBtn.style.display=d?'':'none';
+}
+
+function dashNavDay(delta){
+  const today=todayStr();
+  const base=window._dashDate||today;
+  const dt=new Date(base+'T12:00:00');
+  dt.setDate(dt.getDate()+delta);
+  const nd=dt.toISOString().slice(0,10);
+  if(nd>today) return;
+  window._dashDate=nd===today?null:nd;
+  _updateDashDateDisplay();
+  loadDashboard();
+}
+
+function dashGoToday(){
+  window._dashDate=null;
+  _updateDashDateDisplay();
+  loadDashboard();
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 async function closeDay(){
   if(!confirm('Mark all unlogged core & rotating chores as NOT DONE for today?\nThis cannot be undone easily — only do this at end of day.'))return;
@@ -1556,9 +1609,11 @@ function dashRefresh(){
 async function loadDashboard(){
   // Reset over-100% triumph flags (new load = fresh check)
   delete window._triumph_Liam; delete window._triumph_Rachel;
+  _updateDashDateDisplay();
   const _td=todayStr();
+  const _dateQ=window._dashDate?`?date=${window._dashDate}`:'';
   const [plan,viols,daily,monthly,todayAss,weeklyPlan]=await Promise.all([
-    fetch(`${API}/api/chores/daily-plan`).then(r=>r.json()).catch(()=>({plan:{},unassigned:[]})),
+    fetch(`${API}/api/chores/daily-plan${_dateQ}`).then(r=>r.json()).catch(()=>({plan:{},unassigned:[]})),
     fetch(`${API}/api/violations/today`).then(r=>r.json()).catch(()=>({by_person:{},violations:[]})),
     fetch(`${API}/api/stats/daily`).then(r=>r.json()).catch(()=>({})),
     fetch(`${API}/api/stats/monthly`).then(r=>r.json()).catch(()=>({persons:{}})),
@@ -2906,26 +2961,29 @@ async function renderTabCal(){
     </div>`;
   }
   grid.innerHTML=html;
+  // Auto-select today if viewing current month and nothing selected
+  if(!tabSelDay && tabCalY===parseInt(today.slice(0,4)) && tabCalM===parseInt(today.slice(5,7))){
+    tabSelectDay(today);
+  } else if(tabSelDay){
+    tabSelectDay(tabSelDay);
+  }
 }
 
 async function tabSelectDay(ds){
   tabSelDay=ds;
-  // Update selected highlight on grid cells without re-fetching
   document.querySelectorAll('#tabCalGrid .tcal-day[data-date]').forEach(el=>{
     el.classList.toggle('is-sel',el.dataset.date===ds);
   });
-  const detail=document.getElementById('tabDayDetail');
   const titleEl=document.getElementById('tabDayDetailTitle');
   const bodyEl=document.getElementById('tabDayDetailBody');
-  detail.style.display='block';
   const today=todayStr();
   const isFuture=ds>today;
-  titleEl.innerHTML=`<div style="display:flex;align-items:center;gap:.5rem">
-    <span style="font-size:.78rem;font-weight:700">${ds}</span>
-    ${isFuture?'<span style="font-size:.6rem;color:var(--faint)">(future)</span>':''}
-    <button onclick="document.getElementById('tabDayDetail').style.display='none';tabSelDay=null;renderTabCal()" style="margin-left:auto;background:none;border:none;color:var(--sub);cursor:pointer;font-size:1.1rem;line-height:1">✕</button>
-  </div>`;
-  bodyEl.innerHTML='<div class="empty" style="font-size:.75rem">Loading…</div>';
+  const isToday=ds===today;
+  const dateLabel=isToday?`Today (${ds})`:ds;
+  titleEl.innerHTML=`
+    <span style="font-size:.82rem;font-weight:700;color:${isToday?'var(--blue)':'var(--text)'}">${dateLabel}</span>
+    ${isFuture?'<span style="font-size:.6rem;color:var(--faint)">(future)</span>':''}`;
+  bodyEl.innerHTML='<div style="color:var(--sub);font-size:.75rem;padding:.5rem">Loading…</div>';
 
   const planData=await fetch(`${API}/api/chores/daily-plan?date=${ds}`).then(r=>r.json()).catch(()=>({plan:{}}));
 
@@ -2937,55 +2995,51 @@ async function tabSelectDay(ds){
     const pct=planData.plan[person]?.pct||0;
     const doneCount=chores.filter(c=>c.done).length;
     const barC=pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--rose)';
-    html+=`<div style="margin-bottom:.8rem">
-      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
-        <span style="font-size:.65rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.07em">${dn(person)}</span>
-        <div style="flex:1;height:4px;background:var(--border);border-radius:2px">
-          <div style="height:4px;background:${barC};border-radius:2px;width:${pct}%"></div>
+    const personCol=person==='Liam'?'#93c5fd':'#d8b4fe';
+    html+=`<div style="margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--border)">
+        <span style="font-size:.72rem;font-weight:700;color:${personCol}">${dn(person)}</span>
+        <div style="flex:1;height:5px;background:var(--border);border-radius:3px">
+          <div style="height:5px;background:${barC};border-radius:3px;width:${pct}%;transition:width .3s"></div>
         </div>
-        <span style="font-size:.62rem;color:${barC}">${doneCount}/${chores.length}</span>
+        <span style="font-size:.68rem;font-weight:700;color:${barC}">${doneCount}/${chores.length}</span>
       </div>`;
 
     for(const c of chores){
       const isDone=c.done;
-      const isDoneByOther=isDone&&c.assessment&&/^Done by /i.test(c.assessment);
-      const isNotDone=!isDone&&c.score===0&&c.assessment;
-      const borderC=isDoneByOther?'var(--amber)':isDone?'var(--green)':isNotDone?'var(--rose)':'var(--border)';
-      const iconChar=isDoneByOther?'↗':isDone?'✓':isNotDone?'✗':'○';
-      const iconC=isDoneByOther?'var(--amber)':isDone?'var(--green)':isNotDone?'var(--rose)':'var(--faint)';
-      const nameStyle=isDone?'text-decoration:line-through;opacity:.55':'';
-      const noteText=isDoneByOther?`<span style="font-size:.5rem;color:var(--amber)">${esc(c.assessment)}</span>`:
-                     isNotDone?`<span style="font-size:.5rem;color:var(--rose)">not done</span>`:'';
-      const typeTag=c.chore_type==='core'
-        ?`<span style="font-size:.44rem;color:var(--blue);background:rgba(96,165,250,.12);padding:.05rem .2rem;border-radius:3px;flex-shrink:0">core</span>`
-        :c.chore_type==='rotating'
-        ?`<span style="font-size:.44rem;color:var(--purple);background:rgba(192,132,252,.12);padding:.05rem .2rem;border-radius:3px;flex-shrink:0">↻</span>`:'';
+      const isDoneByOther=!isDone&&c.assessment&&/^Done by /i.test(c.assessment);
+      const isNotDone=!isDone&&c.score===0&&c.assessment&&!isDoneByOther;
+      const rowCls=isDoneByOther?'cdj-byother':isDone?'cdj-done':isNotDone?'cdj-notdone':'cdj-pending';
+      const icon=isDoneByOther?'↗':isDone?'✓':isNotDone?'✗':'○';
+      const nameDecor=isDone?'text-decoration:line-through;':'';
       const safe=c.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const typeTag=c.chore_type==='core'
+        ?`<span style="font-size:.5rem;color:var(--blue);background:rgba(96,165,250,.12);padding:.07rem .25rem;border-radius:3px">core</span>`
+        :c.chore_type==='rotating'
+        ?`<span style="font-size:.5rem;color:var(--purple);background:rgba(192,132,252,.12);padding:.07rem .25rem;border-radius:3px">↻</span>`:'';
+      const byOtherNote=isDoneByOther?`<span style="font-size:.58rem;color:var(--amber)">${esc(c.assessment)}</span>`:'';
 
       let btns='';
       if(!isFuture){
         if(!isDone){
-          btns=`<button onclick="calMarkDone('${person}','${safe}','${ds}')"
-            style="background:rgba(74,222,128,.15);border:1px solid var(--green);color:var(--green);border-radius:4px;padding:.12rem .32rem;font-size:.56rem;cursor:pointer;white-space:nowrap">✓</button>
-          <button onclick="calMarkDoneByOther('${partner}','${safe}','${person}','${ds}')"
-            style="background:rgba(251,191,36,.12);border:1px solid var(--amber);color:var(--amber);border-radius:4px;padding:.12rem .32rem;font-size:.56rem;cursor:pointer;white-space:nowrap">→${dn(partner).charAt(0)}</button>`;
+          btns=`<button class="cdj-btn cdj-btn-done" onclick="calMarkDone('${person}','${safe}','${ds}')">✓ Done</button>
+          <button class="cdj-btn cdj-btn-other" onclick="calMarkDoneByOther('${partner}','${safe}','${person}','${ds}')">→${dn(partner).charAt(0)}</button>`;
         } else {
-          btns=`<button onclick="calMarkNotDone('${person}','${safe}','${ds}')"
-            style="background:rgba(100,100,120,.15);border:1px solid var(--faint);color:var(--faint);border-radius:4px;padding:.12rem .32rem;font-size:.56rem;cursor:pointer;white-space:nowrap">↩</button>`;
+          btns=`<button class="cdj-btn cdj-btn-undo" onclick="calMarkNotDone('${person}','${safe}','${ds}')">↩ Undo</button>`;
         }
       }
 
-      html+=`<div style="display:flex;align-items:center;gap:.35rem;padding:.28rem .32rem;border-radius:6px;background:var(--bg);margin-bottom:.18rem;border-left:2px solid ${borderC}">
-        <span style="color:${iconC};font-size:.68rem;flex-shrink:0">${iconChar}</span>
-        <span style="font-size:.63rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle}">${esc(c.chore_name)}</span>
-        ${noteText}${typeTag}
-        <div style="display:flex;gap:.2rem;flex-shrink:0">${btns}</div>
+      html+=`<div class="cdj-row ${rowCls}">
+        <span class="cdj-icon">${icon}</span>
+        <span class="cdj-name" style="${nameDecor}">${esc(c.chore_name)}</span>
+        ${byOtherNote}${typeTag}
+        <div class="cdj-btns">${btns}</div>
       </div>`;
     }
     html+='</div>';
   }
 
-  if(!html) html='<div class="empty" style="font-size:.75rem">No jobs for this day.</div>';
+  if(!html) html='<div style="color:var(--faint);font-size:.75rem;padding:.5rem">No jobs for this day.</div>';
   bodyEl.innerHTML=html;
 }
 

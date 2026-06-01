@@ -1694,6 +1694,8 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
 @app.post("/api/chores/close-day")
 async def close_day(date: Optional[str] = Form(None), db: AsyncSession = Depends(get_db)):
     """Mark all unassessed core & rotating chores as not_done for the given date.
+    For rotating chores, only marks the subset that was actually in the active
+    rotation for that date (respects _select_rotating_pair logic).
     Idempotent — skips chores that already have any assessment for that date."""
     target_date = date or _today()
     chores_res = await db.execute(select(Chore).where(Chore.active == True))
@@ -1703,8 +1705,13 @@ async def close_day(date: Optional[str] = Form(None), db: AsyncSession = Depends
     existing = existing_res.scalars().all()
     existing_keys = {(a.person_name, a.chore_name) for a in existing}
     # Chores actually done (non-not_done) by anyone today — don't auto-close these
-    # as not_done even if it was done by the other person picking it up
     done_by_anyone = {a.chore_name for a in existing if a.status not in ("not_done",)}
+
+    # Determine which rotating chores were active on this date (uses same logic as daily-plan)
+    _assign_str = _assignment_date(target_date)
+    active_rotating: dict[str, set] = {}  # person → set of chore names due this period
+    for person in ["Liam", "Rachel"]:
+        active_rotating[person] = set(_select_rotating_pair(person, _assign_str))
 
     added = 0
     for c in all_chores:
@@ -1712,6 +1719,10 @@ async def close_day(date: Optional[str] = Form(None), db: AsyncSession = Depends
             continue
         if c.person_name in ("both", "unassigned"):
             continue
+        # For rotating chores: only close if this chore was in the active rotation
+        if c.chore_type == "rotating":
+            if c.chore_name not in active_rotating.get(c.person_name, set()):
+                continue
         key = (c.person_name, c.chore_name)
         # Skip if this person already has a record, OR if someone else did this chore
         if key not in existing_keys and c.chore_name not in done_by_anyone:
