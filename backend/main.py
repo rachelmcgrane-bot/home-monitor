@@ -314,6 +314,14 @@ async def startup():
                 .where(Chore.person_name == person, Chore.chore_name == name)
                 .values(chore_type="rotating", rotating_with=partner))
 
+        # ── Fix milk chores: must be unassigned/standard, never rotating ──────
+        for _milk in ["Bring in milk delivery", "Put milk in fridge"]:
+            await db.execute(
+                sql_update(Chore)
+                .where(Chore.chore_name == _milk)
+                .values(chore_type="standard", person_name="unassigned",
+                        rotating_with=None, active=True))
+
         # ── Auto-dedup Person records: keep highest id per name ──────────────
         persons_res = await db.execute(select(Person).order_by(Person.name, Person.id))
         persons_all = persons_res.scalars().all()
@@ -2511,8 +2519,10 @@ function copyUrl(btn, path) {{
 
 def _html(name): return (BASE_DIR / "templates" / name).read_text(encoding="utf-8")
 
+_NO_CACHE = {"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"}
+
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(): return _html("dashboard.html")
+async def dashboard(): return HTMLResponse(_html("dashboard.html"), headers=_NO_CACHE)
 
 @app.get("/camera", response_class=HTMLResponse)
 async def camera_page(): return _html("camera.html")
