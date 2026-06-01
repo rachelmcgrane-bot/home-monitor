@@ -456,7 +456,10 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
     <div style="display:flex;align-items:center;gap:.4rem;padding:2px 8px 0;flex-shrink:0">
       <!-- Day navigation -->
       <button onclick="dashNavDay(-1)" title="Previous day" style="background:var(--border);border:1px solid var(--faint);color:var(--text);border-radius:6px;padding:.22rem .55rem;font-size:.78rem;cursor:pointer">‹</button>
-      <span id="dashDateDisplay" style="font-size:.72rem;font-weight:700;color:var(--blue);min-width:60px;text-align:center">Today</span>
+      <div style="display:flex;flex-direction:column;align-items:center;line-height:1.2;min-width:90px">
+        <span id="dashDayName" style="font-size:.62rem;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.06em"></span>
+        <span id="dashDateDisplay" style="font-size:.82rem;font-weight:800;color:var(--blue)"></span>
+      </div>
       <button id="dashNextDayBtn" onclick="dashNavDay(1)" title="Next day" style="display:none;background:var(--border);border:1px solid var(--faint);color:var(--text);border-radius:6px;padding:.22rem .55rem;font-size:.78rem;cursor:pointer">›</button>
       <button id="dashTodayBtn" onclick="dashGoToday()" title="Back to today" style="display:none;background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.4);color:var(--blue);border-radius:6px;padding:.22rem .55rem;font-size:.7rem;font-weight:600;cursor:pointer">↩ Today</button>
       <div style="flex:1"></div>
@@ -1563,10 +1566,18 @@ function _dashDateStr(){ return window._dashDate || todayStr(); }
 
 function _updateDashDateDisplay(){
   const today=todayStr(), d=window._dashDate;
+  const viewing=d||today;
+  const dt=new Date(viewing+'T12:00:00');
+  const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const MONTHS_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dayName=DAYS[dt.getDay()];
+  const dateStr=`${dt.getDate()} ${MONTHS_SHORT[dt.getMonth()]}`;
+  const dayEl=document.getElementById('dashDayName');
   const label=document.getElementById('dashDateDisplay');
   const nextBtn=document.getElementById('dashNextDayBtn');
   const todayBtn=document.getElementById('dashTodayBtn');
-  if(label) label.textContent=d?d:'Today';
+  if(dayEl) dayEl.textContent=d?dayName:'Today · '+dayName;
+  if(label) label.textContent=dateStr;
   if(nextBtn) nextBtn.style.display=d?'':'none';
   if(todayBtn) todayBtn.style.display=d?'':'none';
 }
