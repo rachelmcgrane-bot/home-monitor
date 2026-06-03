@@ -471,9 +471,6 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
       <button id="dashNextDayBtn" onclick="dashNavDay(1)" title="Next day" style="display:none;background:var(--border);border:1px solid var(--faint);color:var(--text);border-radius:6px;padding:.22rem .55rem;font-size:.78rem;cursor:pointer">›</button>
       <button id="dashTodayBtn" onclick="dashGoToday()" title="Back to today" style="display:none;background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.4);color:var(--blue);border-radius:6px;padding:.22rem .55rem;font-size:.7rem;font-weight:600;cursor:pointer">↩ Today</button>
       <div style="flex:1"></div>
-      <button onclick="closeDay()" title="Mark any unlogged core & rotating chores as Not Done for today" style="background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.3);color:var(--rose);border-radius:6px;padding:.22rem .65rem;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--rose)'" onmouseout="this.style.borderColor='rgba(251,113,133,.3)'">
-        ✗ Close Day
-      </button>
       <button id="dashRefreshBtn" onclick="dashRefresh()" style="background:var(--border);border:1px solid var(--faint);color:var(--sub);border-radius:6px;padding:.22rem .65rem;font-size:.72rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.3rem;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--faint)';this.style.color='var(--sub)'">
         <span id="dashRefreshIcon" style="display:inline-block;transition:transform .4s">↻</span> Refresh
       </button>
@@ -3028,7 +3025,7 @@ async function tabSelectDay(ds){
   let html='';
   for(const person of ['Liam','Rachel']){
     const partner=person==='Liam'?'Rachel':'Liam';
-    const chores=(planData.plan?.[person]?.chores||[]).filter(c=>!c.carried_forward);
+    const chores=(planData.plan?.[person]?.chores||[]);
     if(!chores.length) continue;
     const pct=planData.plan[person]?.pct||0;
     const doneCount=chores.filter(c=>c.done).length;
@@ -3056,16 +3053,20 @@ async function tabSelectDay(ds){
       const byOtherNote=isDoneByOther?`<span style="font-size:.62rem;color:var(--amber);margin-left:.2rem">${esc(c.assessment)}</span>`:'';
 
       let btns='';
+      let rowClick='';
       if(!isFuture){
         if(!isDone){
-          btns=`<button class="cdj-btn cdj-btn-done" onclick="calMarkDone('${person}','${safe}','${ds}');tabSelectDay('${ds}')">✓</button>
-          <button class="cdj-btn cdj-btn-other" onclick="calMarkDoneByOther('${partner}','${safe}','${person}','${ds}');tabSelectDay('${ds}')">→${dn(partner).charAt(0)}</button>`;
+          btns=`<button class="cdj-btn cdj-btn-done" onclick="event.stopPropagation();calMarkDone('${person}','${safe}','${ds}');tabSelectDay('${ds}')">✓</button>
+          <button class="cdj-btn cdj-btn-other" onclick="event.stopPropagation();calMarkDoneByOther('${partner}','${safe}','${person}','${ds}');tabSelectDay('${ds}')">→${dn(partner).charAt(0)}</button>`;
+          rowClick=`calMarkDone('${person}','${safe}','${ds}');tabSelectDay('${ds}')`;
         } else {
-          btns=`<button class="cdj-btn cdj-btn-undo" onclick="calMarkNotDone('${person}','${safe}','${ds}');tabSelectDay('${ds}')">↩</button>`;
+          btns=`<button class="cdj-btn cdj-btn-undo" onclick="event.stopPropagation();calMarkNotDone('${person}','${safe}','${ds}');tabSelectDay('${ds}')">↩</button>`;
+          rowClick=`calMarkNotDone('${person}','${safe}','${ds}');tabSelectDay('${ds}')`;
         }
       }
+      const rowOnClick=rowClick?`onclick="if(!event.target.closest('.cdj-btn')){${rowClick}}" style="cursor:pointer"`:'';
 
-      html+=`<div class="cdj-row ${rowCls}">
+      html+=`<div class="cdj-row ${rowCls}" ${rowOnClick}>
         <span class="cdj-icon">${icon}</span>
         <span class="cdj-name" style="${nameDecor}">${esc(c.chore_name)}</span>
         ${byOtherNote}${typeTag}

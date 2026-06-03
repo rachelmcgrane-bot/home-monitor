@@ -287,13 +287,26 @@ async def startup():
 
         # ── Fix milk chores FIRST (before dedup) so all copies land on the
         #    same (unassigned, standard) key and the dedup below collapses them
-        for _milk in ["Bring in milk delivery", "Put milk in fridge"]:
+        _milk_names = ["Bring in milk delivery", "Put milk in fridge"]
+        for _milk in _milk_names:
             await db.execute(
                 sql_update(Chore)
                 .where(Chore.chore_name == _milk)
                 .values(chore_type="standard", person_name="unassigned",
                         rotating_with=None, frequency="daily", active=True))
         await db.commit()
+
+        # ── Purge any WeeklyJob records for unassigned/milk chores ──────────
+        _stale_wj = await db.execute(
+            select(WeeklyJob).where(WeeklyJob.chore_name.in_(_milk_names)))
+        for _j in _stale_wj.scalars().all():
+            await db.delete(_j)
+        # Also purge any weekly jobs assigned to "unassigned" (shouldn't exist
+        # but belt-and-braces cleanup)
+        _stale_wj2 = await db.execute(
+            select(WeeklyJob).where(WeeklyJob.person_name == "unassigned"))
+        for _j in _stale_wj2.scalars().all():
+            await db.delete(_j)
 
         # ── Deduplicate: if the same (person, name) has multiple active rows,
         #    keep the one with the lowest id and deactivate the rest ──────────
@@ -1926,14 +1939,19 @@ async def cooking_history(person_name: Optional[str] = None, limit: int = 60,
 
 @app.get("/api/chores/calendar")
 async def get_calendar(month: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+    import calendar as cal_module
+    from collections import defaultdict
     if not month:
-        month = datetime.utcnow().strftime("%Y-%m")
-    chores_res = await db.execute(
-        select(Chore).where(Chore.active == True, Chore.frequency == "daily"))
-    daily_chores = chores_res.scalars().all()
+        month = _today()[:7]
+    today = _today()
+
+    chores_res = await db.execute(select(Chore).where(Chore.active == True))
+    all_chores = chores_res.scalars().all()
+
+    # person_max: baseline total points (core + rotating) per person
     person_max: dict[str, int] = {}
-    for c in daily_chores:
-        if c.person_name != "both":
+    for c in all_chores:
+        if c.chore_type in ("core", "rotating") and c.person_name not in ("both", "unassigned"):
             person_max[c.person_name] = person_max.get(c.person_name, 0) + c.points
 
     result = await db.execute(
@@ -1941,32 +1959,78 @@ async def get_calendar(month: Optional[str] = None, db: AsyncSession = Depends(g
         .order_by(ChoreAssessment.assessed_date))
     assessments = result.scalars().all()
 
-    calendar: dict[str, dict] = {}
+    # Group assessments by (date, person) → {chore_name: ChoreAssessment}
+    ass_by_dp: dict = defaultdict(dict)
     for a in assessments:
-        date = a.assessed_date
-        person = a.person_name
-        if date not in calendar:
-            calendar[date] = {}
-        if person not in calendar[date]:
-            calendar[date][person] = {"earned": 0, "max": 0, "pct": 0, "status": "not_done", "chores": []}
-        calendar[date][person]["earned"] += a.points_earned or 0
-        calendar[date][person]["chores"].append({
-            "chore_name": a.chore_name,
-            "done": (a.status or "") in ("done", "partial") or (a.score or 0) >= 5,
-            "score": a.score or 0,
-            "assessment": a.assessment_text or "",
-        })
+        ass_by_dp[(a.assessed_date, a.person_name)][a.chore_name] = a
 
-    for date, by_person in calendar.items():
-        for person, info in by_person.items():
-            max_pts = person_max.get(person, 100)
-            earned = info["earned"]
+    year, mon = int(month[:4]), int(month[5:7])
+    days_in_month = cal_module.monthrange(year, mon)[1]
+    calendar_data: dict[str, dict] = {}
+
+    for day in range(1, days_in_month + 1):
+        ds = f"{month}-{day:02d}"
+        if ds > today:
+            break  # don't build future days
+
+        _assign_str = _assignment_date(ds)
+        calendar_data[ds] = {}
+
+        for person in ["Liam", "Rachel"]:
+            day_ass = ass_by_dp.get((ds, person), {})  # chore_name → assessment
+
+            # Build the planned set: core + active rotating chores for this date
+            planned: dict[str, dict] = {}
+            for c in all_chores:
+                if c.chore_type == "core" and c.person_name == person:
+                    planned[c.chore_name] = {"points": c.points, "chore_type": "core"}
+            active_rot = set(_select_rotating_pair(person, _assign_str))
+            for c in all_chores:
+                if (c.chore_type == "rotating" and c.person_name == person
+                        and c.chore_name in active_rot):
+                    planned[c.chore_name] = {"points": c.points, "chore_type": "rotating"}
+
+            max_pts = sum(v["points"] for v in planned.values()) if planned else person_max.get(person, 100)
+            earned = 0
+            chores_list = []
+
+            # All planned chores (assessed or not)
+            for cn, info in planned.items():
+                a = day_ass.get(cn)
+                is_done = bool(a and ((a.status or "") in ("done", "partial") or (a.score or 0) >= 5))
+                if is_done:
+                    earned += a.points_earned or 0
+                chores_list.append({
+                    "chore_name": cn, "done": is_done,
+                    "score": a.score if a else 0,
+                    "assessment": a.assessment_text if a else "",
+                    "chore_type": info["chore_type"],
+                })
+
+            # Extra assessments not in the planned set (standard/other chores done that day)
+            for cn, a in day_ass.items():
+                if cn not in planned:
+                    is_done = (a.status or "") in ("done", "partial") or (a.score or 0) >= 5
+                    if is_done:
+                        earned += a.points_earned or 0
+                    chores_list.append({
+                        "chore_name": cn, "done": is_done,
+                        "score": a.score or 0,
+                        "assessment": a.assessment_text or "",
+                        "chore_type": "standard",
+                    })
+
+            if not chores_list:
+                continue  # skip persons with nothing planned/done this day
+
             pct = int(earned / max_pts * 100) if max_pts else 0
-            info["max"] = max_pts
-            info["pct"] = pct
-            info["status"] = "done" if pct >= 80 else "partial" if pct >= 40 else "not_done"
+            calendar_data[ds][person] = {
+                "earned": earned, "max": max_pts, "pct": pct,
+                "status": "done" if pct >= 80 else "partial" if pct >= 40 else "not_done",
+                "chores": chores_list,
+            }
 
-    return {"month": month, "days": calendar, "person_max": person_max}
+    return {"month": month, "days": calendar_data, "person_max": person_max}
 
 
 @app.get("/api/chores/progress")
