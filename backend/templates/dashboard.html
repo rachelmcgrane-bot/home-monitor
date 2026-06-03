@@ -785,7 +785,11 @@ let tabCalY=new Date().getUTCFullYear(),tabCalM=new Date().getUTCMonth()+1,tabSe
 let calData={days:{}},selDay=null,_persons=[],activeType='',_showViolations=false,_feedLoading=false,feedTimer=null;
 
 function p2(n){return String(n).padStart(2,'0')}
-function todayStr(){return new Date().toISOString().slice(0,10)}
+function todayStr(){
+  // Server day starts at 06:00 UTC (~7am Irish) — subtract 6h so browser
+  // agrees with the server on which calendar date is "today"
+  return new Date(Date.now()-6*3600*1000).toISOString().slice(0,10);
+}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function fmtM(m){m=Math.round(m||0);if(m<60)return m+'m';return Math.floor(m/60)+'h'+(m%60?' '+m%60+'m':'')}
 
