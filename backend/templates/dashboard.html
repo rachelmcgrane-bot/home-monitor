@@ -68,11 +68,12 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .pp-arrival{font-size:.68rem;color:var(--sub);font-weight:400}
 .pp-arrival strong{color:var(--blue);font-weight:600}
 /* ── Full donut gauges ── */
-.hd-row{display:flex;flex-direction:column;align-items:center;gap:4px;padding:.25rem .25rem .05rem;flex-shrink:0}
+.hd-row{display:flex;flex-direction:column;align-items:stretch;gap:0;padding:.1rem .1rem .1rem;flex-shrink:0}
 .fd-col{display:flex;flex-direction:column;align-items:center;gap:1px;width:100%}
-.fd-wrap{cursor:pointer;border-radius:10px;transition:background .15s;display:flex;justify-content:center}
+.fd-wrap{cursor:pointer;border-radius:10px;transition:background .15s;display:flex;justify-content:center;align-items:center}
 .fd-wrap:hover{background:rgba(255,255,255,.04)}
-.fd-svg{width:90px;height:90px;display:block;flex-shrink:0}
+/* SVG fills its container height; container height comes from flex:1 on fd-col */
+.fd-svg{width:auto;height:100%;min-height:72px;max-height:160px;display:block;flex-shrink:0;aspect-ratio:1}
 .fd-rot-strip{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;padding:2px 4px;max-width:130px}
 .fd-rot-chip{font-size:.48rem;color:var(--cyan);background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.25);border-radius:10px;padding:.1rem .32rem;white-space:nowrap}
 .fd-legend{display:flex;flex-wrap:wrap;gap:2px 8px;padding:0 2px 2px;justify-content:center}
@@ -1974,26 +1975,24 @@ function renderPanel(person,data,viols,ds,ms,wp){
           </div>
         </div>
       </div>
-      <div class="hd-row" style="flex-shrink:0;padding:.25rem .15rem;border-left:1px solid var(--border)">
-        <div class="fd-col" style="flex-direction:row;align-items:center;gap:.25rem;padding:0 .2rem">
+      <div class="hd-row" style="flex-shrink:0;border-left:1px solid var(--border)">
+        <div class="fd-col" style="flex:1;min-height:0;flex-direction:row;align-items:stretch;gap:.2rem;padding:.1rem .2rem">
           ${donut1}
-          <div style="display:flex;flex-direction:column;gap:2px">
-            <div class="fd-legend" style="justify-content:flex-start">
-              <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#4ade80"></div>Done${pct>100?` <span style="color:var(--amber);font-weight:700">🔥</span>`:''}
-              </div>
-              ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>+${extraCount}</div>`:''}
+          <div style="display:flex;flex-direction:column;justify-content:center;gap:3px">
+            <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#4ade80"></div>Done${pct>100?` <span style="color:var(--amber);font-weight:700">🔥</span>`:''}
             </div>
+            ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>+${extraCount}</div>`:''}
           </div>
         </div>
-        <div class="fd-col" style="flex-direction:row;align-items:center;gap:.25rem;padding:0 .2rem">
+        <div class="fd-col" style="flex:1;min-height:0;flex-direction:row;align-items:stretch;gap:.2rem;padding:.1rem .2rem">
           ${donut2}
-          <div class="fd-legend" style="justify-content:flex-start">
+          <div style="display:flex;flex-direction:column;justify-content:center;gap:3px">
             <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fb923c"></div>Missed</div>
           </div>
         </div>
-        <div class="fd-col" style="flex-direction:row;align-items:center;gap:.25rem;padding:0 .2rem">
+        <div class="fd-col" style="flex:1;min-height:0;flex-direction:row;align-items:stretch;gap:.2rem;padding:.1rem .2rem">
           ${donut3}
-          <div class="fd-legend" style="justify-content:flex-start">
+          <div style="display:flex;flex-direction:column;justify-content:center;gap:3px">
             <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#60a5fa"></div>Rot/Wk</div>
             ${flexTotal?`<div class="fd-leg-item" style="color:var(--faint)">${flexDone}/${flexTotal}</div>`:''}
           </div>
