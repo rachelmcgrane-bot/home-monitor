@@ -1814,6 +1814,9 @@ function renderPanel(person,data,viols,ds,ms,wp){
   // Onclick links
   const choreOnclick=`goToActivity('cleaning','${person}')`;
 
+  // Weekly plan needed early for donut3 computation
+  const myWeeklyJobs=(wp&&wp.jobs?wp.jobs:[]).filter(j=>j.person_name===person);
+
   // Donut 1: Jobs done — completion % (green) + extra picked up (amber)
   // Clamp visual % to 100 for the donut ring, but show real number in center
   const donutPct=Math.min(pct,100);
@@ -1923,7 +1926,7 @@ function renderPanel(person,data,viols,ds,ms,wp){
   }
 
   // ── Weekly plan for this person ──────────────────────────────────────────
-  const myWeeklyJobs=(wp&&wp.jobs?wp.jobs:[]).filter(j=>j.person_name===person);
+  // (myWeeklyJobs declared above near donut3 so it's available early)
 
   function weeklyRow(j,num){
     const safe=j.chore_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
