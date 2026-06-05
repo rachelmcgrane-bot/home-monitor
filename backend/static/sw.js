@@ -1,4 +1,4 @@
-const CACHE = 'home-monitor-v5';
+const CACHE = 'home-monitor-v6';
 const PRECACHE = [
   '/static/manifest.json',
 ];

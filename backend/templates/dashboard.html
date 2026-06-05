@@ -72,7 +72,7 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .fd-col{display:flex;flex-direction:column;align-items:center;gap:1px;width:100%}
 .fd-wrap{cursor:pointer;border-radius:10px;transition:background .15s;display:flex;justify-content:center}
 .fd-wrap:hover{background:rgba(255,255,255,.04)}
-.fd-svg{width:150px;height:150px;display:block;flex-shrink:0}
+.fd-svg{width:90px;height:90px;display:block;flex-shrink:0}
 .fd-rot-strip{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;padding:2px 4px;max-width:130px}
 .fd-rot-chip{font-size:.48rem;color:var(--cyan);background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.25);border-radius:10px;padding:.1rem .32rem;white-space:nowrap}
 .fd-legend{display:flex;flex-wrap:wrap;gap:2px 8px;padding:0 2px 2px;justify-content:center}
@@ -1824,13 +1824,22 @@ function renderPanel(person,data,viols,ds,ms,wp){
   // Donut 2: Not completed % (orange-red)
   const donut2=fullDonut(
     [{pct:notDonePct,color:'#fb923c',glow:true}],
-    notDonePct+'%', `${notDoneJobs} pending`, '', `fd-${person.toLowerCase()}-notdone`
+    notDonePct+'%', `${notDoneJobs} pend`, '', `fd-${person.toLowerCase()}-notdone`
   );
-  // Rotating chore chips (show current active rotating chores for this person)
-  const rotChores=(data.chores||[]).filter(c=>c.chore_type==='rotating');
-  const rotStrip=rotChores.length
-    ?`<div class="fd-rot-strip">${rotChores.map(c=>`<span class="fd-rot-chip"${c.is_overdue?' style="color:var(--rose);border-color:rgba(251,113,133,.35)"':''}>${c.done?'✓':c.is_overdue?'⚠':'↻'} ${esc(c.chore_name.split(' ').slice(0,3).join(' '))}</span>`).join('')}</div>`
-    :'';
+  // Donut 3: Rotating + Weekly + Monthly chores (blue)
+  const _rotTotal=(data.chores||[]).filter(c=>c.chore_type==='rotating').length;
+  const _rotDone=(data.chores||[]).filter(c=>c.chore_type==='rotating'&&c.done).length;
+  const _mthTotal=(data.chores||[]).filter(c=>c.frequency==='monthly'&&c.chore_type!=='rotating').length;
+  const _mthDone=(data.chores||[]).filter(c=>c.frequency==='monthly'&&c.chore_type!=='rotating'&&c.done).length;
+  const _wkTotal=myWeeklyJobs.length;
+  const _wkDone=myWeeklyJobs.filter(j=>j.done).length;
+  const flexTotal=_rotTotal+_wkTotal+_mthTotal;
+  const flexDone=_rotDone+_wkDone+_mthDone;
+  const flexPct=flexTotal>0?Math.round(flexDone/flexTotal*100):0;
+  const donut3=fullDonut(
+    [{pct:Math.min(flexPct,100),color:'#60a5fa',glow:true}],
+    flexPct+'%', `${flexDone}/${flexTotal||'?'}`, '', `fd-${person.toLowerCase()}-flex`
+  );
   // 🎺 Over-100% triumphant music (once per page load, not on every render)
   if(pct>100&&!window[`_triumph_${person}`]){
     window[`_triumph_${person}`]=true;
@@ -1947,25 +1956,6 @@ function renderPanel(person,data,viols,ds,ms,wp){
     </div>
 
     <div style="display:flex;flex:1;min-height:0;overflow:hidden">
-      <div class="hd-row" style="flex-shrink:0;padding:.3rem .2rem;border-right:1px solid var(--border)">
-        <div class="fd-col" style="flex-direction:row;align-items:center;gap:.4rem;padding:0 .3rem">
-          ${donut1}
-          <div style="display:flex;flex-direction:column;gap:3px">
-            <div class="fd-legend" style="justify-content:flex-start">
-              <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#4ade80"></div>Done${pct>100?` <span style="color:var(--amber);font-weight:700">🔥${pct}%</span>`:''}
-              </div>
-              ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>+${extraCount} extra</div>`:''}
-            </div>
-            ${rotStrip}
-          </div>
-        </div>
-        <div class="fd-col" style="flex-direction:row;align-items:center;gap:.4rem;padding:0 .3rem">
-          ${donut2}
-          <div class="fd-legend" style="justify-content:flex-start">
-            <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fb923c"></div>Not done</div>
-          </div>
-        </div>
-      </div>
       <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
         <div class="chore-list-hdr">
           <span style="font-weight:600">Today's Jobs</span>
@@ -1978,6 +1968,31 @@ function renderPanel(person,data,viols,ds,ms,wp){
             ${shown.map((c,i)=>jobRow(c,i+1)).join('')}
             ${extraJobsForMe.map(extraRow).join('')}
             ${!shown.length&&!extraCount?'<div class="empty" style="padding:.8rem;font-size:.75rem">No chores assigned</div>':''}
+          </div>
+        </div>
+      </div>
+      <div class="hd-row" style="flex-shrink:0;padding:.25rem .15rem;border-left:1px solid var(--border)">
+        <div class="fd-col" style="flex-direction:row;align-items:center;gap:.25rem;padding:0 .2rem">
+          ${donut1}
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <div class="fd-legend" style="justify-content:flex-start">
+              <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#4ade80"></div>Done${pct>100?` <span style="color:var(--amber);font-weight:700">🔥</span>`:''}
+              </div>
+              ${extraCount?`<div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fbbf24"></div>+${extraCount}</div>`:''}
+            </div>
+          </div>
+        </div>
+        <div class="fd-col" style="flex-direction:row;align-items:center;gap:.25rem;padding:0 .2rem">
+          ${donut2}
+          <div class="fd-legend" style="justify-content:flex-start">
+            <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#fb923c"></div>Missed</div>
+          </div>
+        </div>
+        <div class="fd-col" style="flex-direction:row;align-items:center;gap:.25rem;padding:0 .2rem">
+          ${donut3}
+          <div class="fd-legend" style="justify-content:flex-start">
+            <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#60a5fa"></div>Rot/Wk</div>
+            ${flexTotal?`<div class="fd-leg-item" style="color:var(--faint)">${flexDone}/${flexTotal}</div>`:''}
           </div>
         </div>
       </div>
@@ -2979,7 +2994,8 @@ async function renderTabCal(){
       const col=isD?'#93c5fd':'#d8b4fe';
       const lbl=isD?'L':'R';
       const done=chores.filter(c=>c.done).length;
-      const notDone=chores.length-done;
+      // Only count CORE chores as "not done" — these are the reliably-expected daily jobs
+      const notDone=chores.filter(c=>!c.done&&c.chore_type==='core').length;
       const dbo=chores.filter(c=>!c.done&&c.assessment&&/^Done by /i.test(c.assessment)).length;
       return `<div style="display:flex;align-items:center;gap:2px;font-size:.54rem;font-weight:700;line-height:1.55;padding:0 1px">
         <span style="color:${col}">${lbl}:</span>
