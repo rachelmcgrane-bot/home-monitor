@@ -1850,15 +1850,9 @@ function renderPanel(person,data,viols,ds,ms,wp){
     [{pct:notDonePct,color:'#fb923c',glow:true}],
     notDonePct+'%', `${notDoneJobs} pend`, '', `fd-${person.toLowerCase()}-notdone`
   );
-  // Donut 3: Rotating + Weekly + Monthly chores (blue)
-  const _rotTotal=(data.chores||[]).filter(c=>c.chore_type==='rotating').length;
-  const _rotDone=(data.chores||[]).filter(c=>c.chore_type==='rotating'&&c.done).length;
-  const _mthTotal=(data.chores||[]).filter(c=>c.frequency==='monthly'&&c.chore_type!=='rotating').length;
-  const _mthDone=(data.chores||[]).filter(c=>c.frequency==='monthly'&&c.chore_type!=='rotating'&&c.done).length;
-  const _wkTotal=myWeeklyJobs.length;
-  const _wkDone=myWeeklyJobs.filter(j=>j.done).length;
-  const flexTotal=_rotTotal+_wkTotal+_mthTotal;
-  const flexDone=_rotDone+_wkDone+_mthDone;
+  // Donut 3: Weekly plan jobs only (3 weekly + 1 monthly assigned at top of panel)
+  const flexTotal=myWeeklyJobs.length;
+  const flexDone=myWeeklyJobs.filter(j=>j.done).length;
   const flexPct=flexTotal>0?Math.round(flexDone/flexTotal*100):0;
   const donut3=fullDonut(
     [{pct:Math.min(flexPct,100),color:'#60a5fa',glow:true}],
@@ -1875,8 +1869,9 @@ function renderPanel(person,data,viols,ds,ms,wp){
       localStorage.setItem('leaderOverride100',JSON.stringify({person,expiresAt:exp}));
   }
 
-  // All non-carried chores for this person
-  const shown=(data.chores||[]).filter(c=>!c.carried_forward);
+  // Panel shows core + rotating only — weekly jobs are in weeklySection at top;
+  // standard daily chores are hidden from the main panel to keep it clean
+  const shown=(data.chores||[]).filter(c=>!c.carried_forward&&(c.chore_type==='core'||c.chore_type==='rotating'));
 
   // ── Job row builder ───────────────────────────────────────────────────────
   function jobRow(c, num){
@@ -1923,8 +1918,8 @@ function renderPanel(person,data,viols,ds,ms,wp){
     const ctxAttr=`data-ctx-person="${person}" data-ctx-chore="${esc(c.chore_name)}" data-ctx-done="${done?1:0}"`;
 
     const numBadge=num?`<span class="jl-num">${num}</span>`:'';
-    // Rotate button: only on rotating chores that are pending today (not done, not a past day view)
-    const rotateBtn=(c.chore_type==='rotating'&&!done&&!window._dashDate)
+    // Rotate button: show on any pending rotating chore (today or past day)
+    const rotateBtn=(c.chore_type==='rotating'&&!done)
       ?`<button class="jl-rot-btn" title="Swap for another rotating chore" onclick="event.stopPropagation();rotateChore('${person}','${safe}')">⇄</button>`
       :'';
     return `<div class="jl-item ${cls}" ${dragAttrs}${rowClick} ${ctxAttr}>
@@ -2017,7 +2012,7 @@ function renderPanel(person,data,viols,ds,ms,wp){
         <div class="fd-col" style="flex:1;min-height:0;flex-direction:row;align-items:stretch;gap:.2rem;padding:.1rem .2rem">
           ${donut3}
           <div style="display:flex;flex-direction:column;justify-content:center;gap:3px">
-            <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#60a5fa"></div>Rot/Wk</div>
+            <div class="fd-leg-item"><div class="fd-leg-dot" style="background:#60a5fa"></div>Weekly</div>
             ${flexTotal?`<div class="fd-leg-item" style="color:var(--faint)">${flexDone}/${flexTotal}</div>`:''}
           </div>
         </div>
