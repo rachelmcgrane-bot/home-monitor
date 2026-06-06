@@ -1568,10 +1568,17 @@ async def get_daily_plan(date: Optional[str] = None, db: AsyncSession = Depends(
         _deadline_dt = _assign_dt + timedelta(hours=84)
         _hours_left  = max(0.0, (_deadline_dt - datetime.utcnow()).total_seconds() / 3600)
         _is_overdue  = datetime.utcnow() > _deadline_dt
-        _sel_rotating = _select_rotating_pair(person, _assign_str)
+        _sel_rotating = set(_select_rotating_pair(person, _assign_str))
+
+        # Manual rotation overrides recorded today
+        _rotated_out = {a.chore_name for a in today_ass
+                        if a.status == "rotated_out" and a.person_name == person}
+        _rotated_in  = {a.chore_name for a in today_ass
+                        if a.status == "rotated_in"  and a.person_name == person}
+        _effective_rotating = (_sel_rotating - _rotated_out) | _rotated_in
 
         for c in all_chores:
-            if c.chore_type == "rotating" and c.person_name == person and c.chore_name in _sel_rotating:
+            if c.chore_type == "rotating" and c.person_name == person and c.chore_name in _effective_rotating:
                 ta = best(today_ass, person, c.chore_name)
                 score, pts_earned, done, done_by_other = resolve_assessment(ta)
                 chore_list.append({
@@ -1763,6 +1770,64 @@ async def close_day(date: Optional[str] = Form(None), db: AsyncSession = Depends
             added += 1
     await db.commit()
     return {"ok": True, "date": target_date, "marked_not_done": added}
+
+
+@app.post("/api/chores/rotate-chore")
+async def rotate_chore(
+    person: str = Form(...),
+    chore_out: str = Form(...),
+    date: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Swap a rotating chore out for another from the same pool for a specific day.
+    Records rotated_out / rotated_in assessment markers so daily-plan
+    reflects the swap without changing the permanent rotation schedule."""
+    target_date = date or _today()
+
+    # Full pool for this person
+    pool = _ROTATING_POOLS.get(person, [])
+    if not pool:
+        raise HTTPException(400, "No rotating pool for this person")
+
+    # Compute currently effective rotating chores (respecting any prior overrides today)
+    _assign_str = _assignment_date(target_date)
+    base_active = set(_select_rotating_pair(person, _assign_str))
+
+    existing_res = await db.execute(
+        select(ChoreAssessment).where(
+            ChoreAssessment.assessed_date == target_date,
+            ChoreAssessment.person_name == person,
+        ))
+    existing_today = existing_res.scalars().all()
+    rotated_out_already = {a.chore_name for a in existing_today if a.status == "rotated_out"}
+    rotated_in_already  = {a.chore_name for a in existing_today if a.status == "rotated_in"}
+
+    # Effective active set before this swap
+    effective = (base_active - rotated_out_already) | rotated_in_already
+
+    # Candidates: pool members not already in effective set and not chore_out
+    candidates = [ch for ch in pool if ch not in effective and ch != chore_out]
+    if not candidates:
+        raise HTTPException(400, "No alternative rotating chore available to swap in")
+
+    chore_in = candidates[0]  # pick first available
+
+    # Mark the swapped-out chore
+    db.add(ChoreAssessment(
+        person_name=person, chore_name=chore_out,
+        status="rotated_out", score=0, points_earned=0,
+        assessment_text=f"Rotated out — replaced by {chore_in}",
+        commentary_text="", assessed_date=target_date, time_spent_mins=0,
+    ))
+    # Mark the swapped-in chore so daily-plan picks it up
+    db.add(ChoreAssessment(
+        person_name=person, chore_name=chore_in,
+        status="rotated_in", score=0, points_earned=0,
+        assessment_text="Rotated in", commentary_text="",
+        assessed_date=target_date, time_spent_mins=0,
+    ))
+    await db.commit()
+    return {"ok": True, "chore_out": chore_out, "chore_in": chore_in, "date": target_date}
 
 
 @app.post("/api/chores/bulk-add")

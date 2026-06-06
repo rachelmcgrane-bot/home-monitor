@@ -115,6 +115,9 @@ header{height:var(--hdr);background:#0a0c17;border-bottom:1px solid var(--border
 .jl-name.carry{color:var(--amber);font-style:italic;opacity:.8}
 /* Inline done button — appears next to detail items */
 .jl-done-btn{background:var(--green);color:#fff;border:none;border-radius:5px;padding:.15rem .4rem;font-size:.7rem;font-weight:700;cursor:pointer;flex-shrink:0;margin-left:2px}
+/* Rotate swap button on rotating chore rows */
+.jl-rot-btn{background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.3);color:var(--cyan);border-radius:5px;padding:.1rem .3rem;font-size:.62rem;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1;transition:background .12s}
+.jl-rot-btn:hover{background:rgba(34,211,238,.25);border-color:var(--cyan)}
 .jl-num{flex-shrink:0;width:16px;text-align:right;font-size:.58rem;font-weight:700;color:var(--faint);margin-right:1px;line-height:1}
 /* Scroll indicator: fade-out at bottom of job list */
 .job-list-wrap{flex:1;display:flex;flex-direction:column;min-height:0;position:relative;overflow:hidden}
@@ -1253,6 +1256,23 @@ async function quickMarkDoneByOther(doingPerson, choreName, originalPerson, date
   }catch(e){showToast('⚠️ Network error — try again','var(--orange)');}
 }
 
+// ── Rotate a rotating chore: swap it for another from the same pool ──────────
+async function rotateChore(person, choreName){
+  const fd=new FormData();
+  fd.append('person',person);
+  fd.append('chore_out',choreName);
+  if(window._dashDate) fd.append('date',window._dashDate);
+  try{
+    const res=await fetch(`${API}/api/chores/rotate-chore`,{method:'POST',body:fd}).then(r=>r.json());
+    if(res.ok){
+      showToast(`⇄ Swapped: "${res.chore_out}" → "${res.chore_in}"`,'var(--cyan)');
+      loadDashboard();
+    } else {
+      showToast('⚠️ No alternative chore available','var(--orange)');
+    }
+  }catch(e){showToast('⚠️ Network error — try again','var(--orange)');}
+}
+
 // ── Calendar: mark job done/not-done/done-by-other for a specific date ────────
 async function calMarkDone(person, choreName, date){
   const fd=new FormData();
@@ -1903,12 +1923,16 @@ function renderPanel(person,data,viols,ds,ms,wp){
     const ctxAttr=`data-ctx-person="${person}" data-ctx-chore="${esc(c.chore_name)}" data-ctx-done="${done?1:0}"`;
 
     const numBadge=num?`<span class="jl-num">${num}</span>`:'';
+    // Rotate button: only on rotating chores that are pending today (not done, not a past day view)
+    const rotateBtn=(c.chore_type==='rotating'&&!done&&!window._dashDate)
+      ?`<button class="jl-rot-btn" title="Swap for another rotating chore" onclick="event.stopPropagation();rotateChore('${person}','${safe}')">⇄</button>`
+      :'';
     return `<div class="jl-item ${cls}" ${dragAttrs}${rowClick} ${ctxAttr}>
       ${!isGiven?`<span class="jl-drag" data-person="${person}" data-chore-name="${esc(c.chore_name)}" title="Drag to give to ${dn(partner)}">⠿</span>`
                :`<span class="jl-icon" style="color:var(--amber)">→</span>`}
       ${numBadge}<span class="jl-icon">${isGiven?'':icon}</span>
       <span class="jl-name ${nameCls}">${esc(c.chore_name)}</span>
-      ${badge}
+      ${badge}${rotateBtn}
     </div>`;
   }
 
