@@ -837,9 +837,11 @@ function fullDonut(segs,centerVal,centerSub,onclickStr,baseId){
       transform="rotate(${deg} ${CX} ${CY})" style="${shadow}"/>`;
     deg+=p*3.6;
   });
+  // Use the primary segment colour for the big value so each donut is clearly colour-coded
+  const valCol=segs[0]?.color||'#e2e8f0';
   const cv=String(centerVal||'0');
-  const cs=centerSub?`<text x="50" y="62" text-anchor="middle" font-size="6" font-weight="500" fill="#4a5578" font-family="'SF Mono','Courier New',monospace" letter-spacing="0.3">${esc(centerSub)}</text>`:'';
-  paths+=`<text x="50" y="55" text-anchor="middle" font-size="16" font-weight="900" fill="#e2e8f0" font-family="Inter,system-ui" letter-spacing="-0.5">${esc(cv)}</text>${cs}`;
+  const cs=centerSub?`<text x="50" y="63" text-anchor="middle" font-size="7.5" font-weight="600" fill="#94a3b8" font-family="'SF Mono','Courier New',monospace" letter-spacing="0.2">${esc(centerSub)}</text>`:'';
+  paths+=`<text x="50" y="54" text-anchor="middle" font-size="17" font-weight="900" fill="${valCol}" font-family="Inter,system-ui" letter-spacing="-0.5">${esc(cv)}</text>${cs}`;
   return `<div class="fd-wrap" ${oc}><svg viewBox="0 0 100 100" class="fd-svg">${paths}</svg></div>`;
 }
 
